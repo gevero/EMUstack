@@ -213,7 +213,7 @@ def t_r_a_plots(stacks_list, xvalues=None, params_layer=1,
         else:
             xvalues = [s.layers[0].light.wl_nm for s in stacks_list]
             xlabel = r'$\lambda$ (nm)'
-            print "t_r_a_plots is guessing you have a single wavelength, else specify xvalues."
+            print("t_r_a_plots is guessing you have a single wavelength, else specify xvalues.")
 
     if add_height!=0: add_name += "_" + zeros_int_str(add_height)
     stack_label = zeros_int_str(stack_label)
@@ -239,7 +239,7 @@ def t_r_a_plots(stacks_list, xvalues=None, params_layer=1,
         active_abs = []
         active_layer_nu = len(stacks_list[0].layers) - active_layer_nu - 1
         if not 0 < active_layer_nu < len(stacks_list[0].layers)-1:
-            raise ValueError, "active_layer_nu must refer to a finite layer."
+            raise ValueError("active_layer_nu must refer to a finite layer.")
         for i in range(len(xvalues)):
             active_abs.append(float(a_list[active_layer_nu - 1 +
                               i*layers_steps]))
@@ -318,7 +318,7 @@ def layers_plot(spectra_name, spec_list, xvalues, xlabel, total_h,
         layer_spec = []
         for wl in range(len(xvalues)):
             layer_spec = np.append(layer_spec, spec_list[wl*nu_layers + i])
-        av_array = zip(xvalues, layer_spec, h_array)
+        av_array = list(zip(xvalues, layer_spec, h_array))
         ax1 = fig.add_subplot(nu_layers, 1, i+1)
         ax1.plot(xvalues, layer_spec, linewidth=linesstrength)
         if plt_eV == True:
@@ -517,7 +517,7 @@ def t_r_a_plots_subs(stacks_list, wavelengths, period, sub_n,
         active_abs = []
         active_layer_nu = len(stacks_list[0].layers) - active_layer_nu - 1
         if not 0 < active_layer_nu < len(stacks_list[0].layers)-1:
-            raise ValueError, "active_layer_nu must refer to a finite layer."
+            raise ValueError("active_layer_nu must refer to a finite layer.")
         for i in range(len(xvalues)):
             active_abs.append(float(a_list[active_layer_nu - 1 + \
                 i*layers_steps]))
@@ -708,7 +708,7 @@ def J_sc_eta_NO_plots(stacks_list, wavelengths, params_layer=1,
     active_abs = []
     active_layer_nu = len(stacks_list[0].layers) - active_layer_nu - 1
     if not 0 < active_layer_nu < len(stacks_list[0].layers)-1:
-        raise ValueError, "active_layer_nu must refer to a finite layer."
+        raise ValueError("active_layer_nu must refer to a finite layer.")
     for i in range(len(wavelengths)):
         active_abs.append(float(a_list[active_layer_nu - 1 + i*layers_steps]))
 
@@ -789,7 +789,7 @@ def layers_print(spectra_name, spec_list, wavelengths, total_h,
             lay_spec_name = 'Lay_Reflec'
             if i == nu_layers-1:
                 lay_spec_name = 'Reflectance'
-        av_array = zip(wavelengths, layer_spec, h_array)
+        av_array = list(zip(wavelengths, layer_spec, h_array))
 
         if i != nu_layers-1:
             np.savetxt('%(s)s_%(i)i_stack%(bon)s%(add)s.txt'% {'s' : lay_spec_name, 'i' : i,
@@ -869,9 +869,9 @@ def EOT_plot(stacks_list, wavelengths, pol='TM', params_layer=1,
 
     if savetxt == True:
         np.savetxt('Trans_%(s)s%(add)s.txt'% {'s' : plot_name, 'add' : add_name}, \
-        zip(wavelengths, T_00), fmt = '%10.6f')
+        list(zip(wavelengths, T_00)), fmt = '%10.6f')
         np.savetxt('Refl_%(s)s%(add)s.txt'% {'s' : plot_name, 'add' : add_name}, \
-        zip(wavelengths, R_00), fmt = '%10.6f')
+        list(zip(wavelengths, R_00)), fmt = '%10.6f')
 ###############################################################################
 
 
@@ -1054,9 +1054,9 @@ def E_conc_plot(stacks_list, which_layer, which_modes, wavelengths,
         fig1.savefig('Energy_Concentration_stack%(bon)s'% {'bon' : stack_label}, \
             bbox_inches='tight')
     else:
-        print "\nERROR: plotting.E_conc_plot; \n" + \
-            "Can only calculate energy concentration in NanoStruct layers."
-        print repr(stacks_list[0].layers[which_layer])
+        print("\nERROR: plotting.E_conc_plot; \n" + \
+            "Can only calculate energy concentration in NanoStruct layers.")
+        print(repr(stacks_list[0].layers[which_layer]))
 ###############################################################################
 
 
@@ -1303,9 +1303,9 @@ def BM_amplitudes(stacks_list, xvalues=None, chosen_BMs=None,
         else:
             xvalues = [s.layers[0].light.wl_nm for s in stacks_list]
             xlabel = r'$\lambda$ (nm)'
-            print "BM_amplitudes is guessing you have a single wavelength, else specify xvalues."
+            print("BM_amplitudes is guessing you have a single wavelength, else specify xvalues.")
 
-    if chosen_BMs == None: chosen_BMs = range(stacks_list[-1].layers[lay_interest].num_BMs)
+    if chosen_BMs == None: chosen_BMs = list(range(stacks_list[-1].layers[lay_interest].num_BMs))
     try:
         save_trans = []
         for BM in chosen_BMs:
@@ -1347,8 +1347,8 @@ def BM_amplitudes(stacks_list, xvalues=None, chosen_BMs=None,
 
 
     except ValueError:
-        print "BM_amplitudes only works in NanoStruct layers."\
-        "\nPlease select lay_interest !=%i.\n" % lay_interest
+        print("BM_amplitudes only works in NanoStruct layers."\
+        "\nPlease select lay_interest !=%i.\n" % lay_interest)
 
 
 def PW_amplitudes(stacks_list, xvalues=None, chosen_PWs=None,
@@ -1408,7 +1408,7 @@ def PW_amplitudes(stacks_list, xvalues=None, chosen_PWs=None,
         else:
             xvalues = [s.layers[0].light.wl_nm for s in stacks_list]
             xlabel = r'$\lambda$ (nm)'
-            print "PW_amplitudes is guessing you have a single wavelength, else specify xvalues."
+            print("PW_amplitudes is guessing you have a single wavelength, else specify xvalues.")
 
     try:
         save_trans = []
@@ -1483,8 +1483,8 @@ def PW_amplitudes(stacks_list, xvalues=None, chosen_PWs=None,
                 save_trans, fmt = '%18.11f')
 
     except ValueError:
-        print "PW_amplitudes only works in ThinFilm layers."\
-        "\nPlease select lay_interest !=%i.\n" % lay_interest
+        print("PW_amplitudes only works in ThinFilm layers."\
+        "\nPlease select lay_interest !=%i.\n" % lay_interest)
 
 
 def evanescent_merit(stacks_list, xvalues=None, chosen_PWs=None,
@@ -1536,7 +1536,7 @@ def evanescent_merit(stacks_list, xvalues=None, chosen_PWs=None,
         else:
             xvalues = [s.layers[0].light.wl_nm for s in stacks_list]
             xlabel = r'$\lambda$ (nm)'
-            print "evanescent_merit is guessing you have a single wavelength, else specify xvalues."
+            print("evanescent_merit is guessing you have a single wavelength, else specify xvalues.")
 
     store_m_p      = []
     store_m_ne     = []
@@ -1635,8 +1635,8 @@ def evanescent_merit(stacks_list, xvalues=None, chosen_PWs=None,
                 av_diff, fmt = '%18.11f')
 
     except ValueError:
-        print "evanescent_merit only works in ThinFilm layers."\
-        "\nPlease select lay_interest !=%i.\n" % lay_interest
+        print("evanescent_merit only works in ThinFilm layers."\
+        "\nPlease select lay_interest !=%i.\n" % lay_interest)
 ###############################################################################
 
 
@@ -1708,8 +1708,8 @@ def fields_in_plane(stacks_list, lay_interest=1, z_values=[0.1, 3.6],
                         meat.structure.plot_imag, meat.structure.plot_abs, extra_name)
 
             except ValueError:
-                print "fields_in_plane cannot plot fields in 1D-arrays."\
-                "\nPlease select a different lay_interest.\n"
+                print("fields_in_plane cannot plot fields in 1D-arrays."\
+                "\nPlease select a different lay_interest.\n")
 
 
         # If selected z location is within a ThinFilm layer
@@ -1721,7 +1721,7 @@ def fields_in_plane(stacks_list, lay_interest=1, z_values=[0.1, 3.6],
             heights_list = []
             name_lay = ''
 
-            for i in xrange(num_lays):
+            for i in range(num_lays):
                 if i == 0 or i == num_lays-1:pass
                 else: heights_list.append(pstack.layers[i].structure.height_nm)
                 try:
@@ -1807,16 +1807,15 @@ def fields_in_plane(stacks_list, lay_interest=1, z_values=[0.1, 3.6],
             E_TM_y_array = np.zeros((np.size(x1),np.size(y1),np.size(z1)), dtype = 'complex')
             E_TM_z_array = np.zeros((np.size(x1),np.size(y1),np.size(z1)), dtype = 'complex')
 
-            for z in xrange(np.size(z1)):
-                for y in xrange(np.size(y1)):
-                    for x in xrange(np.size(x1)):
+            for z in range(np.size(z1)):
+                for y in range(np.size(y1)):
+                    for x in range(np.size(x1)):
                         if pstack.layers[lay_interest].structure.height_nm == 'semi_inf':
                             expo_down = np.exp(1j*(alpha*x1[x]+beta*y1[y]-gamma*z1[z]))
                         elif z1[z] <= float(pstack.layers[lay_interest].structure.height_nm)/period:
                             expo_down = np.exp(1j*(alpha*x1[x]+beta*y1[y]-gamma*(z1[z]-float(pstack.layers[lay_interest].structure.height_nm)/period)))
                         else:
-                            raise ValueError, \
-                            "fields_in_plane: z_value exceeds thickness of layer, reduce it. "
+                            raise ValueError("fields_in_plane: z_value exceeds thickness of layer, reduce it. ")
                         expo_up = np.exp(1j*(alpha*x1[x]+beta*y1[y]+gamma*z1[z]))
 
                         E_TE_x = np.sum(eta_TE_x_down*expo_down + eta_TE_x_up*expo_up)
@@ -1841,7 +1840,7 @@ def fields_in_plane(stacks_list, lay_interest=1, z_values=[0.1, 3.6],
 
             # Save figures
             for re_im in ['real','imag']:
-                for z_of_xy in xrange(np.size(z1)):
+                for z_of_xy in range(np.size(z1)):
                     fig1 = plt.figure(num=None, figsize=(12,21), dpi=80, facecolor='w', edgecolor='k')
                     for i in range(len(E_super)):
                         ax1 = fig1.add_subplot(4,1,i+1)
@@ -2032,9 +2031,9 @@ def fields_interpolator_in_plane(pstack, lay_interest=1, z_value=0.1):
             return ReEx, ImEx, ReEy, ImEy, ReEz, ImEz, AbsE
 
         except ValueError as e:
-            print e
-            print "fields_in_plane cannot plot fields in 1D-arrays."\
-                  "\nPlease select a different lay_interest.\n"
+            print(e)
+            print("fields_in_plane cannot plot fields in 1D-arrays."\
+                  "\nPlease select a different lay_interest.\n")
 
     # If selected z location is within a ThinFilm layer
     # plot fields in Plane Wave Basis using python routine.
@@ -2420,7 +2419,7 @@ def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,
                                 x1 = x_range
                                 y1 = np.array([0])
                                 y2 = gradient*x_range
-                                for i in xrange(np.size(y2)):
+                                for i in range(np.size(y2)):
                                     if y2[i] > 1:
                                         y2 = np.resize(y2,(i,))
                                         x1 = np.resize(x1,(i,))
@@ -2430,7 +2429,7 @@ def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,
                                 x1 = x_range[::-1]
                                 y1 = np.array([0])
                                 y2 = gradient*x_range
-                                for i in xrange(np.size(y2)):
+                                for i in range(np.size(y2)):
                                     if y2[i] > 1:
                                         y2 = np.resize(y2,(i,))
                                         x1 = np.resize(x1,(i,))
@@ -2439,9 +2438,9 @@ def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,
 
                             E_field = np.zeros((np.size(x1),np.size(y1),np.size(z_range)), dtype = 'complex')
 
-                            for z in xrange(np.size(z_range)):
-                                for y in xrange(np.size(y1)):
-                                    for x in xrange(np.size(x1)):
+                            for z in range(np.size(z_range)):
+                                for y in range(np.size(y1)):
+                                    for x in range(np.size(x1)):
                                         if sli == 'diag+' or sli == 'diag-' or sli == 'special+' or sli == 'special-':
                                             if layer.structure.height_nm == 'semi_inf':
                                                 expo_down = np.exp(1j*(alpha*x1[x]+beta*y2[x]-gamma*z_range[z]))
@@ -2825,7 +2824,7 @@ def field_values(stacks_list, lay_interest=0, xyz_values=[(0.1,0.1,0.1)]):
             calc_E_TM_y_array = np.zeros(len(xyz_values),dtype='complex')
             calc_E_TM_z_array = np.zeros(len(xyz_values),dtype='complex')
 
-            for i in xrange(len(xyz_values)):
+            for i in range(len(xyz_values)):
 
                 (x1,y1,z1) = np.array(xyz_values[i])#/float(pstack.layers[lay_interest].structure.period)
 
@@ -2871,8 +2870,8 @@ def field_values(stacks_list, lay_interest=0, xyz_values=[(0.1,0.1,0.1)]):
             super_points.append([calc_E_x_array,calc_E_y_array,calc_E_z_array,calc_E_tot_array])
 
         except ValueError:
-            print "field_values can only calculate field values in ThinFilms."\
-            "\nPlease select a different lay_interest.\n"
+            print("field_values can only calculate field values in ThinFilms."\
+            "\nPlease select a different lay_interest.\n")
 
         return super_points
 
@@ -2928,8 +2927,8 @@ def fields_3d(stacks_list, lay_interest=1):
 
             stack_num += 1
         except ValueError:
-            print "fields_3d can only plot 3D fields within 2D_array "\
-            "Nanostruct layers. \nPlease select a different lay_interest.\n"
+            print("fields_3d can only plot 3D fields within 2D_array "\
+            "Nanostruct layers. \nPlease select a different lay_interest.\n")
 
 def Bloch_fields_1d(stacks_list, lay_interest=None):
     """
@@ -3126,8 +3125,8 @@ def Bloch_fields_1d(stacks_list, lay_interest=None):
                     plt.savefig(dir_name + '/' + name_lay, bbox_inches = 'tight')
 
             except ValueError:
-                print "fields_1d can only plot 1D fields of 1D_array "\
-                "NanoStruct layers. \nPlease select different lay_interest.\n"
+                print("fields_1d can only plot 1D fields of 1D_array "\
+                "NanoStruct layers. \nPlease select different lay_interest.\n")
 
 ###############################################################################
 
