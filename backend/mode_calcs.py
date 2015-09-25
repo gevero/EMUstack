@@ -201,8 +201,8 @@ class Anallo(Modes):
         # self.k_z repeats itself halfway through
         # First half is for TE pol, second is for TM
         num_pw2 = len(self.k_z) / 2
-        k_z = self.k_z[:num_pw2]
-        assert (k_z == self.k_z[num_pw2:]).all()
+        k_z = self.k_z[:int(num_pw2)]
+        assert (k_z == self.k_z[int(num_pw2):]).all()
 
         # Calculate the (relative) wave impedances Z
         # TE (E in interface plane): Z = Zcr * k/k_z
