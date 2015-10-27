@@ -26,7 +26,7 @@ import materials
 from mode_calcs import Simmo, Anallo
 from fortran import EMUstack
 
-msh_location = '../backend/fortran/msh/'
+msh_location = '/home/giovi/electrodynamics/st-matrix/EMUstack/backend/fortran/msh/'
 
 # Acknowledgements
 print('\n##################################################################\n'\
@@ -52,7 +52,8 @@ class NanoStruct(object):
 
             inc_shape  (str): Shape of inclusions that have template mesh, \
                 currently; 'circle', 'ellipse', 'square', 'ring', 'SRR',
-                'dimer', 'square_dimer', 'strip_circle', 'strip_square'.
+                'dimer', 'square_dimer', 'strip_circle', 'strip_square',
+                'rectangle'.
 
             ellipticity  (float): If != 0, inclusion has given ellipticity, \
                 with b = diameter, a = diameter-ellipticity * diameter. \
@@ -72,7 +73,7 @@ class NanoStruct(object):
 
             smooth (float): smoothness of square_dimer angles, between 0 (sharp). \
                 and 1 (circle).
-                (if inc_shape = square_dimer').
+                (if inc_shape = 'square_dimer' or inc_shape = 'rectangle').
 
             inclusion_a  : A :Material: instance for first inclusion, \
                 specified as dispersive refractive index (eg. materials.Si_c) \
@@ -530,6 +531,25 @@ class NanoStruct(object):
                     geo = geo.replace('a1 = 0;', "a1 = %f;" % self.diameter1)
                     geo = geo.replace('a2 = 0;', "a2 = %f;" % self.diameter2)
                     geo = geo.replace('gap = 0;', "gap = %f;" % self.gap)
+                    geo = geo.replace('smooth = 0;', "smooth = %f;" % self.smooth)
+                    geo = geo.replace('lc = 0;', "lc = %f;" % self.lc)
+                    geo = geo.replace('lc2 = lc/1;', "lc2 = lc/%f;" % self.lc2)
+                    geo = geo.replace('lc3 = lc/1;', "lc3 = lc/%f;" % self.lc3)
+
+            elif self.inc_shape == 'rectangle':
+                msh_name = 'rect_%(d)s_%(dy)s_%(d_one)s_%(d_two)s_%(smooth)s' % {
+                           'd': dec_float_str(self.period),
+                           'dy': dec_float_str(self.period_y),
+                           'd_one': dec_float_str(self.diameter1),
+                           'd_two': dec_float_str(self.diameter2),
+                           'smooth': dec_float_str(self.smooth)}
+                if not os.path.exists(msh_location + msh_name + '.mail') or self.force_mesh is True:
+                    geo_tmp = open(msh_location + 'rect1_msh_template.geo', "r").read()
+                    geo = geo_tmp.replace('ff = 0;', "ff = %f;" % self.ff)
+                    geo = geo.replace('d_in_nm = 0;', "d_in_nm  = %f;" % self.period)
+                    geo = geo.replace('dy_in_nm = 0;', "dy_in_nm = %f;" % self.period_y)
+                    geo = geo.replace('a1 = 0;', "a1 = %f;" % self.diameter1)
+                    geo = geo.replace('a2 = 0;', "a2 = %f;" % self.diameter2)
                     geo = geo.replace('smooth = 0;', "smooth = %f;" % self.smooth)
                     geo = geo.replace('lc = 0;', "lc = %f;" % self.lc)
                     geo = geo.replace('lc2 = lc/1;', "lc2 = lc/%f;" % self.lc2)
