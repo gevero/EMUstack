@@ -35,7 +35,7 @@ EMUstack.pyf: $(SUBROUTINES_FOR_PYTHON)
 
 purge:
 	-rm EMUstack.pyf
-	-rm EMUstack.so
+	-rm EMUstack*.so
 	-rm lib/umf4_f77zwrapper64.o
 clean:
 	-rm EMUstack.so

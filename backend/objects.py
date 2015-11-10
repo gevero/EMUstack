@@ -516,11 +516,13 @@ class NanoStruct(object):
                     geo = geo.replace('lc3 = lc/1;', "lc3 = lc/%f;" % self.lc3)
 
             elif self.inc_shape == 'square_dimer':
-                msh_name = 'square_dimer_%(d)s_%(dy)s_%(d_one)s_%(d_two)s_%(gap)s_%(smooth)s' % {
+                msh_name = 'square_dimer_%(d)s_%(dy)s_%(d_one)s_%(d_two)s_%(d_three)s_%(d_four)s_%(gap)s_%(smooth)s' % {
                            'd': dec_float_str(self.period),
                            'dy': dec_float_str(self.period_y),
                            'd_one': dec_float_str(self.diameter1),
                            'd_two': dec_float_str(self.diameter2),
+                           'd_three': dec_float_str(self.diameter3),
+                           'd_four': dec_float_str(self.diameter4),
                            'gap': dec_float_str(self.gap),
                            'smooth': dec_float_str(self.smooth)}
                 if not os.path.exists(msh_location + msh_name + '.mail') or self.force_mesh is True:
@@ -530,6 +532,8 @@ class NanoStruct(object):
                     geo = geo.replace('dy_in_nm = 0;', "dy_in_nm = %f;" % self.period_y)
                     geo = geo.replace('a1 = 0;', "a1 = %f;" % self.diameter1)
                     geo = geo.replace('a2 = 0;', "a2 = %f;" % self.diameter2)
+                    geo = geo.replace('b1 = 0;', "b1 = %f;" % self.diameter3)
+                    geo = geo.replace('b2 = 0;', "b2 = %f;" % self.diameter4)
                     geo = geo.replace('gap = 0;', "gap = %f;" % self.gap)
                     geo = geo.replace('smooth = 0;', "smooth = %f;" % self.smooth)
                     geo = geo.replace('lc = 0;', "lc = %f;" % self.lc)

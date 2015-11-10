@@ -22,7 +22,7 @@
 import numpy as np
 from scipy.interpolate import interp1d
 
-data_location = '../backend/data/'
+data_location = '/home/giovi/electrodynamics/st-matrix/EMUstack/backend/data/'
 
 
 class Material(object):

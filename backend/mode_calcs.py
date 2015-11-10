@@ -23,7 +23,7 @@ import numpy as np
 import sys
 # from scipy import sqrt
 import os
-sys.path.append("../backend/")
+sys.path.append("/home/giovi/electrodynamics/st-matrix/EMUstack/backend/")
 
 from fortran import EMUstack
 
@@ -291,7 +291,7 @@ class Simmo(Modes):
         # Parameters that control how FEM routine runs
         self.E_H_field = 1  # Selected formulation (1=E-Field, 2=H-Field)
         i_cond = 2  # Boundary conditions (0=Dirichlet,1=Neumann,2=Periodic)
-        itermax = 60  # Maximum number of iterations for convergence
+        itermax = 30  # Maximum number of iterations for convergence
         FEM_debug = 0  # Fortran routines will display & save add. info
 
         # Calculate where to center the Eigenmode solver around.
@@ -352,7 +352,7 @@ class Simmo(Modes):
 
         elif self.structure.periodicity == '2D_array':
             # Prepare for the mesh
-            with open("../backend/fortran/msh/"+self.structure.mesh_file) as f:
+            with open("/home/giovi/electrodynamics/st-matrix/EMUstack/backend/fortran/msh/"+self.structure.mesh_file) as f:
                 self.n_msh_pts, self.n_msh_el = [int(i) for i in f.readline().split()]
 
             # Size of Fortran's complex superarray (scales with mesh)

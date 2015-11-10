@@ -174,6 +174,7 @@ C      Checks = 0 ! check completeness, energy conservation
       tol = 0.0 ! ARPACK accuracy (0.0 for machine precision)
       lx=1.0 ! Diameter of unit cell. Default, lx = 1.0.
       ly=1.0 ! NOTE: currently requires ly=lx, ie rectangular unit cell.
+      debug=0
 
       if (debug .eq. 1) then
         write(*,*) "WELCOME TO DEBUG MODE"
@@ -741,6 +742,7 @@ C  Orthogonal integral
       endif
 C
 C    Save Original solution
+      plot_modes = 0
       if (plot_modes .eq. 1) then
         dir_name = "Bloch_fields"
         q_average = 0

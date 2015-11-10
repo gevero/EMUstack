@@ -1701,11 +1701,11 @@ def fields_in_plane(stacks_list, lay_interest=1, z_values=[0.1, 3.6],
                     vec_index = num_lays - lay_interest - 1
                     vec_coef = np.concatenate((pstack.vec_coef_down[vec_index],pstack.vec_coef_up[vec_index]))
 
-                    EMUstack.gmsh_plot_field (meat.num_BMs,
-                        meat.n_msh_el, meat.n_msh_pts, nnodes, meat.structure.nb_typ_el, meat.table_nod, meat.type_el,
-                        eps, meat.x_arr, meat.k_z, meat.sol1, vec_coef, h_normed, z_value,
-                        gmsh_file_pos, meat.structure.plot_real,
-                        meat.structure.plot_imag, meat.structure.plot_abs, extra_name)
+                    # EMUstack.gmsh_plot_field (meat.num_BMs,
+                    #     meat.n_msh_el, meat.n_msh_pts, nnodes, meat.structure.nb_typ_el, meat.table_nod, meat.type_el,
+                    #     eps, meat.x_arr, meat.k_z, meat.sol1, vec_coef, h_normed, z_value,
+                    #     gmsh_file_pos, meat.structure.plot_real,
+                    #     meat.structure.plot_imag, meat.structure.plot_abs, extra_name)
 
             except ValueError:
                 print("fields_in_plane cannot plot fields in 1D-arrays."\
@@ -2178,12 +2178,12 @@ def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,
                                     h_normed = float(layer.structure.height_nm)/float(layer.structure.period)
                                     shift_v_plot = h_normed*0.75
                                     nnodes = 6
-                                    EMUstack.gmsh_plot_slice(layer.E_H_field, layer.num_BMs,
-                                        layer.n_msh_el, layer.n_msh_pts, nnodes, layer.type_el,
-                                        layer.structure.nb_typ_el, eps, layer.table_nod,
-                                        layer.x_arr, layer.k_z, layer.sol1, vec_coef_fem,
-                                        h_normed, wl_normed, gmsh_file_pos,
-                                        scale_plot, shift_v_plot, shift_x_plot)
+                                    # EMUstack.gmsh_plot_slice(layer.E_H_field, layer.num_BMs,
+                                    #     layer.n_msh_el, layer.n_msh_pts, nnodes, layer.type_el,
+                                    #     layer.structure.nb_typ_el, eps, layer.table_nod,
+                                    #     layer.x_arr, layer.k_z, layer.sol1, vec_coef_fem,
+                                    #     h_normed, wl_normed, gmsh_file_pos,
+                                    #     scale_plot, shift_v_plot, shift_x_plot)
 
                                     z_plot = np.linspace(h_list[lay],h_list[lay+1],2)
                                     (y_axis_plot,x_axis) = np.meshgrid(z_plot,[0,1])
