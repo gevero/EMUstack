@@ -3,6 +3,7 @@
 *.mail
 *.pyf
 *.exe
+*.so
 backend/Data/*.geo
 backend/Data/*.log
 backend/Data/*.mail
@@ -19,3 +20,18 @@ docs/*.out
 docs/*.toc
 test*/*.txt
 test*/*.pdf
+gemini/
+backend/fortran/msh/*test*.geo
+backend/fortran/msh/*test*.msh
+backend/fortran/msh/*test*.mail
+backend/*.bak
+examples/tmp
+examples/.ipynb_checkpoints
+examples/Bloch_fields
+examples/NH_systematics
+examples/fields_vertically
+examples/gratings
+examples/ipynb
+*Bloch_fields*
+*gemini*
+
