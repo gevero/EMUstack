@@ -604,7 +604,7 @@ class NanoStruct(object):
                     geo = geo.replace('d_in_nm = 0;', "d_in_nm  = %f;" % self.period)
                     geo = geo.replace('dy_in_nm = 0;', "dy_in_nm = %f;" % self.period_y)
                     geo = geo.replace('a1 = 0;', "a1 = %f;" % self.diameter1)
-                    geo = geo.replace('a2 = 0;', "a2 = %f;" % self.diameter2)
+                    geo = geo.replace('b1 = 0;', "b1 = %f;" % self.diameter2)
                     geo = geo.replace('smooth = 0;', "smooth = %f;" % self.smooth)
                     geo = geo.replace('t = 0;', "t = %f;" % self.t)
                     geo = geo.replace('lc = 0;', "lc = %f;" % self.lc)
