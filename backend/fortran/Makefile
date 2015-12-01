@@ -31,7 +31,7 @@ lib/umf4_f77zwrapper64.o: lib/umf4_f77zwrapper_SS_3.7.1.c
 #       -fPIC -o lib/umf4_f77zwrapper64.o
 
 EMUstack.pyf: $(SUBROUTINES_FOR_PYTHON)
-	f2py3 -m EMUstack -h EMUstack.pyf $(SUBROUTINES_FOR_PYTHON) --overwrite-signature
+	f2py3 -m EMUstack -h EMUstack.pyf $(SUBROUTINES_FOR_PYTHON)
 
 purge:
 	-rm EMUstack.pyf
