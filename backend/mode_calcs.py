@@ -363,6 +363,7 @@ class Simmo(Modes):
             int_max = 2**22
 
             try:
+                # print('I computing the 2d field')
                 resm = EMUstack.calc_modes_2d(
                     self.wl_norm(), self.num_BMs, self.max_order_PWs,
                     FEM_debug, self.structure.mesh_file, self.n_msh_pts,
@@ -371,7 +372,7 @@ class Simmo(Modes):
                     self.structure.plotting_fields, self.structure.plot_real,
                     self.structure.plot_imag, self.structure.plot_abs,
                     num_pw_per_pol, cmplx_max, real_max, int_max)
-
+                # print('2d field finished')
                 self.k_z, J, J_dag, self.sol1, self.mode_pol, \
                 self.table_nod, self.type_el, self.x_arr = resm
                 # self.J, self.J_dag = np.mat(J), np.mat(J_dag)
