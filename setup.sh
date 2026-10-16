@@ -1,26 +1,25 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Modernized EMUstack installation and verification script (Python 3.11+, Zero Fortran)
+set -euo pipefail
 
-function makeEMUs() {
-## compile Fortran routines
-  cd backend/fortran/
-  make
-## run tests
-  cd ../../tests/
-  nosetests
+echo "====================================================================="
+echo "   EMUstack: Finite Element Maxwell Mode-Matching Solver (v2.0)      "
+echo "====================================================================="
 
-##
-  echo ''
-  echo '#####################################################################'
-  echo '        EMUstack and its dependencies have been installed        '
-  echo ' Last tests may give errors if not using Ubuntu 12.04, gmsh 2.5  '
-  echo '    ... as long as the tests run, things are okay.  '
-  echo ''
-  echo 'EMUstack is brought to you by Bjorn Sturmberg, Kokou Dossou,'
-  echo 'Felix Lawrence and Lindsay Botton, with support from CUDOS and ARENA'
-  echo '#####################################################################'
-  echo ''
+# Check Python environment
+PYTHON_BIN="${PYTHON:-python3}"
+echo "Using Python: $($PYTHON_BIN --version) at $(which $PYTHON_BIN)"
 
-}
+# Install package in editable mode with modern build backend
+echo "Installing emustack-fem in editable mode..."
+$PYTHON_BIN -m pip install --no-build-isolation -e .
 
-makeEMUs
+# Run pytest test suite
+echo "Running pytest test suite..."
+$PYTHON_BIN -m pytest tests/ -v --tb=short
 
+echo ""
+echo "====================================================================="
+echo "        EMUstack modernized suite successfully verified!             "
+echo "  Zero Fortran dependencies. Powered by Netgen/NGSolve & SciPy.      "
+echo "====================================================================="

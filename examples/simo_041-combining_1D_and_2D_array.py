@@ -25,7 +25,7 @@ import time
 import datetime
 import numpy as np
 import sys
-from multiprocessing import Pool
+from multiprocessing.dummy import Pool
 sys.path.append("../backend/")
 
 import objects
@@ -48,7 +48,7 @@ wl_2     = 1127
 no_wl_1  = 3
 # Set up light objects
 wavelengths = np.linspace(wl_1, wl_2, no_wl_1)
-light_list  = [objects.Light(wl, max_order_PWs = 4, theta = 0.0, phi = 0.0) \
+light_list  = [objects.Light(wl, max_order_PWs = 2, theta = 0.0, phi = 0.0) \
     for wl in wavelengths]
 
 
@@ -57,7 +57,7 @@ period = 600
 
 # In this example we set the number of Bloch modes to use in the simulation
 # Be default it is set to be slightly greater than the number of PWs.
-num_BMs = 200
+num_BMs = 50
 
 superstrate = objects.ThinFilm(period, height_nm = 'semi_inf',
     material = materials.Air, loss = False)
@@ -84,13 +84,14 @@ def simulate_stack(light):
     sim_superstrate = superstrate.calc_modes(light)
     sim_substrate   = substrate.calc_modes(light)
     sim_NWs         = NW_array.calc_modes(light, num_BMs=num_BMs)
+    sim_grating     = grating.calc_modes(light, num_BMs=num_BMs)
 
     ###################### Evaluate structure ######################
     """ Now define full structure. Here order is critical and
         stack list MUST be ordered from bottom to top!
     """
 
-    stack = Stack((sim_substrate, sim_NWs, sim_superstrate))
+    stack = Stack((sim_substrate, sim_grating, sim_NWs, sim_superstrate))
     stack.calc_scat(pol = 'TE')
 
     return stack

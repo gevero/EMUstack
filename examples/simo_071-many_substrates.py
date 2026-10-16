@@ -27,7 +27,7 @@ import time
 import datetime
 import numpy as np
 import sys
-from multiprocessing import Pool
+from multiprocessing.dummy import Pool
 sys.path.append("../backend/")
 
 import objects
@@ -76,7 +76,7 @@ def simulate_stack(light):
     stack_list = []
     for s in sub_ns:
         sub = objects.ThinFilm(period = period, height_nm = 'semi_inf',
-        material = materials.Material(s + 0.0j), loss = False)
+        material = materials.Material(s + 0.0j), loss = False, world_1d = True)
         sim_sub = sub.calc_modes(light)
 
         # Loop over heights to wash out sharp FP resonances

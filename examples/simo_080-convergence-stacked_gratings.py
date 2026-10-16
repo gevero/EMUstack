@@ -26,7 +26,7 @@ import time
 import datetime
 import numpy as np
 import sys
-from multiprocessing import Pool
+from multiprocessing.dummy import Pool
 sys.path.append("../backend/")
 
 import objects
@@ -49,14 +49,14 @@ wavelengths = np.linspace(1600,900,1)
 BMs = [11,27,59,99,163,227,299,395,507,635,755,883,1059,1227,1419]
 B = 0
 
-for PWs in np.linspace(1,10,10):
+for PWs in np.linspace(1, 3, 3):
     light_list  = [objects.Light(wl, max_order_PWs = PWs, theta = 28.0, phi = 0.0) for wl in wavelengths]
 
     ################ Grating parameters #####################
     period = 760
 
     superstrate = objects.ThinFilm(period, height_nm = 'semi_inf',
-        material = materials.Air,, world_1d = True loss = False)
+        material = materials.Air, world_1d = True, loss = False)
 
     substrate  = objects.ThinFilm(period, height_nm = 'semi_inf',
         material = materials.Air, world_1d = True, loss = False)
@@ -65,11 +65,11 @@ for PWs in np.linspace(1,10,10):
         diameter1=int(round(0.25*period)), diameter2=int(round(0.25*period)), height_nm = 150,
         inclusion_a = materials.Material(3.61 + 0.0j), inclusion_b = materials.Material(3.61 + 0.0j),
         background = materials.Material(1.46 + 0.0j),
-        loss = True, make_mesh_now = True, force_mesh = True, lc_bkg = 0.1, lc2= 3.0)
+        loss = True, make_mesh_now = True, force_mesh = False, lc_bkg = 0.01, lc2= 3.0)
 
     grating_2 = objects.NanoStruct('1D_array', period, int(round(0.75*period)), height_nm = 2900,
         background = materials.Material(1.46 + 0.0j), inclusion_a = materials.Material(3.61 + 0.0j),
-        loss = True, make_mesh_now = True, force_mesh = True, lc_bkg = 0.1, lc2= 3.0)
+        loss = True, make_mesh_now = True, force_mesh = False, lc_bkg = 0.01, lc2= 3.0)
 
     num_BMs = BMs[B]+30
     B += 1

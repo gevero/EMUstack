@@ -176,12 +176,10 @@ class Material(object):
     def __setstate__(self, d):
         """ Recreate self._n when unpickling."""
         self.__dict__ = d
-        if None is self.data_wls:
+        if self.data_wls is None:
             self._n = lambda x: self.data_ns
-        elif self.data_wls is 'Drude':
+        elif isinstance(self.data_wls, str) and self.data_wls == 'Drude':
             self._n = lambda x: np.sqrt(self.data_ns[2]-self.data_ns[0]**2/(((2*np.pi*self.data_ns[3])/(x*1e-9))**2 + 1j*self.data_ns[1]*(2*np.pi*self.data_ns[3])/(x*1e-9)))
-            if np.imag(self._n) < 0:
-                self._n *= -1
         else:
             self._n = interp1d(self.data_wls, self.data_ns)
 

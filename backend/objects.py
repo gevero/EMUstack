@@ -26,7 +26,7 @@ import numpy as np
 import paths
 import materials
 from mode_calcs import Simmo, Anallo
-from fortran import EMUstack
+
 
 msh_location = paths.msh_path
 template_location = paths.template_path
@@ -157,7 +157,7 @@ class NanoStruct(object):
 
             mesh_file  (str): If using a set premade mesh give its name \
                 including .mail if 2D_array (eg. 600_60.mail), or .txt if \
-                1D_array. It must be located in backend/fortran/msh/
+                1D_array. It must be located in backend/data/meshes/
 
             lc_bkg  (float): Length constant of meshing of background medium \
                 (smaller = finer mesh)
@@ -185,8 +185,8 @@ class NanoStruct(object):
     """
     def __init__(self,
                  periodicity,
-                 period,
-                 diameter1,
+                 period=None,
+                 diameter1=None,
                  period_y=None,
                  inc_shape='circle',
                  is_hex=False,
@@ -248,11 +248,35 @@ class NanoStruct(object):
                  plot_abs=0,
                  plot_field_conc=False,
                  plt_msh=True):
+        if geo_params is None:
+            geo_params = {}
+
+        if period is None:
+            if 'period' in geo_params:
+                period = geo_params['period']
+            elif 'd_in_nm' in geo_params:
+                period = geo_params['d_in_nm']
+            else:
+                raise TypeError("NanoStruct missing required argument 'period' (or 'd_in_nm' in geo_params)")
+
+        if diameter1 is None:
+            if 'diameter1' in geo_params:
+                diameter1 = geo_params['diameter1']
+            elif 'a1' in geo_params:
+                diameter1 = geo_params['a1']
+            else:
+                diameter1 = 0.0
+
         self.periodicity = periodicity
         self.period = float(period)
         self.diameter1 = diameter1
         if period_y is None:
-            self.period_y = float(period)
+            if 'period_y' in geo_params:
+                self.period_y = float(geo_params['period_y'])
+            elif 'dy_in_nm' in geo_params:
+                self.period_y = float(geo_params['dy_in_nm'])
+            else:
+                self.period_y = float(period)
         else:
             self.period_y = float(period_y)
         self.inc_shape = inc_shape
@@ -959,28 +983,22 @@ class NanoStruct(object):
                     geo = geo.replace('lc3 = lc/1;', "lc3 = lc/%f;" % self.lc3)
                     geo = geo.replace('square = 0;', "square = 1;")
 
-            elif self.inc_shape == 'custom':
+            elif self.inc_shape == 'custom' or (hasattr(self, 'geo_file') and self.geo_file):
 
-                # check that geo_file and geo_params have been assigned
-                if self.geo_file == None:
+                # check that geo_file has been assigned
+                if self.geo_file is None:
                     raise TypeError(
-                        'Must provide a .geo file if inc_shape="custom".')
-                if self.geo_params == None:
-                    raise TypeError(
-                        'Must provide geo_params dictionary if inc_shape="custom".'
-                    )
+                        'Must provide a geo_file if inc_shape="custom".')
 
-                # check geo_file name structure
-                if self.geo_file[-4:] != '.geo':
+                # check geo_file extension
+                if not (self.geo_file.endswith('.geo') or self.geo_file.endswith('.py')):
                     raise ValueError(
-                        'Must provide a .geo file if inc_shape="custom".')
-                if self.geo_file[-13:] != '_template.geo':
-                    raise ValueError(
-                        'Provided .geo filename must respect the "*_template.geo" naming convention.'
-                    )
+                        'Must provide a .geo or .py file for custom geometry.')
 
                 # define root mesh name
-                root_msh_name = self.geo_file[:-13]
+                root_msh_name = self.geo_file[:-4]
+                if root_msh_name.endswith('_template'):
+                    root_msh_name = root_msh_name[:-9]
 
                 # add period values to mesh name
                 msh_name = root_msh_name + '%(d)s_%(dy)s_' % {
@@ -989,49 +1007,11 @@ class NanoStruct(object):
                 }
 
                 # add custom parameter values to mesh name
-                for key, value in self.geo_params.items():
-                    msh_name = msh_name + '_' + key + '%(value)s' % {
-                        'value': dec_float_str(value)
-                    }
-
-                # open geo template file, pass params and save to new geo file
-                if not os.path.exists(msh_location + msh_name +
-                                      '.mail') or self.force_mesh is True:
-
-                    # loop over ge_params to replace parameters
-                    geo_tmp = open(template_location + self.geo_file, "r").read()
-                    geo = geo_tmp.replace('d_in_nm = 0;',
-                                          "d_in_nm  = %f;" % self.period)
-                    geo = geo.replace('dy_in_nm = 0;',
-                                      "dy_in_nm = %f;" % self.period_y)
-                    geo = geo.replace('lc = 0;', "lc = %f;" % self.lc)
-                    geo = geo.replace('lc2 = lc/1;', "lc2 = lc/%f;" % self.lc2)
-                    geo = geo.replace('lc3 = lc/1;', "lc3 = lc/%f;" % self.lc3)
-                    try:
-                        geo = geo.replace('lc4 = lc/1;', "lc4 = lc/%f;" % self.lc4)
-                    except:
-                        print('lc4 not present')
-                    try:
-                        geo = geo.replace('lc5 = lc/1;', "lc5 = lc/%f;" % self.lc5)
-                    except:
-                        print('lc5 not present')
-                    try:
-                        geo = geo.replace('lc6 = lc/1;', "lc6 = lc/%f;" % self.lc6)
-                    except:
-                        print('lc6 not present')
+                if hasattr(self, 'geo_params') and self.geo_params:
                     for key, value in self.geo_params.items():
-                        try:
-                            if key[0:2] == 'lc':
-                                str_in = key + ' = lc/1;'
-                                str_out = key + ' = lc/%f;' % value
-                            else:
-                                str_in = key + ' = 0;'
-                                str_out = key + ' = %f;' % value
-                            geo = geo.replace(str_in, str_out)
-                        except:
-                            raise RuntimeError('Could not find "' + str_in +
-                                               ' string in ' + self.geo_file +
-                                               ' geometry file.')
+                        msh_name = msh_name + '_' + key + '%(value)s' % {
+                            'value': dec_float_str(value)
+                        }
 
             else:
                 raise NotImplementedError("\n Selected inc_shape = '%s' \n \
@@ -1040,10 +1020,74 @@ class NanoStruct(object):
                                           self.inc_shape)
 
             self.mesh_file = msh_name + '.mail'
-            if not os.path.exists(msh_location + msh_name +
-                                  '.mail') or self.force_mesh is True:
-                open(msh_location + msh_name + '.geo', "w").write(geo)
-                EMUstack.conv_gmsh(msh_location + msh_name)
+            import meshing
+            merged_geo_params = self.harvest_geo_params()
+
+            if hasattr(self, 'geo_file') and self.geo_file:
+                if self.geo_file.endswith('.geo'):
+                    self.mesh = meshing.mesh_from_geo(
+                        self.geo_file,
+                        geo_params=merged_geo_params,
+                        period=self.period,
+                        period_y=self.period_y,
+                        lc=self.lc,
+                        lc2=self.lc2,
+                        lc3=self.lc3,
+                        curve_order=2
+                    )
+                elif self.geo_file.endswith('.py'):
+                    self.mesh = meshing.mesh_from_py(
+                        self.geo_file,
+                        geo_params=merged_geo_params,
+                        period=self.period,
+                        period_y=self.period_y,
+                        lc=self.lc,
+                        lc2=self.lc2,
+                        lc3=self.lc3,
+                        curve_order=2
+                    )
+                else:
+                    raise ValueError(f"Unsupported geometry file format for '{self.geo_file}'. Expected .geo or .py")
+            else:
+                dy = self.period_y / self.period
+                d1 = self.diameter1 / self.period
+                d2 = getattr(self, 'diameter2', 0.0) / self.period
+                posx = getattr(self, 'posx', 0.0) / self.period
+                posy = getattr(self, 'posy', 0.0) / self.period
+                center = (0.5 + posx, dy / 2.0 + posy)
+                inclusions = []
+                if self.inc_shape in ('circle', 'ellipse') and d1 > 0:
+                    if self.inc_shape == 'ellipse' and getattr(self, 'ellipticity', 0.0) != 0:
+                        el = getattr(self, 'ellipticity', 0.0)
+                        rx = d1 / 2.0
+                        ry = rx * (1.0 - el)
+                        inclusions.append({"kind": "ellipse", "c": center, "rx": rx, "ry": ry, "tag": 2})
+                    else:
+                        inclusions.append({"kind": self.inc_shape, "c": center, "r": d1 / 2.0, "tag": 2})
+                elif self.inc_shape in ('square', 'rectangle') and d1 > 0:
+                    inclusions.append({"kind": self.inc_shape, "c": center, "s": d1, "tag": 2})
+                elif self.inc_shape == "ring" and d1 > 0:
+                    inclusions.append({"kind": "ring", "c": center, "r_out": d1 / 2.0, "r_in": d2 / 2.0, "tag": 2})
+                elif self.inc_shape == "dimer" and d1 > 0:
+                    gap = getattr(self, 'gap', 0.0) / self.period
+                    inclusions.append({"kind": "dimer", "c": center, "r": d1 / 2.0, "gap": gap, "tag": 2})
+
+                inc_h = self.lc / self.lc2 if getattr(self, 'lc2', 1.0) > 1.0 else self.lc
+                refine = meshing.Refine(bg=self.lc, inc=inc_h)
+                self.mesh = meshing.unit_cell(dy, inclusions, refine=refine, curve_order=2, period_x=1.0)
+
+            if self.mesh is not None:
+                self.n_msh_pts = self.mesh.nv
+                self.n_msh_el = self.mesh.ne
+                self.x_arr = np.array([v.point[:2] for v in self.mesh.vertices]).T
+                t_nod = np.zeros((6, self.mesh.ne), dtype=int)
+                t_el = np.zeros(self.mesh.ne, dtype=int)
+                for i_el, el in enumerate(self.mesh.Elements(meshing.ngs.VOL)):
+                    verts = [v.nr + 1 for v in el.vertices]
+                    t_nod[:len(verts), i_el] = verts
+                    t_el[i_el] = 1 if el.mat == 'bg' else (int(el.mat[3:]) if el.mat.startswith('inc') and el.mat[3:].isdigit() else 2)
+                self.table_nod = t_nod
+                self.type_el = t_el
 
             # # Automatically show created mesh in gmsh.
             # gmsh_cmd = 'gmsh '+ msh_location + msh_name + '.msh'
@@ -1479,12 +1523,11 @@ class NanoStruct(object):
                         x_1 = ls_x[2 * i_el - 1]
                         x_2 = ls_x[2 * i_el + 1]
                         dx = x_2 - x_1
-                        if x_1 <= 0.5 + rad_1 and 0.5 - rad_1 - dx <= x_1 \
-                        and x_2 <= 0.5 + rad_1 and 0.5 - rad_1 - dx <= x_2:
+                        if x_1 >= 0.5 - rad_1 - 1e-6 and x_2 <= 0.5 + rad_1 + 1e-6:
                             type_el[i_el] = 2
-                        elif x_1 <= 0.5 - rad_1 - small_space and x_2 <= 0.5 - rad_1 - small_space:
+                        elif x_2 <= 0.5 - rad_1 - small_space + 1e-6:
                             type_el[i_el] = 3
-                        elif x_1 >= 0.5 + large_d + rad_1 and x_2 >= 0.5 + large_d + rad_1:
+                        elif x_1 >= 0.5 + large_d + rad_1 - 1e-6:
                             type_el[i_el] = 3
                         else:
                             type_el[i_el] = 1
@@ -1499,8 +1542,7 @@ class NanoStruct(object):
                     x_1 = ls_x[2 * i_el - 1]
                     x_2 = ls_x[2 * i_el + 1]
                     dx = x_2 - x_1
-                    if x_1 <= 0.5 + rad_1 and 0.5 - rad_1 - dx <= x_1 \
-                    and x_2 <= 0.5 + rad_1 and 0.5 - rad_1 - dx <= x_2:
+                    if x_1 >= 0.5 - rad_1 - 1e-6 and x_2 <= 0.5 + rad_1 + 1e-6:
                         type_el[i_el] = 2
                     else:
                         type_el[i_el] = 1
@@ -1582,7 +1624,6 @@ class NanoStruct(object):
         #         #     geo = geo.replace('lc5 = lc/1;', "lc5 = lc/%f;" % self.lc5)
 
         #         open(msh_location + msh_name + '.geo', "w").write(geo)
-        #         EMUstack.conv_gmsh(msh_location+msh_name)
         #         # gmsh_cmd = 'gmsh '+ msh_location + msh_name + '.msh'
         #         # gmsh_cmd = 'gmsh '+ msh_location + msh_name + '.geo'
         #         # os.system(gmsh_cmd)
@@ -1590,6 +1631,52 @@ class NanoStruct(object):
         else:
             raise ValueError(
                 "Must be simulating either a '1D_array' or a '2D_array'.")
+
+    def harvest_geo_params(self):
+        """Harvests and merges geometry parameters.
+        geo_params dict is the source of truth and overrides legacy arguments.
+        Legacy arguments provide defaults when omitted from geo_params.
+        """
+        params = {}
+        if hasattr(self, 'period') and self.period is not None:
+            params['period'] = self.period
+        if hasattr(self, 'period_y') and self.period_y is not None:
+            params['period_y'] = self.period_y
+        if hasattr(self, 'diameter1') and self.diameter1:
+            params['a1'] = self.diameter1
+        if hasattr(self, 'diameter2') and self.diameter2:
+            params['a2'] = self.diameter2
+        if hasattr(self, 'diameter3') and self.diameter3:
+            params['a3'] = self.diameter3
+        if hasattr(self, 'gap') and self.gap:
+            params['gap'] = self.gap
+        if hasattr(self, 'ellipticity') and self.ellipticity:
+            params['ellipticity'] = self.ellipticity
+        if hasattr(self, 'angle') and self.angle:
+            params['angle'] = self.angle
+        if hasattr(self, 'lc') and self.lc != 0.09:
+            params['lc'] = self.lc
+        if hasattr(self, 'lc2') and self.lc2 != 1.0:
+            params['lc2'] = self.lc2
+        if hasattr(self, 'lc3') and self.lc3 != 1.0:
+            params['lc3'] = self.lc3
+
+        if hasattr(self, 'geo_params') and self.geo_params:
+            params.update(self.geo_params)
+            if 'period' in self.geo_params:
+                self.period = float(self.geo_params['period'])
+            elif 'd_in_nm' in self.geo_params:
+                self.period = float(self.geo_params['d_in_nm'])
+            if 'period_y' in self.geo_params:
+                self.period_y = float(self.geo_params['period_y'])
+            elif 'dy_in_nm' in self.geo_params:
+                self.period_y = float(self.geo_params['dy_in_nm'])
+            if 'diameter1' in self.geo_params:
+                self.diameter1 = float(self.geo_params['diameter1'])
+            elif 'a1' in self.geo_params:
+                self.diameter1 = float(self.geo_params['a1'])
+
+        return params
 
     def calc_modes(self, light, **args):
         """ Run a simulation to find the NanoStruct's modes.
@@ -1714,7 +1801,7 @@ class Light(object):
         else:
             self.wl_nm = float(np.real(wl_nm))
         self._air_anallos = {}
-        self.max_order_PWs = max_order_PWs
+        self.max_order_PWs = int(max_order_PWs)
 
         if None == theta and None == k_parallel:
             raise ValueError("Specify incident angle either by \n\

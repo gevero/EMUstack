@@ -25,7 +25,7 @@ import time
 import datetime
 import numpy as np
 import sys
-from multiprocessing import Pool
+from multiprocessing.dummy import Pool
 sys.path.append("../backend/")
 
 import objects
@@ -43,7 +43,7 @@ num_cores = 5
 plotting.clear_previous()
 
 ################ Light parameters #####################
-azi_angles = np.linspace(-89,89,91)
+azi_angles = np.linspace(-89, 89, 7)
 wl = 1600
 light_list  = [objects.Light(wl, max_order_PWs = 10, theta = p, phi = 0.0) \
     for p in azi_angles]

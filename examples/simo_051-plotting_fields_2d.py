@@ -25,7 +25,7 @@ import time
 import datetime
 import numpy as np
 import sys
-from multiprocessing import Pool
+from multiprocessing.dummy import Pool
 sys.path.append("../backend/")
 
 import objects
@@ -44,7 +44,7 @@ plotting.clear_previous()
 
 ################ Light parameters #####################
 wl     = 615
-light_list  = [objects.Light(wl, max_order_PWs = 15, theta = 0.0, phi = 0.0)]
+light_list  = [objects.Light(wl, max_order_PWs = 2, theta = 0.0, phi = 0.0)]
 
 # Period must be consistent throughout simulation!!!
 period = 600

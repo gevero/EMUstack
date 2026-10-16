@@ -26,7 +26,7 @@ import time
 import datetime
 import numpy as np
 import sys
-from multiprocessing import Pool
+from multiprocessing.dummy import Pool
 sys.path.append("../backend/")
 
 import objects
@@ -77,39 +77,45 @@ def simulate_stack(light):
 
     return stack
 
-# Run wavelengths in parallel across num_cores CPUs using multiprocessing package.
-pool = Pool(num_cores)
-stacks_list = pool.map(simulate_stack, light_list)
-# Save full simo data to .npz file for safe keeping!
-np.savez('Simo_results', stacks_list=stacks_list)
+if __name__ == '__main__':
+    import multiprocessing as mp
+    try:
+        mp.set_start_method('fork')
+    except RuntimeError:
+        pass
+    # Run wavelengths in parallel across num_cores CPUs using multiprocessing package.
+    pool = Pool(num_cores)
+    stacks_list = pool.map(simulate_stack, light_list)
+    # Save full simo data to .npz file for safe keeping!
+    np.savez('Simo_results', stacks_list=stacks_list)
 
-######################## Post Processing ########################
-# This time let's visualise the net Transmission scattering matrix,
-# which describes the propagation of light all the way from the superstrate into
-# the substrate. When studying diffractive layers it is useful to know how many
-# of theplane waves of the substrate are propagating, so lets include this.
-wl_num = -1
-T_net = stacks_list[wl_num].T_net
-nu_prop = stacks_list[wl_num].layers[0].num_prop_pw_per_pol
-plotting.vis_scat_mats(T_net, nu_prop_PWs=nu_prop)
+    ######################## Post Processing ########################
+    # This time let's visualise the net Transmission scattering matrix,
+    # which describes the propagation of light all the way from the superstrate into
+    # the substrate. When studying diffractive layers it is useful to know how many
+    # of theplane waves of the substrate are propagating, so lets include this.
+    wl_num = -1
+    T_net = stacks_list[wl_num].T_net
+    nu_prop = stacks_list[wl_num].layers[0].num_prop_pw_per_pol
+    plotting.vis_scat_mats(T_net, nu_prop_PWs=nu_prop)
 
-# Let's just plot the spectra and see the effect of changing refractive indices.
-plotting.t_r_a_plots(stacks_list)
+    # Let's just plot the spectra and see the effect of changing refractive indices.
+    plotting.t_r_a_plots(stacks_list)
 
-######################## Wrapping up ########################
-print('\n*******************************************')
-# Calculate and record the (real) time taken for simulation,
-elapsed = (time.time() - start)
-hms     = str(datetime.timedelta(seconds=elapsed))
-hms_string = 'Total time for simulation was \n \
-    %(hms)s (%(elapsed)12.3f seconds)'% {
-            'hms'       : hms,
-            'elapsed'   : elapsed, }
-print(hms_string)
-print('*******************************************')
-print('')
+    ######################## Wrapping up ########################
+    print('\n*******************************************')
+    # Calculate and record the (real) time taken for simulation,
+    elapsed = (time.time() - start)
+    hms     = str(datetime.timedelta(seconds=elapsed))
+    hms_string = 'Total time for simulation was \n \
+        %(hms)s (%(elapsed)12.3f seconds)'% {
+                'hms'       : hms,
+                'elapsed'   : elapsed, }
+    print(hms_string)
+    print('*******************************************')
+    print('')
 
-# and store this info.
-python_log = open("python_log.log", "w")
-python_log.write(hms_string)
-python_log.close()
+    # and store this info.
+    python_log = open("python_log.log", "w")
+    python_log.write(hms_string)
+    python_log.close()

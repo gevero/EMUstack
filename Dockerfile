@@ -1,30 +1,47 @@
-# Latest fedora image. It works well with the new compilation flags.
-FROM fedora:39
+# EMUstack Modernized Docker Environment (Python 3.11+, NGSolve/Netgen, Zero Fortran)
+FROM ubuntu:24.04
 
-# Install Fedora package dependencies, needed to add an explicit timezone
-RUN dnf -y update
-RUN dnf -y install make gmsh python3-numpy python3-devel python3-scipy python3-nose python3-pip python3-matplotlib gfortran
-RUN dnf -y install suitesparse-devel blas-devel lapack-devel atlas-devel
-RUN dnf -y install nano micro openssh
-RUN dnf -y install jupyterlab
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
 
-# Add the NumBAT source code -> Will be overwritten when used with mounted volumes! (which is good)
+# Install system dependencies including Gmsh for Path II geometry import
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    python3-venv \
+    gmsh \
+    libgl1 \
+    libglu1-mesa \
+    libxcursor1 \
+    libxinerama1 \
+    libxrandr2 \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /home/EMUstack
 COPY ./ /home/EMUstack/
 
-# Compile the Fortran code, only use when running tests or copying compiled source to host
-WORKDIR /home/EMUstack/backend/fortran/
-RUN make
+# Install Python packages and emustack-fem
+RUN pip install --break-system-packages --no-cache-dir \
+    numpy>=1.26 \
+    scipy>=1.11 \
+    matplotlib>=3.8 \
+    ngsolve>=6.2.2600 \
+    netgen-mesher>=6.2.2600 \
+    pytest>=8 \
+    pytest-xdist \
+    jupyterlab
 
-# create useful folder
-WORKDIR /home
-RUN mkdir host
+RUN pip install --break-system-packages --no-build-isolation -e /home/EMUstack
 
-# getting code and setup env vars
-ENV PYTHONPATH "${PYTHONPATH}:/home/EMUstack/backend/"
+# Concurrency limits for deterministic FEM eigenvalue solving
 ENV OPENBLAS_NUM_THREADS=1
 ENV OMP_NUM_THREADS=1
-RUN echo -e "ulimit -s unlimited" >> /root/.bashrc
-RUN source /root/.bashrc
+ENV MKL_NUM_THREADS=1
+ENV NGS_NUM_THREADS=1
 
-# expose port
+WORKDIR /home/EMUstack
 EXPOSE 8888
+
+CMD ["pytest", "tests/", "-v", "--tb=short"]

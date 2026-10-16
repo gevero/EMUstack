@@ -23,15 +23,24 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-# where the python and fortran backend code is placed
-backend_path = '../backend'
+from pathlib import Path
+
+_backend_dir = Path(__file__).resolve().parent
+
+# where the backend code is placed
+backend_path = str(_backend_dir)
 
 # folder containing relevant data as the optical constants
-data_path = '../backend/data/'
+data_path = str(_backend_dir / 'data') + '/'
 
-# where template.geo files for mesh creation are store
-template_path = '../backend/fortran/msh/'
+# where template.geo files and meshes are stored
+_msh_dir = _backend_dir / 'data' / 'meshes'
+if not _msh_dir.exists():
+    _msh_dir = _backend_dir.parent / 'tests' / 'data' / 'meshes'
+
+template_path = str(_msh_dir) + '/'
 
 # where existing .msh and .mail files are stored and
 # new .msh and .mail files are created
-msh_path = '../backend/fortran/msh/'
+msh_path = str(_msh_dir) + '/'
+

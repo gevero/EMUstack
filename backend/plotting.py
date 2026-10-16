@@ -23,7 +23,7 @@ import objects
 import mode_calcs
 
 import numpy as np
-from scipy import sqrt
+from numpy import sqrt
 import subprocess
 import matplotlib
 matplotlib.use('pdf')
@@ -202,7 +202,7 @@ def t_r_a_plots(stacks_list, xvalues=None, xlabel='', params_layer=1,
     params_2_print += '\n'r'$h_t,...,h_b$ = '
     params_2_print += ''.join('%4f, ' % num for num in height_list)
 
-    if xvalues == None:
+    if xvalues is None:
         if stacks_list[0].layers[0].light.wl_nm != stacks_list[-1].layers[0].light.wl_nm:
             xvalues = [s.layers[0].light.wl_nm for s in stacks_list]
             xlabel = r'$\lambda$ (nm)'
@@ -230,9 +230,9 @@ def t_r_a_plots(stacks_list, xvalues=None, xlabel='', params_layer=1,
     t_tot = []
     r_tot = []
     for i in range(len(xvalues)):
-        a_tot.append(float(a_list[layers_steps-1+(i*layers_steps)]))
-        t_tot.append(float(t_list[layers_steps-1+(i*layers_steps)]))
-        r_tot.append(float(r_list[i]))
+        a_tot.append(float(np.asarray(a_list[layers_steps-1+(i*layers_steps)]).flat[0]))
+        t_tot.append(float(np.asarray(t_list[layers_steps-1+(i*layers_steps)]).flat[0]))
+        r_tot.append(float(np.asarray(r_list[i]).flat[0]))
 
     if ult_eta is True or J_sc is True:
         active_abs = []
@@ -240,8 +240,8 @@ def t_r_a_plots(stacks_list, xvalues=None, xlabel='', params_layer=1,
         if not 0 < active_layer_nu < len(stacks_list[0].layers)-1:
             raise ValueError("active_layer_nu must refer to a finite layer.")
         for i in range(len(xvalues)):
-            active_abs.append(float(a_list[active_layer_nu - 1 +
-                              i*layers_steps]))
+            active_abs.append(float(np.asarray(a_list[active_layer_nu - 1 +
+                              i*layers_steps]).flat[0]))
         out = []
 
     if ult_eta is True:
@@ -378,7 +378,8 @@ def layers_plot(spectra_name, spec_list, xvalues, xlabel, total_h,
                 lay_spec_name = 'Reflectance'
                 if set_y_lim==True:
                     plt.ylim((0, 1))
-        ax1.set_xlim((xvalues[0], xvalues[-1]))
+        if len(xvalues) > 1 and xvalues[0] != xvalues[-1]:
+            ax1.set_xlim((xvalues[0], xvalues[-1]))
 
         if save_txt == True:
             if i != nu_layers-1:
@@ -392,7 +393,7 @@ def layers_plot(spectra_name, spec_list, xvalues, xlabel, total_h,
         if save_pdf == True:
             plt.savefig('%(s)s_stack%(bon)s%(add)s'% \
                 {'s': spectra_name, 'bon': stack_label, 'add' : add_name})
-    fig.clf()
+    plt.close(fig)
 
 
 def total_tra_plot(plot_name, a_spec, t_spec, r_spec, xvalues, xlabel,
@@ -403,11 +404,13 @@ def total_tra_plot(plot_name, a_spec, t_spec, r_spec, xvalues, xlabel,
     """
 
     fig = plt.figure(num=None, figsize=(9, 12))
+    has_range = (len(xvalues) > 1 and xvalues[0] != xvalues[-1])
 
     ax1 = fig.add_subplot(3, 1, 1)
     ax1.plot(xvalues, a_spec, linewidth=linesstrength)
     ax1.set_ylabel('Absorptance')
-    ax1.set_xlim((xvalues[0], xvalues[-1]))
+    if has_range:
+        ax1.set_xlim((xvalues[0], xvalues[-1]))
     if label_eV == True:
         ax2 = ax1.twiny()
         new_tick_values = np.linspace(10, 0.5, 20)
@@ -415,7 +418,8 @@ def total_tra_plot(plot_name, a_spec, t_spec, r_spec, xvalues, xlabel,
         new_tick_labels = ["%.1f" % z for z in new_tick_values]
         ax2.set_xticks(new_tick_locations)
         ax2.set_xticklabels(new_tick_labels)
-        ax2.set_xlim((xvalues[0], xvalues[-1]))
+        if has_range:
+            ax2.set_xlim((xvalues[0], xvalues[-1]))
         if xlabel == r'$\lambda$ (nm)':
             ax2.set_xlabel('Energy (eV)')
     if set_y_lim==True:
@@ -424,12 +428,14 @@ def total_tra_plot(plot_name, a_spec, t_spec, r_spec, xvalues, xlabel,
     ax1 = fig.add_subplot(3, 1, 2)
     ax1.plot(xvalues, t_spec, linewidth=linesstrength)
     ax1.set_ylabel('Transmittance')
-    ax1.set_xlim((xvalues[0], xvalues[-1]))
+    if has_range:
+        ax1.set_xlim((xvalues[0], xvalues[-1]))
     if label_eV == True:
         ax2 = ax1.twiny()
         ax2.set_xticklabels( () )
         ax2.set_xticks(new_tick_locations)
-        ax2.set_xlim((xvalues[0], xvalues[-1]))
+        if has_range:
+            ax2.set_xlim((xvalues[0], xvalues[-1]))
     if set_y_lim==True:
         plt.ylim((0, 1))
 
@@ -437,12 +443,14 @@ def total_tra_plot(plot_name, a_spec, t_spec, r_spec, xvalues, xlabel,
     ax1.plot(xvalues, r_spec, linewidth=linesstrength)
     ax1.set_xlabel(xlabel)
     ax1.set_ylabel('Reflectance')
-    ax1.set_xlim((xvalues[0], xvalues[-1]))
+    if has_range:
+        ax1.set_xlim((xvalues[0], xvalues[-1]))
     if label_eV == True:
         ax2 = ax1.twiny()
         ax2.set_xticklabels( () )
         ax2.set_xticks(new_tick_locations)
-        ax2.set_xlim((xvalues[0], xvalues[-1]))
+        if has_range:
+            ax2.set_xlim((xvalues[0], xvalues[-1]))
     if set_y_lim==True:
         plt.ylim((0, 1))
 
@@ -450,7 +458,7 @@ def total_tra_plot(plot_name, a_spec, t_spec, r_spec, xvalues, xlabel,
     # plt.suptitle(plot_name+add_name+'\n'+params_2_print)
     plt.savefig('%(s)s_stack%(bon)s%(add)s'% \
                 {'s': plot_name, 'bon': stack_label, 'add': add_name})
-    fig.clf()
+    plt.close(fig)
 ###############################################################################
 
 
@@ -892,11 +900,15 @@ def J_short_circuit(active_abs, wavelengths, params_2_print='',
         Assuming every absorbed photon produces a pair of charge carriers.
     """
 
-    Irrad_spec_file = '../backend/data/ASTMG173'
-    i_data = np.loadtxt('%s.txt' % Irrad_spec_file)
+    _data_dir = os.path.join(os.path.dirname(__file__), 'data')
+    Irrad_spec_file = os.path.join(_data_dir, 'ASTMG173.txt')
+    if not os.path.exists(Irrad_spec_file):
+        Irrad_spec_file = '../backend/data/ASTMG173.txt'
+    i_data = np.loadtxt(Irrad_spec_file)
     i_spec = np.interp(wavelengths, i_data[:, 0], i_data[:, 3])
     expression = i_spec*active_abs*wavelengths
-    integral_tmp = np.trapz(expression, x=wavelengths)
+    _trapz_fn = getattr(np, 'trapezoid', getattr(np, 'trapz', None))
+    integral_tmp = _trapz_fn(expression, x=wavelengths)
     J = (charge_e/(Plancks_h*speed_c)) * integral_tmp * 1e-10  # in mA/cm^2
     nums_2_print = params_2_print.split()
     np.savetxt('J_sc_stack%(bon)s%(add)s.txt' % {'bon': stack_label,
@@ -918,11 +930,15 @@ def ult_efficiency(active_abs, wavelengths, bandgap_wl=None,
     """
     if bandgap_wl is None:
         bandgap_wl = np.max(wavelengths)
-    Irrad_spec_file = '../backend/data/ASTMG173'
-    i_data       = np.loadtxt('%s.txt' % Irrad_spec_file)
+    _data_dir = os.path.join(os.path.dirname(__file__), 'data')
+    Irrad_spec_file = os.path.join(_data_dir, 'ASTMG173.txt')
+    if not os.path.exists(Irrad_spec_file):
+        Irrad_spec_file = '../backend/data/ASTMG173.txt'
+    i_data       = np.loadtxt(Irrad_spec_file)
     i_spec       = np.interp(wavelengths, i_data[:,0], i_data[:,3])
     expression   = i_spec*active_abs*wavelengths
-    integral_tmp = np.trapz(expression, x=wavelengths)
+    _trapz_fn = getattr(np, 'trapezoid', getattr(np, 'trapz', None))
+    integral_tmp = _trapz_fn(expression, x=wavelengths)
     Efficiency   = integral_tmp/(bandgap_wl*ASTM15_tot_I)
     nums_2_print = params_2_print.split()
     np.savetxt('Efficiency_stack%(bon)s%(add)s.txt'% {'bon' : stack_label,'add' : add_name},\
@@ -1318,7 +1334,7 @@ def BM_amplitudes(stacks_list, xvalues=None, chosen_BMs=None,
             xlabel = r'$\lambda$ (nm)'
             print("BM_amplitudes is guessing you have a single wavelength, else specify xvalues.")
 
-    if chosen_BMs == None: chosen_BMs = range(stacks_list[-1].layers[lay_interest].num_BMs)
+    if chosen_BMs is None: chosen_BMs = range(stacks_list[-1].layers[lay_interest].num_BMs)
     try:
         save_trans = []
         for BM in chosen_BMs:
@@ -1347,9 +1363,9 @@ def BM_amplitudes(stacks_list, xvalues=None, chosen_BMs=None,
             lgd = ax1.legend(handles, labels, loc='center left', bbox_to_anchor=(1.0,0.5))
             ax1.set_ylabel('BM Amplitude')
             ax1.set_xlabel(xlabel)
-            plt.suptitle(add_name)
+            plt.suptitle(add_name, fontsize=title_font)
             plt.savefig('BM_amplitudes-lay_%s' % add_name, \
-                fontsize=title_font, bbox_extra_artists=(lgd,), bbox_inches='tight')
+                bbox_extra_artists=(lgd,), bbox_inches='tight')
 
         if save_npz == True:
             np.savez('BM_amplitudes-lay_%s' % add_name, save_trans=save_trans)
@@ -1405,7 +1421,7 @@ def PW_amplitudes(stacks_list, xvalues=None, chosen_PWs=None,
     ax1 = fig.add_subplot(1,1,1)
     # vec_coef sorted from top of stack, everything else is sorted from bottom
     vec_index = len(stacks_list[-1].layers) - lay_interest - 1
-    if chosen_PWs == None:
+    if chosen_PWs is None:
         # Create arrays of grating order indexes (-p, ..., p)
         max_ords = stacks_list[0].layers[-1].max_order_PWs
         chosen_PWs = np.arange(-max_ords, max_ords + 1)
@@ -1441,7 +1457,7 @@ def PW_amplitudes(stacks_list, xvalues=None, chosen_PWs=None,
                 # Consider only transmission into singular polarization.
                 one_pol_k_space = full_k_space[0:n_PW_p_pols]
 
-                ix = np.in1d(one_pol_k_space.ravel(), on_axis_kzs).reshape(one_pol_k_space.shape)
+                ix = np.isin(one_pol_k_space.ravel(), on_axis_kzs).reshape(one_pol_k_space.shape)
                 axis_indices = np.ravel(np.array(np.where(ix))).astype(int)
                 # Substrate - only ever take downward propagating.
                 if vec_index == len(stacks_list[-1].layers) - 1:
@@ -1484,9 +1500,9 @@ def PW_amplitudes(stacks_list, xvalues=None, chosen_PWs=None,
             lgd = ax1.legend(handles, labels, loc='center left', bbox_to_anchor=(1.0,0.5))
             ax1.set_ylabel(r'$|E|$')
             ax1.set_xlabel(xlabel)
-            plt.suptitle(add_name)
+            plt.suptitle(add_name, fontsize=title_font)
             plt.savefig('PW_amplitudes-lay_%s' % add_name, \
-                fontsize=title_font, bbox_extra_artists=(lgd,), bbox_inches='tight')
+                bbox_extra_artists=(lgd,), bbox_inches='tight')
 
         if save_npz == True:
             np.savez('PW_amplitudes-lay_%s' % add_name, save_trans=save_trans)
@@ -1534,7 +1550,7 @@ def evanescent_merit(stacks_list, xvalues=None, chosen_PWs=None,
     """
     # vec_coef sorted from top of stack, everything else is sorted from bottom
     vec_index = len(stacks_list[-1].layers) - lay_interest - 1
-    if chosen_PWs == None:
+    if chosen_PWs is None:
         # Create arrays of grating order indexes (-p, ..., p)
         max_ords = stacks_list[0].layers[-1].max_order_PWs
         chosen_PWs = np.arange(-max_ords, max_ords + 1)
@@ -1585,7 +1601,7 @@ def evanescent_merit(stacks_list, xvalues=None, chosen_PWs=None,
                 # Consider only transmission into singular polarization
                 one_pol_k_space = full_k_space[0:n_PW_p_pols]
 
-                ix = np.in1d(one_pol_k_space.ravel(), on_axis_kzs).reshape(one_pol_k_space.shape)
+                ix = np.isin(one_pol_k_space.ravel(), on_axis_kzs).reshape(one_pol_k_space.shape)
                 axis_indices = np.ravel(np.array(np.where(ix))).astype(int)
 
                 # Outgoing TE polarisation
@@ -1632,9 +1648,9 @@ def evanescent_merit(stacks_list, xvalues=None, chosen_PWs=None,
             ax1.set_xticklabels(())
             ax2.set_ylabel(r'$\Sigma|a_p|^2$')
             ax2.set_xlabel(xlabel)
-            plt.suptitle(add_name)
+            plt.suptitle(add_name, fontsize=title_font)
             plt.savefig('evanescent_merit-lay_%s' % add_name,
-                        fontsize=title_font, bbox_extra_artists=(lgd,),
+                        bbox_extra_artists=(lgd,),
                         bbox_inches='tight')
 
         if save_txt is True:
@@ -1680,7 +1696,7 @@ def fields_in_plane(stacks_list, lay_interest=1, z_values=[0.1, 3.6],
             nu_calc_pts  (int): fields are calculated over a mesh of \
                 nu_calc_pts * nu_calc_pts points.
     """
-    from fortran import EMUstack
+    import field_eval
 
     dir_name = "in_plane_fields"
     if not os.path.exists(dir_name):
@@ -1721,7 +1737,7 @@ def fields_in_plane(stacks_list, lay_interest=1, z_values=[0.1, 3.6],
                     vec_coef = np.concatenate((pstack.vec_coef_down[vec_index],
                                               pstack.vec_coef_up[vec_index]))
 
-                    EMUstack.gmsh_plot_field(meat.num_BMs,
+                    field_eval.gmsh_plot_field(meat.num_BMs,
                                              meat.n_msh_el, meat.n_msh_pts,
                                              nnodes, meat.structure.nb_typ_el,
                                              meat.table_nod, meat.type_el, eps,
@@ -1747,7 +1763,7 @@ def fields_in_plane(stacks_list, lay_interest=1, z_values=[0.1, 3.6],
             heights_list = []
             name_lay = ''
 
-            for i in xrange(num_lays):
+            for i in range(num_lays):
                 if i == 0 or i == num_lays-1:pass
                 else: heights_list.append(pstack.layers[i].structure.height_nm)
                 try:
@@ -1833,9 +1849,9 @@ def fields_in_plane(stacks_list, lay_interest=1, z_values=[0.1, 3.6],
             E_TM_y_array = np.zeros((np.size(x1),np.size(y1),np.size(z1)), dtype = 'complex')
             E_TM_z_array = np.zeros((np.size(x1),np.size(y1),np.size(z1)), dtype = 'complex')
 
-            for z in xrange(np.size(z1)):
-                for y in xrange(np.size(y1)):
-                    for x in xrange(np.size(x1)):
+            for z in range(np.size(z1)):
+                for y in range(np.size(y1)):
+                    for x in range(np.size(x1)):
                         if pstack.layers[lay_interest].structure.height_nm == 'semi_inf':
                             expo_down = np.exp(1j*(alpha*x1[x]+beta*y1[y]-gamma*z1[z]))
                         elif z1[z] <= float(pstack.layers[lay_interest].structure.height_nm)/period:
@@ -1866,7 +1882,7 @@ def fields_in_plane(stacks_list, lay_interest=1, z_values=[0.1, 3.6],
 
             # Save figures
             for re_im in ['real','imag']:
-                for z_of_xy in xrange(np.size(z1)):
+                for z_of_xy in range(np.size(z1)):
                     fig1 = plt.figure(num=None, figsize=(12,21), dpi=80, facecolor='w', edgecolor='k')
                     for i in range(len(E_super)):
                         ax1 = fig1.add_subplot(4,1,i+1)
@@ -1888,8 +1904,8 @@ def fields_in_plane(stacks_list, lay_interest=1, z_values=[0.1, 3.6],
                         ax1.axis('scaled')
                         ax1.set_ylim((y_min,y_max))
 
-                    plt.suptitle('%(name)s \n %(p)s_E_xy_slice, z = %(z_pos)s, heights = %(h)s \n \
-                        $\lambda$ = %(wl)f nm, period = %(d)f, PW = %(pw)i,' % \
+                    plt.suptitle(r'%(name)s ' + '\n' + r'%(p)s_E_xy_slice, z = %(z_pos)s, heights = %(h)s ' + '\n' + \
+                        r'$\lambda$ = %(wl)f nm, period = %(d)f, PW = %(pw)i,' % \
                         {'name' : name_lay, 'h':heights_list, 'p' : re_im, 'z_pos' : z1[z_of_xy],'wl' : wl, \
                         'd' : period, 'pw' : pw} + '\n'
                         + '# prop. ords = %(prop)s, # evan. ords = %(evan)s, n = %(n)s,k = %(k)s'\
@@ -1898,7 +1914,8 @@ def fields_in_plane(stacks_list, lay_interest=1, z_values=[0.1, 3.6],
                         {'dir_name' : dir_name, 'wl' : wl, 'p' : re_im, 'z_pos' : z1[z_of_xy], \
                         'name' : name_lay,'stack_num':stack_num})
 
-                    fig.clf()
+                    fig1.clf()
+                    plt.close(fig1)
 
         stack_num += 1
 
@@ -1924,12 +1941,7 @@ def fields_in_plane(stacks_list, lay_interest=1, z_values=[0.1, 3.6],
             # if TF_lay == 0: vec_coef_up = np.zeros(shape=(np.shape(vec_coef_down)),dtype='complex128')
             # else: vec_coef_up = pstack.vec_coef_up[vec_index]
 
-            # EMUstack.gmsh_plot_pw(meat.n_msh_el, meat.n_msh_pts, nnodes, neq_PW,
-            #     bloch_vec, meat.table_nod, meat.x_arr, lat_vec, wl_normed,
-            #     n_eff_0, vec_coef_down, vec_coef_up,
-            #     index_pw_inv, ordre_ls, select_h,
-            #     gmsh_file_pos, meat.structure.plot_real, meat.structure.plot_imag,
-            #     meat.structure.plot_abs, extra_name)
+
 
             # # # Semi-inf case
             # # vec_coef_up = meat.R12[:,0] # TE polarisation
@@ -1959,7 +1971,7 @@ def fields_interpolator_in_plane(pstack, lay_interest=1, z_value=0.1):
                 then z_value is distance from top of this layer (i.e. bottom \
                 interface of stack).
     """
-    from fortran import EMUstack
+    import field_eval
 
     num_lays = len(pstack.layers)
     # If selected z location is within a NanoStruct layer
@@ -1985,7 +1997,7 @@ def fields_interpolator_in_plane(pstack, lay_interest=1, z_value=0.1):
             vec_coef = np.concatenate((pstack.vec_coef_down[vec_index], pstack.vec_coef_up[vec_index]))
 
             # piling up of all the bloch modes to get all the fields
-            m_E = EMUstack.field_value_plane(meat.num_BMs,
+            m_E = field_eval.field_value_plane(meat.num_BMs,
                                              meat.n_msh_el, meat.n_msh_pts, nnodes,
                                              meat.structure.nb_typ_el,
                                              meat.table_nod, meat.type_el,
@@ -1996,69 +2008,95 @@ def fields_interpolator_in_plane(pstack, lay_interest=1, z_value=0.1):
             table_nod = meat.table_nod.T
             x_arr = meat.x_arr.T
 
-            # dense triangulation with multiple points
-            v_x6p = np.zeros(6*meat.n_msh_el)
-            v_y6p = np.zeros(6*meat.n_msh_el)
-            v_Ex6p = np.zeros(6*meat.n_msh_el, dtype=np.complex128)
-            v_Ey6p = np.zeros(6*meat.n_msh_el, dtype=np.complex128)
-            v_Ez6p = np.zeros(6*meat.n_msh_el, dtype=np.complex128)
-            v_triang6p = []
+            has_6_nodes = bool((table_nod[:, 3] > 0).any()) if table_nod.shape[1] >= 4 else False
 
-            i = 0
-            for i_el in np.arange(meat.n_msh_el):
+            if has_6_nodes:
+                # dense triangulation with multiple points (6-node quadratic elements)
+                v_x6p = np.zeros(6*meat.n_msh_el)
+                v_y6p = np.zeros(6*meat.n_msh_el)
+                v_Ex6p = np.zeros(6*meat.n_msh_el, dtype=np.complex128)
+                v_Ey6p = np.zeros(6*meat.n_msh_el, dtype=np.complex128)
+                v_Ez6p = np.zeros(6*meat.n_msh_el, dtype=np.complex128)
+                v_triang6p = []
 
-                # triangles
-                idx = np.arange(6*i_el, 6*(i_el+1))
-                triangles = [[idx[0], idx[3], idx[5]],
-                             [idx[1], idx[4], idx[3]],
-                             [idx[2], idx[5], idx[4]],
-                             [idx[3], idx[4], idx[5]]]
-                v_triang6p.extend(triangles)
+                i = 0
+                for i_el in np.arange(meat.n_msh_el):
+                    idx = np.arange(6*i_el, 6*(i_el+1))
+                    triangles = [[idx[0], idx[3], idx[5]],
+                                 [idx[1], idx[4], idx[3]],
+                                 [idx[2], idx[5], idx[4]],
+                                 [idx[3], idx[4], idx[5]]]
+                    v_triang6p.extend(triangles)
 
-                for i_node in np.arange(6):
+                    for i_node in np.arange(6):
+                        i_ex = table_nod[i_el, i_node]-1
+                        v_x6p[i] = x_arr[i_ex, 0]
+                        v_y6p[i] = x_arr[i_ex, 1]
+                        v_Ex6p[i] = m_E[i_el, i_node, 0]
+                        v_Ey6p[i] = m_E[i_el, i_node, 1]
+                        v_Ez6p[i] = m_E[i_el, i_node, 2]
+                        i += 1
 
-                    # index for the coordinates
-                    i_ex = table_nod[i_el, i_node]-1
+                v_E6p = np.sqrt(np.abs(v_Ex6p)**2 +
+                                np.abs(v_Ey6p)**2 +
+                                np.abs(v_Ez6p)**2)
 
-                    # values
-                    v_x6p[i] = x_arr[i_ex, 0]
-                    v_y6p[i] = x_arr[i_ex, 1]
-                    v_Ex6p[i] = m_E[i_el, i_node, 0]
-                    v_Ey6p[i] = m_E[i_el, i_node, 1]
-                    v_Ez6p[i] = m_E[i_el, i_node, 2]
+                # dense triangulation with unique points
+                v_triang1p = []
+                for i_el in np.arange(meat.n_msh_el):
+                    triangles = [[table_nod[i_el,0]-1,table_nod[i_el,3]-1,table_nod[i_el,5]-1],
+                                 [table_nod[i_el,1]-1,table_nod[i_el,4]-1,table_nod[i_el,3]-1],
+                                 [table_nod[i_el,2]-1,table_nod[i_el,5]-1,table_nod[i_el,4]-1],
+                                 [table_nod[i_el,3]-1,table_nod[i_el,4]-1,table_nod[i_el,5]-1]]
+                    v_triang1p.extend(triangles)
 
-                    i += 1
+                # triangulations
+                triang6p = matplotlib.tri.Triangulation(v_x6p,v_y6p,v_triang6p)
+                triang1p = matplotlib.tri.Triangulation(x_arr[:,0],x_arr[:,1],v_triang1p)
 
-            v_E6p = np.sqrt(np.abs(v_Ex6p)**2 +
-                            np.abs(v_Ey6p)**2 +
-                            np.abs(v_Ez6p)**2)
+                # building interpolators: triang1p for the finder, triang6p for the values
+                finder = matplotlib.tri.TrapezoidMapTriFinder(triang1p)
+                ReEx = matplotlib.tri.LinearTriInterpolator(triang6p,v_Ex6p.real,trifinder=finder)
+                ImEx = matplotlib.tri.LinearTriInterpolator(triang6p,v_Ex6p.imag,trifinder=finder)
+                ReEy = matplotlib.tri.LinearTriInterpolator(triang6p,v_Ey6p.real,trifinder=finder)
+                ImEy = matplotlib.tri.LinearTriInterpolator(triang6p,v_Ey6p.imag,trifinder=finder)
+                ReEz = matplotlib.tri.LinearTriInterpolator(triang6p,v_Ez6p.real,trifinder=finder)
+                ImEz = matplotlib.tri.LinearTriInterpolator(triang6p,v_Ez6p.imag,trifinder=finder)
+                AbsE = matplotlib.tri.LinearTriInterpolator(triang6p,v_E6p,trifinder=finder)
 
-            # dense triangulation with unique points
-            v_triang1p = []
-            for i_el in np.arange(meat.n_msh_el):
+                return ReEx, ImEx, ReEy, ImEy, ReEz, ImEz, AbsE
+            else:
+                # 3-node linear triangles
+                v_Ex_nod = np.zeros(meat.n_msh_pts, dtype=np.complex128)
+                v_Ey_nod = np.zeros(meat.n_msh_pts, dtype=np.complex128)
+                v_Ez_nod = np.zeros(meat.n_msh_pts, dtype=np.complex128)
+                counts = np.zeros(meat.n_msh_pts)
+                v_triang = []
+                for i_el in range(meat.n_msh_el):
+                    tri = [table_nod[i_el, 0] - 1, table_nod[i_el, 1] - 1, table_nod[i_el, 2] - 1]
+                    v_triang.append(tri)
+                    for inod in range(3):
+                        node_idx = table_nod[i_el, inod] - 1
+                        v_Ex_nod[node_idx] += m_E[i_el, inod, 0]
+                        v_Ey_nod[node_idx] += m_E[i_el, inod, 1]
+                        v_Ez_nod[node_idx] += m_E[i_el, inod, 2]
+                        counts[node_idx] += 1
+                c = np.maximum(counts, 1)
+                v_Ex_nod /= c
+                v_Ey_nod /= c
+                v_Ez_nod /= c
+                v_E_nod = np.sqrt(np.abs(v_Ex_nod)**2 + np.abs(v_Ey_nod)**2 + np.abs(v_Ez_nod)**2)
 
-                # triangles
-                triangles = [[table_nod[i_el,0]-1,table_nod[i_el,3]-1,table_nod[i_el,5]-1],
-                             [table_nod[i_el,1]-1,table_nod[i_el,4]-1,table_nod[i_el,3]-1],
-                             [table_nod[i_el,2]-1,table_nod[i_el,5]-1,table_nod[i_el,4]-1],
-                             [table_nod[i_el,3]-1,table_nod[i_el,4]-1,table_nod[i_el,5]-1]]
-                v_triang1p.extend(triangles)
+                triang = matplotlib.tri.Triangulation(x_arr[:, 0], x_arr[:, 1], v_triang)
+                ReEx = matplotlib.tri.LinearTriInterpolator(triang, v_Ex_nod.real)
+                ImEx = matplotlib.tri.LinearTriInterpolator(triang, v_Ex_nod.imag)
+                ReEy = matplotlib.tri.LinearTriInterpolator(triang, v_Ey_nod.real)
+                ImEy = matplotlib.tri.LinearTriInterpolator(triang, v_Ey_nod.imag)
+                ReEz = matplotlib.tri.LinearTriInterpolator(triang, v_Ez_nod.real)
+                ImEz = matplotlib.tri.LinearTriInterpolator(triang, v_Ez_nod.imag)
+                AbsE = matplotlib.tri.LinearTriInterpolator(triang, v_E_nod)
 
-            # triangulations
-            triang6p = matplotlib.tri.Triangulation(v_x6p,v_y6p,v_triang6p)
-            triang1p = matplotlib.tri.Triangulation(x_arr[:,0],x_arr[:,1],v_triang1p)
-
-            # building interpolators: triang1p for the finder, triang6p for the values
-            finder = matplotlib.tri.TrapezoidMapTriFinder(triang1p)
-            ReEx = matplotlib.tri.LinearTriInterpolator(triang6p,v_Ex6p.real,trifinder=finder)
-            ImEx = matplotlib.tri.LinearTriInterpolator(triang6p,v_Ex6p.imag,trifinder=finder)
-            ReEy = matplotlib.tri.LinearTriInterpolator(triang6p,v_Ey6p.real,trifinder=finder)
-            ImEy = matplotlib.tri.LinearTriInterpolator(triang6p,v_Ey6p.imag,trifinder=finder)
-            ReEz = matplotlib.tri.LinearTriInterpolator(triang6p,v_Ez6p.real,trifinder=finder)
-            ImEz = matplotlib.tri.LinearTriInterpolator(triang6p,v_Ez6p.imag,trifinder=finder)
-            AbsE = matplotlib.tri.LinearTriInterpolator(triang6p,v_E6p,trifinder=finder)
-
-            return ReEx, ImEx, ReEy, ImEy, ReEz, ImEz, AbsE
+                return ReEx, ImEx, ReEy, ImEy, ReEz, ImEz, AbsE
 
         except ValueError as e:
             print(e)
@@ -2109,7 +2147,7 @@ def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,
             plot_boundaries  (bool): plot boundaries of inclusions.
     """
 
-    from fortran import EMUstack
+    import field_eval
 
     dir_name = "fields_vertically"
     if not os.path.exists(dir_name):
@@ -2160,11 +2198,11 @@ def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,
                 if force_eq_ratio == True:
                     h_ratio = [1 for h in ind_h_list[::-1]]
                     gs = gridspec.GridSpec(num_lays, 1, wspace=0.0, hspace=0.0,
-                                           width_ratios=[1, 1],
+                                           width_ratios=[1],
                                            height_ratios=h_ratio)
                 else:
                     gs = gridspec.GridSpec(num_lays, 1, wspace=0.0, hspace=0.0,
-                                           width_ratios=[1, 1],
+                                           width_ratios=[1],
                                            height_ratios=h_ratio)
                 # Find maximum field value to normalise plots.
                 max_E = None
@@ -2178,7 +2216,7 @@ def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,
                             eps = layer.n_effs**2
                         else:
                             eps = layer.n()**2
-                        nu_pts_vert = np.round(factor_pts_vert*(np.real(np.max(eps))*ind_h_list[lay] / wl_normed))
+                        nu_pts_vert = int(np.round(factor_pts_vert*(np.real(np.max(eps))*ind_h_list[lay] / wl_normed)))
                         if nu_pts_vert < 11: nu_pts_vert = 11
                         if lay == 0:
                             z_range = np.linspace(h_list[lay],0.0,nu_pts_vert)
@@ -2214,7 +2252,7 @@ def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,
                                     h_normed = float(layer.structure.height_nm)/float(layer.structure.period)
                                     shift_v_plot = h_normed*0.75
                                     nnodes = 6
-                                    EMUstack.gmsh_plot_slice(layer.E_H_field, layer.num_BMs,
+                                    field_eval.gmsh_plot_slice(layer.E_H_field, layer.num_BMs,
                                         layer.n_msh_el, layer.n_msh_pts, nnodes, layer.type_el,
                                         layer.structure.nb_typ_el, eps, layer.table_nod,
                                         layer.x_arr, layer.k_z, layer.sol1, vec_coef_fem,
@@ -2308,24 +2346,24 @@ def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,
 
                                 if E[-3:] != '(E)':  # Re(x,y,z), Im(x,y,z)
                                     max_E_lay = np.max(E_slice)
-                                    if max_E_lay > max_E or max_E == None:
+                                    if max_E is None or max_E_lay > max_E:
                                         max_E = max_E_lay
                                     min_E_lay = np.min(E_slice)
-                                    if min_E_lay < min_E or min_E == None:
+                                    if min_E is None or min_E_lay < min_E:
                                         min_E = min_E_lay
                                 elif E == 'Re(E)':
                                     max_E_lay = np.max(np.real(np.sqrt(E_fields_tot[lay])))
-                                    if max_E_lay > max_E or max_E == None:
+                                    if max_E is None or max_E_lay > max_E:
                                         max_E = max_E_lay
                                     min_E_lay = np.min(np.real(np.sqrt(E_fields_tot[lay])))
-                                    if min_E_lay < min_E or min_E == None:
+                                    if min_E is None or min_E_lay < min_E:
                                         min_E = min_E_lay
                                 else:
                                     max_E_lay = np.max(np.abs(epsE_fields_tot[lay]))
-                                    if max_E_lay > max_E or max_E == None:
+                                    if max_E is None or max_E_lay > max_E:
                                         max_E = max_E_lay
                                     min_E_lay = np.min(np.abs(epsE_fields_tot[lay]))
-                                    if min_E_lay < min_E or min_E == None:
+                                    if min_E is None or min_E_lay < min_E:
                                         min_E = min_E_lay
 
                                 if lay == 0:
@@ -2369,16 +2407,7 @@ def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,
                                             ax1.plot([b, b], [start, end], 'w',
                                                      linewidth=2)
 
-                                # else:
-                                # scale_plot = 2.0
-                                # shift_x_plot = -.5
-                                # shift_v_plot = h_normed*0.75
-                                # EMUstack.gmsh_plot_slice_1d(layer.E_H_field, layer.num_BMs,
-                                #     struct.n_msh_el, struct.n_msh_pts, struct.type_el,
-                                #     struct.nb_typ_el, n_eff, struct.table_nod,
-                                #     struct.x_arr, layer.k_z, layer.sol1, vec_coef,
-                                #     h_normed, wl_normed, gmsh_file_pos,
-                                #     scale_plot, shift_v_plot, shift_x_plot)
+
 
                         # ThinFilm layer, using Plane Wave basis.
                         else:
@@ -2466,7 +2495,7 @@ def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,
                                 x1 = x_range
                                 y1 = np.array([0])
                                 y2 = gradient*x_range
-                                for i in xrange(np.size(y2)):
+                                for i in range(np.size(y2)):
                                     if y2[i] > 1:
                                         y2 = np.resize(y2, (i,))
                                         x1 = np.resize(x1, (i,))
@@ -2476,7 +2505,7 @@ def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,
                                 x1 = x_range[::-1]
                                 y1 = np.array([0])
                                 y2 = gradient*x_range
-                                for i in xrange(np.size(y2)):
+                                for i in range(np.size(y2)):
                                     if y2[i] > 1:
                                         y2 = np.resize(y2,(i,))
                                         x1 = np.resize(x1,(i,))
@@ -2486,9 +2515,9 @@ def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,
                             E_field = np.zeros((np.size(x1), np.size(y1),
                                                np.size(z_range)), dtype='complex')
 
-                            for z in xrange(np.size(z_range)):
-                                for y in xrange(np.size(y1)):
-                                    for x in xrange(np.size(x1)):
+                            for z in range(np.size(z_range)):
+                                for y in range(np.size(y1)):
+                                    for x in range(np.size(x1)):
                                         if sli == 'diag+' or sli == 'diag-' or sli == 'special+' or sli == 'special-':
                                             if layer.structure.height_nm == 'semi_inf':
                                                 expo_down = np.exp(1j*(alpha*x1[x]+beta*y2[x]-gamma*z_range[z]))
@@ -2533,24 +2562,24 @@ def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,
 
                                 if E[-3:] != '(E)':
                                     max_E_lay = np.max(E_slice)
-                                    if max_E_lay > max_E or max_E == None:
+                                    if max_E is None or max_E_lay > max_E:
                                         max_E = max_E_lay
                                     min_E_lay = np.min(E_slice)
-                                    if min_E_lay < min_E or min_E == None:
+                                    if min_E is None or min_E_lay < min_E:
                                         min_E = min_E_lay
                                 elif E == 'Re(E)':
                                     max_E_lay = np.max(np.real(np.sqrt(E_fields_tot[lay])))
-                                    if max_E_lay > max_E or max_E == None:
+                                    if max_E is None or max_E_lay > max_E:
                                         max_E = max_E_lay
                                     min_E_lay = np.min(np.real(np.sqrt(E_fields_tot[lay])))
-                                    if min_E_lay < min_E or min_E == None:
+                                    if min_E is None or min_E_lay < min_E:
                                         min_E = min_E_lay
                                 else:
                                     max_E_lay = np.max(np.real(epsE_fields_tot[lay]))
-                                    if max_E_lay > max_E or max_E == None:
+                                    if max_E is None or max_E_lay > max_E:
                                         max_E = max_E_lay
                                     min_E_lay = np.min(np.real(epsE_fields_tot[lay]))
-                                    if min_E_lay < min_E or min_E == None:
+                                    if min_E is None or min_E_lay < min_E:
                                         min_E = min_E_lay
 
                                 if max_E_field == 1:
@@ -2657,7 +2686,10 @@ def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,
                                   [max_E, max_E]], colour_res,
                                   cmap=choice_cmap, vmin=min_E, vmax=max_E),
                                   cax=cax)
-                cb.set_clim(min_E, max_E)
+                if hasattr(cb, 'set_clim'):
+                    cb.set_clim(min_E, max_E)
+                elif hasattr(cb, 'mappable') and hasattr(cb.mappable, 'set_clim'):
+                    cb.mappable.set_clim(min_E, max_E)
                 if E == 'eps_abs(E)':
                     cax.set_ylabel(r'$|\epsilon|$ |E|$^2$')
                 elif E == 'Re(E)':
@@ -2670,10 +2702,10 @@ def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,
                      'stack_num': stack_num, 'add': add_name},
                         bbox_inches='tight')
 
-                fig.clf()
+                plt.close(fig)
 
                             # elif sli == 'yz':
-                            #     for x_of_yz in xrange(np.size(x1)):
+                            #     for x_of_yz in range(np.size(x1)):
                             #         fig1 = plt.figure(num=None, figsize=(12, 21), dpi=80, facecolor='w', edgecolor='k')
                             #         for i in range(len(E_super)):
                             #             ax1 = fig1.add_subplot(4, 1, i+1)
@@ -2947,7 +2979,7 @@ def field_values(stacks_list, lay_interest=0, xyz_values=[(0.1,0.1,0.1)]):
             calc_E_TM_y_array = np.zeros(len(xyz_values),dtype='complex')
             calc_E_TM_z_array = np.zeros(len(xyz_values),dtype='complex')
 
-            for i in xrange(len(xyz_values)):
+            for i in range(len(xyz_values)):
 
                 (x1,y1,z1) = np.array(xyz_values[i])#/float(pstack.layers[lay_interest].structure.period)
 
@@ -3010,7 +3042,7 @@ def fields_3d(stacks_list, lay_interest=1):
             lay_interest  (int): the index of the layer considered within \
             the stack.
     """
-    from fortran import EMUstack
+    import field_eval
     import subprocess
 
     nnodes=6
@@ -3044,7 +3076,7 @@ def fields_3d(stacks_list, lay_interest=1):
 
             layer_name = 'Lay_' + zeros_int_str(lay_interest) + 'Stack_' + str(stack_num)
 
-            EMUstack.gmsh_plot_field_3d(wl_normed, h_normed, meat.num_BMs,
+            field_eval.gmsh_plot_field_3d(wl_normed, h_normed, meat.num_BMs,
                 meat.E_H_field, meat.n_msh_el, meat.n_msh_pts,
                 nnodes, meat.type_el, meat.structure.nb_typ_el, meat.table_nod,
                 meat.k_z, meat.sol1, vec_coef, meat.x_arr, gmsh_file_pos, layer_name)
@@ -3075,7 +3107,7 @@ def Bloch_fields_1d(stacks_list, lay_interest=None):
     stack_num = 0
     for pstack in stacks_list:
         # by default find all 1D layers
-        if lay_interest == None:
+        if lay_interest is None:
             lay_interest = []
             for l in range(len(pstack.layers)):
                 if isinstance(pstack.layers[l],mode_calcs.Simmo):
@@ -3095,9 +3127,10 @@ def Bloch_fields_1d(stacks_list, lay_interest=None):
                 eps = meat.n_effs**2
 
                 struct = meat.structure
+                struct_type_el = np.asarray(struct.type_el, dtype=int)
                 boundary = []
-                for i in range(len(struct.type_el) - 1):
-                    if struct.type_el[i] != struct.type_el[i+1]:
+                for i in range(len(struct_type_el) - 1):
+                    if struct_type_el[i] != struct_type_el[i+1]:
                         boundary.append(struct.x_arr[2*(i+1)])
 
                 fields = ['Re(E_x)', 'Im(E_x)', 'Re(E_y)', 'Im(E_y)', 'Re(E_z)', 'Im(E_z)']
@@ -3109,11 +3142,11 @@ def Bloch_fields_1d(stacks_list, lay_interest=None):
                     for i in range(len(fields)):
                         E = fields[i]
                         # sol_P2([Ex,Ey,Ez],P2_interpolation_points,nval,nel)
-                        BM_sol = meat.sol1[i/2,:,BM,:]
+                        BM_sol = meat.sol1[i // 2, :, BM, :]
                         if E[0] == 'R': plot_sol = [np.real(BM_sol[0,0])]
                         else: plot_sol = [np.imag(BM_sol[0,0])]
                         plot_sol_abs[0] += np.real(np.sqrt((BM_sol[0,0])* np.conj(BM_sol[0,0])))
-                        plot_sol_eps_abs[0] += np.real(eps[struct.type_el[0]-1] * np.sqrt((BM_sol[0,0])* np.conj(BM_sol[0,0])))
+                        plot_sol_eps_abs[0] += np.real(eps[struct_type_el[0]-1] * np.sqrt((BM_sol[0,0])* np.conj(BM_sol[0,0])))
                         for x in range(struct.n_msh_el - 1):
                             if E[0] == 'R':
                                 plot_sol.append(np.real(BM_sol[1,x]))
@@ -3123,8 +3156,8 @@ def Bloch_fields_1d(stacks_list, lay_interest=None):
                                 plot_sol.append(np.imag(BM_sol[2,x] + BM_sol[0,x+1]) / 2)
                             plot_sol_abs[2*x+1] += np.real(np.sqrt((BM_sol[1,x])* np.conj(BM_sol[1,x])))
                             plot_sol_abs[2*x+2] += np.real(np.sqrt(((BM_sol[2,x] + BM_sol[0,x+1]) / 2)* np.conj((BM_sol[2,x] + BM_sol[0,x+1]) / 2)))
-                            plot_sol_eps_abs[2*x+1] += np.real(eps[struct.type_el[x]-1] * np.sqrt((BM_sol[1,x])* np.conj(BM_sol[1,x])))
-                            plot_sol_eps_abs[2*x+2] += np.real(eps[struct.type_el[x]-1] * np.sqrt(((BM_sol[2,x] + BM_sol[0,x+1]) / 2)* np.conj((BM_sol[2,x] + BM_sol[0,x+1]) / 2)))
+                            plot_sol_eps_abs[2*x+1] += np.real(eps[struct_type_el[x]-1] * np.sqrt((BM_sol[1,x])* np.conj(BM_sol[1,x])))
+                            plot_sol_eps_abs[2*x+2] += np.real(eps[struct_type_el[x]-1] * np.sqrt(((BM_sol[2,x] + BM_sol[0,x+1]) / 2)* np.conj((BM_sol[2,x] + BM_sol[0,x+1]) / 2)))
 
                         if E[0] == 'R':
                             plot_sol.append(np.real(BM_sol[1,-1]))
@@ -3134,8 +3167,8 @@ def Bloch_fields_1d(stacks_list, lay_interest=None):
                             plot_sol.append(np.imag(BM_sol[2,-1]))
                         plot_sol_abs[-2] += np.real(np.sqrt((BM_sol[1,x])* np.conj(BM_sol[1,x])))
                         plot_sol_abs[-1] += np.real(np.sqrt((BM_sol[2,x])* np.conj(BM_sol[2,x])))
-                        plot_sol_eps_abs[-2] += np.real(eps[struct.type_el[-1]-1] * np.sqrt((BM_sol[1,x])* np.conj(BM_sol[1,x])))
-                        plot_sol_eps_abs[-1] += np.real(eps[struct.type_el[-1]-1] * np.sqrt((BM_sol[2,x])* np.conj(BM_sol[2,x])))
+                        plot_sol_eps_abs[-2] += np.real(eps[struct_type_el[-1]-1] * np.sqrt((BM_sol[1,x])* np.conj(BM_sol[1,x])))
+                        plot_sol_eps_abs[-1] += np.real(eps[struct_type_el[-1]-1] * np.sqrt((BM_sol[2,x])* np.conj(BM_sol[2,x])))
 
                         ax1 = fig.add_subplot(6, 2, i+1)
                         ax1.plot(struct.x_arr, plot_sol)
@@ -3243,7 +3276,7 @@ def Bloch_fields_1d(stacks_list, lay_interest=None):
                     plt.suptitle(r'BM %(BM)i, k$_z$ = %(re)7.3f + %(im)7.3fi (d)'% \
                         {'re' : np.real(meat.k_z[BM]), 'im' : np.imag(meat.k_z[BM]), 'BM' : BM})
                     plt.savefig(dir_name + '/' + name_lay, bbox_inches = 'tight')
-                    fig.clf()
+                    plt.close(fig)
 
             except ValueError:
                 print("fields_1d can only plot 1D fields of 1D_array "\

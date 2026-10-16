@@ -1,105 +1,119 @@
-Welcome to EMUstack!
---------------------
+# EMUstack: Finite Element Maxwell Mode-Matching Solver
 
-EMUstack is an open-source simulation package for calculating light propagation through multi-layered stacks of dispersive, lossy, nanostructured, optical media. It implements a generalised scattering matrix method, which extends the physical intuition of thin film optics to complex structures.
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Backend: Netgen/NGSolve](https://img.shields.io/badge/FEM%20Backend-Netgen%2FNGSolve%206.2-orange.svg)](https://ngsolve.org/)
+[![Zero Fortran](https://img.shields.io/badge/Fortran-0%25%20(Pure%20Python%20%2B%20NGSolve)-brightgreen.svg)](#modernization)
 
+EMUstack is an open-source simulation package for calculating light propagation, reflection, transmission, and absorption through multi-layered stacks of dispersive, lossy, nanostructured optical media. It implements a generalised scattering matrix method, extending the physical intuition of thin film optics to complex nanostructured systems.
 
-ORIGIN
-------
+---
 
-EMUstack is the product of many years research, and is designed primarily as a research tool.
-The underpinnings of EMUstack were majoritively developed within CUDOS (the ARC Centre of Excellence for Ultra-high bandwidth Devices for Optical Systems), at its University of Sydney (USyd) and University of Technology Sydney (UTS) nodes.
+## What's New in EMUstack v2.0
 
-The scattering matrix method formalism was developed by Lindsay Botten, Ara Asatryan, and Kokou Dossou at UTS. The FEM routine was developed by Kokou Dossou while at the Université du Québec en Outaouais, Université Laval and UTS.
+* **100% Zero Fortran**: Completely eliminated all legacy Fortran 90 routines, `f2py` bindings, and static library dependencies.
+* **Modern FEM Engines**:
+  * **2D FEM**: Built on [Netgen / NGSolve](https://ngsolve.org/) (v6.2+), using higher-order vector elements ($H(\text{curl})$ and $H^1$) with exact curved Bézier geometry.
+  * **1D FEM**: Pure Python/SciPy implementation with exact rational element matrices and sparse shift-invert eigensolvers.
+* **Dual Geometry Pipeline**: Native in-memory Netgen CSG (Path I) and Gmsh `.geo` / MSH 2.2 import with 1-based periodic node identification (Path II).
+* **Direct FEM $\leftrightarrow$ FEM Mode Matching**: Inter-layer scattering matrices are computed directly between structured layers without requiring artificial thin-film air spacers.
+* **Modern Python Packaging**: Standard PEP 517/518/621 `pyproject.toml`, installable via `pip install -e .`.
 
-EMUstack was written by Björn Sturmberg during his Ph.D. at USyd, which was supported by the Australian Renewable Energy Agency. THE FEM routine was written by Kokou Dossou, and Felix Lawrence created the smooth f2py interface of Fortran and Python while at UTS.
+---
 
+## Installation
 
-LICENSE
--------
+### Requirements
 
-EMUstack is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 3 of the License, or (at your option) any later version.
+* Python **>= 3.11**
+* `numpy>=1.26`, `scipy>=1.11`, `matplotlib>=3.8`
+* `ngsolve>=6.2.2600`, `netgen-mesher>=6.2.2600`
+* Optional: `gmsh` for Path II mesh generation from `.geo` templates
 
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+### Install with pip
 
-You should have received a copy of the GNU General Public License in the EMUstack/ directory. If not, see `here <http://www.gnu.org/copyleft/gpl.html>`_
+```bash
+# Editable install from repo
+pip install -e .
 
+# With optional high-performance MKL Pardiso solvers
+pip install -e ".[fast]"
 
-OFFICIALLY SUPPORTED PLATFORMS
-------------------------------
+# With test suite dependencies
+pip install -e ".[dev]"
+```
 
-EMUstack has been developed for use on Linux and Unix-like operating systems. It may be easily ported to other operating systems, but there are no current plans for doing so. If you are willing and able to do so, please get in contact!
+---
 
+## Quickstart
 
-LEGACY SETUP
--------
+```python
+import numpy as np
+from EMUstack import objects, materials, stack
 
-EMUstack has been developed on Ubuntu and is easiest to install on this platform. Simply sudo apt-get install the packages listed in the dependencies.txt file and then run setup.sh.
-On other linux distributions you may have to install some packages manually, hints for which are given in the documentation.
+# Define incident light (wavelength sweep 400 - 800 nm, TE pol)
+light = objects.Light(wl_nm=np.linspace(400, 800, 41), pol='TE', theta=0.0)
 
-DOCKER SETUP
-------------
+# Materials
+air = materials.Material(1.0)
+glass = materials.Material(1.5)
+si = materials.Si_c
 
-The docker installation is the preferred and supported method. The detailed instructions for the installation procedure can be found [here](./docker_install.md).
+# 1D grating: period = 400 nm, duty cycle 50%
+grating = objects.NanoStruct(
+    periodicity='1D_array',
+    period=400.0,
+    diameter1=200.0,
+    background=air,
+    inclusion_a=si,
+    thickness=150.0,
+    num_modes=15,
+)
 
+# Stack layers: Air -> Grating -> Glass substrate
+sim_stack = stack.Stack([
+    (air, 0.0),
+    (grating, 150.0),
+    (glass, 0.0),
+], light=light)
 
-TESTING
--------
+# Spectra
+R = sim_stack.R()
+T = sim_stack.T()
+A = 1.0 - R - T
+```
 
-EMUstack comes with a range of tests to ensure it is running correctly. These are found in the EMUstack/tests directories.
+---
 
+## Package Structure
 
-FILE MAP
---------
+* `backend/`
+  * `objects.py`: High-level nanostructure, thin film, light, and stack classes.
+  * `fem_2d.py`: 2D Maxwell de Rham pencil solver powered by NGSolve.
+  * `fem_1d.py`: 1D coupled pencil solver in pure Python/SciPy.
+  * `meshing.py`: Dual geometry pipeline (Netgen CSG Path I, Gmsh MSH 2.2 Path II).
+  * `mode_matching.py`: Direct FEM $\leftrightarrow$ FEM interface scattering matrices.
+  * `mode_calcs.py`: Modal solver dispatchers and Bloch mode containers.
+  * `stack.py`: Scattering matrix cascading (Redheffer star product).
+  * `materials.py`: Dispersive optical constant tables and Drude models.
+  * `plotting.py`: Near-field spatial distributions and cross-sectional visualizations.
+  * `data/`: Tabulated refractive index data (62 materials) and mesh templates.
+* `examples/`: Extensive simulation tutorials (`simo_010` to `simo_091`).
+* `examples_netgen/`: Modern native Netgen CSG examples.
+* `tests/`: Comprehensive pytest verification suite.
 
-**backend** contains all the modules that make up EMUstack.
+---
 
-____ **data** contains refractive index data for materials and solar irradiance spectra.
+## Testing
 
-____ **fortran** the Fortran code for the FEM solvers and the scattering matrix calculations.
+Run the automated test suite with pytest:
 
-________ **lib** libraries used by the Fortran routines.
+```bash
+pytest tests/ -v
+```
 
-________ **msh** location of Gmsh FEM mesh files, including template files.
+---
 
-**docs** contains the documentation.
+## License
 
-____ **build** the documentation you want to read.
-
-________ **doctrees** created by sphynix in compilation of docs.
-
-________ **html** in web format.
-
-________ **latex** in pdf format.
-
-____ **source** the documentation you want to edit.
-
-**examples** contains example simulations. Numbered files form a tutorial.
-
-**reload_simo** contains python script demonstrating how to load a .npz file.
-
-**tests** test files, best run with nosetests.
-
-____ **ref** reference data for tests.
-
-*dependencies.txt* list of linux packages needed to run EMUstack.
-
-*LICENSE.txt* GNU GPL software license.
-
-*README.rst* this file...
-
-*setup.sh* bash script that compiles Fortran code and runs tests.
-
-
-HELP!
------
-
-The growing human-readable documentation for EMUstack lives in EMUstack/docs/ and online at `readthedocs <http://emustack.readthedocs.org/en/latest/index.html>`_.org.
-
-Limited community support is `available on the GitHub site <https://github.com/bjornsturmberg/EMUstack>`_, and via `the EMUstack mailing list <https://groups.google.com/forum/#!forum/emustack>`_. Feel free to ask questions.
-
-
-CONTRIBUTING
-------------
-
-If you make an improvement to EMUstack, please share it with others by contributing back to the project via the GitHub site.
+EMUstack is free software released under the **GNU General Public License v3 or later (GPL-3.0-or-later)**. See `LICENSE.txt` for details.

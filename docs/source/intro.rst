@@ -19,5 +19,5 @@ Taking full advantage of the boundary-element nature of the scattering matrix me
 
 EMUstack is a completely open source package, utilising free, open source compilers, meshing programs and libraries. 
 All user interaction with EMUstack is done using the dynamic and easy to script language of python.
-The low-level numerical routines are written in Fortran for optimal performance making use of the LAPACK, ARPACK, and UMFPACK libraries. The Fortran routines are compiled as python subroutines using f2py.
-EMUstack currently comes with template FEM mesh for 1D and 2D gratings, Nanowire/Nanohole arrays, elliptical inclusions and split ring resonators. The mesh of other structures may be easily created using the open source program `gmsh <http://geuz.org/gmsh/>`_. 
+The numerical solvers are implemented in pure Python/NumPy/SciPy for 1D FEM and NGSolve/Netgen for 2D FEM, eliminating legacy Fortran dependencies while achieving high performance via sparse solvers and Arnoldi iteration.
+EMUstack comes with built-in geometry generation via Netgen as well as Gmsh mesh import for 1D and 2D gratings, Nanowire/Nanohole arrays, elliptical inclusions and split ring resonators. 

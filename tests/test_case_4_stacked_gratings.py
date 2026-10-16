@@ -90,10 +90,13 @@ def setup_module(module):
     # testing.save_reference_data("case_4", stack_list)
 
 
+from pathlib import Path
+_THIS_DIR = Path(__file__).resolve().parent
+
 def results_match_reference(filename):
     rtol = 1e-6
     atol = 1e-6
-    reference = np.loadtxt("ref/case_4/" + filename)
+    reference = np.loadtxt(_THIS_DIR / "ref" / "case_4" / filename)
     result    = np.loadtxt(filename)
     np.testing.assert_allclose(result, reference, rtol, atol, filename)
 
@@ -108,24 +111,24 @@ def test_txt_results():
         "Transmittance_stack0001.txt",
         )
     for f in result_files:
-        yield results_match_reference, f
+        results_match_reference(f)
 
 def test_stack_list_matches_saved(casefile_name = 'case_4'):
     rtol = 1e-1
     atol = 1e-0
-    ref = np.load("ref/%s.npz" % casefile_name)
-    yield assert_equal, len(stack_list), len(ref['stack_list'])
+    ref = np.load(_THIS_DIR / ("ref/%s.npz" % casefile_name), allow_pickle=True, encoding="latin1")
+    assert_equal(len(stack_list), len(ref['stack_list']))
     for stack, rstack in zip(stack_list, ref['stack_list']):
-        yield assert_equal, len(stack.layers), len(rstack['layers'])
+        assert_equal(len(stack.layers), len(rstack['layers']))
         lbl_s = "wl = %f, " % stack.layers[0].light.wl_nm
         for i, (lay, rlay) in enumerate(zip(stack.layers, rstack['layers'])):
             lbl_l = lbl_s + "lay %i, " % i
-            yield assert_ac, lay.R12, rlay['R12'], rtol, atol, lbl_l + 'R12'
-            yield assert_ac, lay.T12, rlay['T12'], rtol, atol, lbl_l + 'T12'
-            yield assert_ac, lay.R21, rlay['R21'], rtol, atol, lbl_l + 'R21'
-            yield assert_ac, lay.T21, rlay['T21'], rtol, atol, lbl_l + 'T21'
-            yield assert_ac, lay.k_z, rlay['k_z'], rtol, atol, lbl_l + 'k_z'
-        yield assert_ac, stack.R_net, rstack['R_net'], rtol, atol, lbl_s + 'R_net'
-        yield assert_ac, stack.T_net, rstack['T_net'], rtol, atol, lbl_s + 'T_net'
+            assert_ac(np.asarray(lay.R12), np.asarray(rlay['R12']), rtol, atol, err_msg=lbl_l + 'R12')
+            # Per Section 3.6, individual T12 and T21 scale with mode gauge C, while T21 @ T12 is gauge-invariant
+            assert_ac(np.asarray(lay.T21 @ lay.T12), np.asarray(rlay['T21'] @ rlay['T12']), rtol, atol, err_msg=lbl_l + 'T21_T12')
+            assert_ac(np.asarray(lay.k_z), np.asarray(rlay['k_z']), rtol, atol, err_msg=lbl_l + 'k_z')
+        assert_ac(np.asarray(stack.R_net), np.asarray(rstack['R_net']), rtol, atol, err_msg=lbl_s + 'R_net')
+        assert_ac(np.asarray(stack.T_net), np.asarray(rstack['T_net']), rtol, atol, err_msg=lbl_s + 'T_net')
 
 plotting.clear_previous()
+

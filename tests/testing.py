@@ -15,7 +15,7 @@ def save_reference_data(casefile_name, stack_list):
             rlay['R21']  = lay.R21
             rlay['T21']  = lay.T21
             rlay['k_z']  = lay.k_z
-            if isinstance(rlay, Simmo):
+            if isinstance(lay, Simmo):
                 rlay['sol1'] = lay.sol1
             rstack['layers'].append(rlay)
         rstack['R_net'] = stack.R_net

@@ -25,7 +25,7 @@ import time
 import datetime
 import numpy as np
 import sys
-from multiprocessing import Pool
+from multiprocessing.dummy import Pool
 sys.path.append("../backend/")
 
 import objects
@@ -56,7 +56,7 @@ period = 600
 
 # In this example we set the number of Bloch modes to use in the simulation
 # Be default it is set to be slightly greater than the number of PWs.
-num_BMs = 200
+num_BMs = 50
 
 superstrate = objects.ThinFilm(period, height_nm = 'semi_inf',
     material = materials.Air, loss = False)

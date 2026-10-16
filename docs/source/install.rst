@@ -7,25 +7,19 @@ Installation
 Which backend are you installing?
 --------------------------------------
 
-EMUstack solves a Bloch eigenproblem in each nanostructured layer. In the tree as released that
-eigenproblem is solved by a **Fortran** backend (``backend/fortran/``, built with ``f2py`` +
-UMFPACK). The port replaces that engine with one of two modern FEM backends. Everything else — the
-1D grating solver, the plane-wave Resolutes, the Redheffer stack recursion, the public API — is the
-same in both.
+EMUstack solves a Bloch eigenproblem in each nanostructured layer. The legacy Fortran
+backend has been completely replaced by modern pure Python and NGSolve backends. Everything else —
+the plane-wave Resolutes, the Redheffer stack recursion, the public API — is preserved verbatim.
 
-**The decision is taken: Option A (NGSolve) is the backend being implemented.** Option B is kept
-documented here because its installation and API surface were verified on this machine and because
-switching later is possible, but it is not specified at implementation level and nothing in the
-codebase is written against it.
+Installation is pure Python via ``pip install -e .`` within an environment providing ``ngsolve`` and standard scientific Python packages.
 
 ================================== ================================================================== ========================================================
-option                             2D FEM engine                                                      status
+backend                            2D FEM engine                                                      status
 ================================== ================================================================== ========================================================
-**Legacy Fortran**                 hand-written ``P2``/``P3`` elements + bundled ARPACK + UMFPACK     present in this tree; superseded by the port.
-                                                                                                      Keep it only to regenerate references
-**Option A - NGSolve** (chosen)    ``ngsolve`` ``HCurl`` (Nedelec) x ``H1`` product space,            **selected and specified**: the 2D, geometry and
-                                   built-in ``ArnoldiSolver`` + ``Periodic(phase=...)``               API sections of ``PORTING_PLAN_EMUSTACK_FEM.md``
-                                                                                                      are written against it
+**Legacy Fortran**                 hand-written ``P2``/``P3`` elements + bundled ARPACK + UMFPACK     **Purged**: completely removed from repository.
+**NGSolve (2D)**                   ``ngsolve`` ``HCurl`` (Nedelec) x ``H1`` product space,            **Active**: pure Python/NGSolve 2D solver with
+                                   built-in ``ArnoldiSolver`` + ``Periodic(phase=...)``               native Netgen and Gmsh MSH 2.2 import.
+**Pure Python (1D)**               Coupled pencil on ``dP2(E_x) ⊕ P3(E_y) ⊕ P3(Ê_z)``                 **Active**: pure Python sparse CSR + SuperLU solver.
 **Option B - FEniCSx**             ``dolfinx`` mixed ``N1curl`` x Lagrange space, UFL forms,          installable and API-verified on 0.11.0, but
                                    SLEPc eigenproblem via ``petsc4py``/``slepc4py`` (MPI + PETSc)     **not selected** and **not** specified: sections 5,
                                                                                                       6 and 9 of the plan would be rewritten, see
@@ -410,24 +404,12 @@ in seconds on one core:
         bash -lc 'python3 ../tests/test_case_1_simple_struct.py'      # ~2 s, exit 0
     $ ./research/check_oracle_provenance.sh                          # image == this checkout?
 
-If you must build it natively, note that this checkout is missing ``backend/fortran/EMUstack.pyf``
-(the ``f2py`` signature file the Makefile consumes); it exists only inside the image
-(``docker cp`` it out). Historical instructions, for completeness and for older checkouts:
+With the completion of the port, no Fortran compiler, SuiteSparse, UMFPACK wrapper,
+or ``.mail`` files are required. EMUstack is installed directly with standard Python tools:
 
-* Install the packages in ``dependencies.txt`` (``gfortran``, ``make``, ``gmsh``, BLAS/LAPACK,
-  ``libsuitesparse-dev``) and run ``setup.sh``.
-* To use the shipped pre-compiled libraries instead of a system SuiteSparse, swap the Makefile::
+.. code-block:: console
 
-      $ cd backend/fortran/ && mv Makefile Makefile_ubuntu \
-            && mv Makefile-pre_compiled_libs Makefile && cd ../../ && ./setup.sh
-
-* SuiteSparse/UMFPACK: the current SuiteSparse is not fully compatible with 64-bit Linux; the
-  historical workaround was to backport SuiteSparse 3.4, build it into
-  ``backend/fortran/SS_installed/{lib,include}`` with ``-fPIC``, build ``metis-4.0`` and the
-  Fortran 64-bit UMFPACK wrapper (``umf4_f77zwrapper64.o``), and copy the results into the
-  backend's library directory so the package is relocatable.
-* ``gmsh`` version differences can make the final test complain; that is acceptable provided the
-  test simulation itself ran.
+    $ pip install -e .
 
 All of the above disappears with the port: no compiler, no SuiteSparse, no UMFPACK backport, no
 ``.mail`` files, no ``gmsh`` subprocess (Option A) — which is one of the main reasons for doing it.

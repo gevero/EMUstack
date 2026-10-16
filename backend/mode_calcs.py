@@ -26,8 +26,9 @@ import sys
 import os
 import paths
 sys.path.append(paths.backend_path)
+from linalg import mat
 
-from fortran import EMUstack
+
 
 _interfaces_i_have_known = {}
 pi = np.pi
@@ -75,16 +76,20 @@ class Modes(object):
 
     def prop_fwd(self, height_norm):
         """ Return the matrix P corresponding to forward propagation/decay. """
-        return np.mat(np.diag(np.exp(1j * self.k_z * height_norm)))
+        return mat(np.diag(np.exp(1j * self.k_z * height_norm)))
 
     def shear_transform(self, coords):
         """ Return the matrix Q corresponding to a shear transformation to coordinats coords. """
         alphas = np.append(self.air_ref().alphas, self.air_ref().alphas)
         if np.shape(coords) == (1,):
-            return np.mat(np.diag(np.exp(1j * (alphas * coords[0]))))
+            return mat(np.diag(np.exp(1j * (alphas * coords[0]))))
         else:
-            betas = np.append(self.air_ref().betas, self.air_ref().betas)
-            return np.mat(np.diag(np.exp(1j * (alphas * coords[0] + betas * coords[1]))))
+            if np.size(self.air_ref().betas) == 1:
+                betas = self.air_ref().betas
+            else:
+                betas = np.append(self.air_ref().betas, self.air_ref().betas)
+            return mat(np.diag(np.exp(1j * (alphas * coords[0] + betas * coords[1]))))
+
 
     def __del__(self):
         # Clean up _interfaces_i_have_known to avoid memory leak
@@ -229,7 +234,7 @@ class Anallo(Modes):
         spec_TM = self.specular_order + self.structure.num_pw_per_pol
         tot_num_pw = self.structure.num_pw_per_pol * 2
 
-        inc_amp = np.mat(np.zeros(tot_num_pw, dtype='complex128')).T
+        inc_amp = mat(np.zeros(tot_num_pw, dtype='complex128')).T
         if 'TE' == pol:
             inc_amp[spec_TE] = 1
         elif 'TM' == pol:
@@ -330,7 +335,9 @@ class Simmo(Modes):
                 num_pw_per_pol_2d = pxs.size
 
             try:
-                resm = EMUstack.calc_modes_1d(self.wl_norm(), self.num_BMs,
+                import fem_1d
+                modes = fem_1d.solve_bloch_modes_1d(
+                    self.wl_norm(), self.num_BMs,
                     self.max_order_PWs, self.structure.nb_typ_el,
                     self.structure.n_msh_pts, self.structure.n_msh_el,
                     self.structure.table_nod, self.structure.type_el,
@@ -339,16 +346,18 @@ class Simmo(Modes):
                     self.k_pll_norm()[0], self.k_pll_norm()[1], shift,
                     self.structure.plotting_fields, self.structure.plot_real,
                     self.structure.plot_imag, self.structure.plot_abs,
-                    num_pw_per_pol, num_pw_per_pol_2d, world_1d)
+                    num_pw_per_pol, num_pw_per_pol_2d, world_1d
+                )
 
-                self.k_z, J, J_dag, J_2d, J_dag_2d, self.sol1 = resm
+                self.modes = modes
+                self.k_z = modes.zeta
+                self.sol1 = modes.sol1
+                self.mode_flux = modes.mode_flux
 
                 if self.structure.world_1d is True:
-                    self.J, self.J_dag = np.mat(J), np.mat(J_dag)
+                    self.J, self.J_dag = mat(modes._J_1d), mat(modes._J_dag_1d)
                 else:
-                    self.J, self.J_dag = np.mat(J_2d), np.mat(J_dag_2d)
-                J_2d = None
-                J_dag_2d = None
+                    self.J, self.J_dag = mat(modes.J), mat(modes.J_dag)
 
             except KeyboardInterrupt:
                 print("\n\n1D FEM routine calc_modes_1d",\
@@ -356,38 +365,34 @@ class Simmo(Modes):
 
 
         elif self.structure.periodicity == '2D_array':
-            # Prepare for the mesh
-            with open(paths.msh_path+self.structure.mesh_file) as f:
-                self.n_msh_pts, self.n_msh_el = [int(i) for i in f.readline().split()]
-
-            # Size of Fortran's complex superarray (scales with mesh)
-            # In theory could do some python-based preprocessing
-            # on the mesh file to work out RAM requirements
-            cmplx_max = 2**27  # 30
-            real_max = 2**23
-            int_max = 2**22
-
             try:
-                resm = EMUstack.calc_modes_2d(
+                import fem_2d
+                modes = fem_2d.solve_bloch_modes_2d(
                     self.wl_norm(), self.num_BMs, self.max_order_PWs,
-                    FEM_debug,paths.msh_path,self.structure.mesh_file, self.n_msh_pts,
-                    self.n_msh_el, self.structure.nb_typ_el, self.n_effs,
-                    self.k_pll_norm(), shift, self.E_H_field, i_cond, itermax,
-                    self.structure.plotting_fields, self.structure.plot_real,
-                    self.structure.plot_imag, self.structure.plot_abs,
-                    num_pw_per_pol, cmplx_max, real_max, int_max)
+                    self.structure, self.n_effs,
+                    self.k_pll_norm(), shift,
+                    order=getattr(self.structure, 'space_order', 2),
+                    plotting_fields=(self.structure.plotting_fields == 1),
+                    num_pw_per_pol=num_pw_per_pol
+                )
 
-                self.k_z, J, J_dag, self.sol1, self.mode_pol, \
-                self.table_nod, self.type_el, self.x_arr = resm
-                # self.J, self.J_dag = np.mat(J), np.mat(J_dag)
+                self.modes = modes
+                self.k_z = modes.zeta
+                self.sol1 = modes.sol1
+                self.mode_pol = modes.mode_pol
+                self.mode_flux = modes.mode_flux
+                self.J = mat(modes.J)
+                self.J_dag = mat(modes.J_dag)
 
-                area = self.structure.period * self.structure.period_y
-                area_norm = area/self.structure.period**2
-                self.J, self.J_dag = np.mat(J)/area_norm, np.mat(J_dag)
+                self.table_nod = getattr(self.structure, 'table_nod', None)
+                self.type_el = getattr(self.structure, 'type_el', None)
+                self.x_arr = getattr(self.structure, 'x_arr', None)
+                self.n_msh_pts = getattr(self.structure, 'n_msh_pts', None)
+                self.n_msh_el = getattr(self.structure, 'n_msh_el', None)
 
             except KeyboardInterrupt:
-                print("\n\n2D FEM routine calc_modes_2d",\
-                "interrupted by keyboard.\n\n")
+                print("\n\n2D FEM routine calc_modes_2d",
+                      "interrupted by keyboard.\n\n")
 
         else:
             raise ValueError("NanoStruct layer must have periodicity of \
@@ -440,8 +445,8 @@ def r_t_mat(lay1, lay2):
         R21, T21, R12, T12 = r_t_mat_tf_ns(lay2, lay1)
         ref_trans = R12, T12, R21, T21
     elif isinstance(lay1, Simmo) and isinstance(lay2, Simmo):
-        raise NotImplementedError("Sorry! For, now you can put an extremely thin film between your \
-            NanoStructs")
+        import mode_matching
+        ref_trans = mode_matching.r_t_mat_ns_ns(lay1, lay2)
 
     # Store its R and T matrices for later use
     _interfaces_i_have_known[id(lay1), id(lay2)] = ref_trans
@@ -463,14 +468,14 @@ def r_t_mat_anallo(an1, an2):
     Z1 = an1.Z()
     Z2 = an2.Z()
 
-    R12 = np.mat(np.diag((Z2 - Z1)/(Z2 + Z1)))
+    R12 = mat(np.diag((Z2 - Z1)/(Z2 + Z1)))
     # N.B. there is potentially a branch choice problem here, stemming
     # from the normalisation to unit flux.
     # We normalise each field amplitude by
     # $chi^{\pm 1/2} = sqrt(k_z/k)^{\pm 1} = sqrt(Z/Zc)^{\pm 1}$
     # The choice of branch in those square roots must be the same as the
     # choice in the related square roots that we are about to take:
-    T12 = np.mat(np.diag(2.*np.sqrt(Z2)*np.sqrt(Z1)/(Z2+Z1)))
+    T12 = mat(np.diag(2.*np.sqrt(Z2)*np.sqrt(Z1)/(Z2+Z1)))
     R21 = -R12
     T21 = T12
 
@@ -495,8 +500,8 @@ def r_t_mat_tf_ns(an1, sim2):
         raise ValueError("Scattering matrices of layers are not consistent,\
             \nsome layers are 1D and others 2D. Check that world_1d status.")
 
-    A = np.mat(Z1_sqrt_inv.T * sim2.J.A)
-    B = np.mat(sim2.J_dag.A * Z1_sqrt_inv)
+    A = mat(Z1_sqrt_inv.T * sim2.J.A)
+    B = mat(sim2.J_dag.A * Z1_sqrt_inv)
 
     denominator = np.eye(len(B)) + B.dot(A)
 
@@ -512,4 +517,4 @@ def r_t_mat_tf_ns(an1, sim2):
     T21 = 2 * A * denominator.I
     # T21 = T12.T
 
-    return np.mat(R12), np.mat(T12), np.mat(R21), np.mat(T21)
+    return mat(R12), mat(T12), mat(R21), mat(T21)

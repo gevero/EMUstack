@@ -1,15 +1,65 @@
+# Bytecode and runtime caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Packaging & Build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Legacy compiled Fortran artifacts (safety purge)
 *.o
-*.pyc
-*.mail
 *.pyf
 *.exe
-backend/Data/*.geo
-backend/Data/*.log
-backend/Data/*.mail
-backend/Data/*.msh
+*.a
+
+# Transient mesh outputs & logs
+*.mail
+*.msh
+backend/data/*.log
+backend/data/*.mail
+backend/data/*.msh
+backend/data/meshes/*.log
+backend/data/meshes/*.msh
+
+# Never ignore checked-in test mail and geo files
+!backend/data/meshes/4testing-*.mail
+!backend/data/meshes/*.geo
+!backend/data/meshes/*.py
+
+# Never ignore materials databases
+!backend/data/*.txt
+
+# Backup files
+*.bak
+*.geo.bak
+
+# Simulation output artifacts
+*.pdf
+Lay_*.txt
+Lay_*.pdf
+Absorptance_*.txt
+Reflectance_*.txt
+Transmittance_*.txt
+Total_Spectra_*.pdf
+1D_*.pdf
 examples/*.txt
 examples/*.pdf
 examples/*.log
+examples/*.npz
+examples_netgen/*.txt
+examples_netgen/*.pdf
+examples_netgen/*.npz
+test*/*.txt
+test*/*.pdf
+test*/*.npz
+
+# Documentation build outputs
 docs/*.tex
 docs/*.aux
 docs/*.log
@@ -17,5 +67,13 @@ docs/*.fdb_latexmk
 docs/*.gz
 docs/*.out
 docs/*.toc
-test*/*.txt
-test*/*.pdf
+docs/build/
+
+# Jupyter & Editor
+.ipynb_checkpoints/
+.DS_Store
+*.swp
+*~
+.vscode/
+.idea/
+overrides.json

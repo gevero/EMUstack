@@ -26,7 +26,7 @@ import time
 import datetime
 import numpy as np
 import sys
-from multiprocessing import Pool
+from multiprocessing.dummy import Pool
 sys.path.append("../backend/")
 
 import objects
@@ -48,9 +48,9 @@ wl_1     = 0.85*940
 wl_2     = 1.15*940
 no_wl_1  = 600
 # Set up light objects
-wavelengths = np.linspace(wl_1, wl_2, no_wl_1)
-# wavelengths = np.array([785,788,790,792,795])
-light_list  = [objects.Light(wl, max_order_PWs = 5, theta = 0.0, phi = 0.0) for wl in wavelengths]
+# wavelengths = np.linspace(wl_1, wl_2, no_wl_1)
+wavelengths = np.array([785, 790, 795])
+light_list  = [objects.Light(wl, max_order_PWs = 2, theta = 0.0, phi = 0.0) for wl in wavelengths]
 
 
 #period must be consistent throughout simulation!!!
@@ -70,7 +70,7 @@ NH_heights = [200]
 
 def simulate_stack(light):
     ################ Evaluate each layer individually ##############
-    sim_NHs    = NHs.calc_modes(light)
+    sim_NHs    = NHs.calc_modes(light, num_BMs = 50)
     sim_strate = strate.calc_modes(light)
 
 # Loop over heights

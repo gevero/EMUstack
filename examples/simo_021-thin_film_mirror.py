@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-"""
+r"""
 EUMstack loves metal \m/
 However, as we saw in the previous example the substrate layer must be lossless,
 so that we can distinguish propagating waves from evanescent ones.
@@ -28,7 +28,7 @@ import time
 import datetime
 import numpy as np
 import sys
-from multiprocessing import Pool
+from multiprocessing.dummy import Pool
 sys.path.append("../backend/")
 
 import objects

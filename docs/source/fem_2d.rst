@@ -4,14 +4,12 @@
 2D Mesh
 --------
 
-2D FEM mesh are created using the open source program `gmsh <http://geuz.org/gmsh/>`_.
-In general they are created automatically by EMUstack using the templates files for each inclusion shape. These are stored in backend/fortran/msh. For an up to date list of templates see the 'inc_shape' entry in the NanoStruct docstring. 
+2D FEM meshes can be created natively via NGSolve/Netgen or using Gmsh.
+Templates for Gmsh inclusion shapes are stored in ``backend/data/meshes/``. For an up to date list of templates see the 'inc_shape' entry in the NanoStruct docstring. 
 
-An advantage of using the FEM to calculate the modes of layers is that there is absolutely no constraints on the content of the unit cell. If you wish to create a different structure this can be done using gmsh, which is also used to view the mesh files (select files with the extension .msh).
+An advantage of using the FEM to calculate the modes of layers is that there is absolutely no constraints on the content of the unit cell. If you wish to create a different structure this can be done using Netgen native builders or Gmsh.
 
 Note that the area of the unit cell must always be unity! This has been assumed throughout the theoretical derivations.
-
-A guide to making your own mesh from scratch is presented `here <http://numbat-au.readthedocs.io/en/latest/fem.html>`_. While the geometry in this example is different from those typically examined with EMUstack, the process is the same.
 
 Note that the Physical Surface numbers set in the .geo file must map onto the following array in EMUstack ::
 
@@ -22,26 +20,7 @@ Note that the Physical Surface numbers set in the .geo file must map onto the fo
 So, for example, Physical Surface(1) is st.background and Physical Surface(2) is inclusion_a.
 
 
-FEM Errors
------------
+FEM Solver
+----------
 
-There are 2 errors that can be easily triggered within the Fortran FEM routines. These both cause them to simulation to abort and the terminal to be unresponsive (until you kill python or the screen session as described in :ref:`screen_sesh`).
-
-The first of these is ::
-
-	Error with _naupd, info_32 =           -3
-	Check the documentation in _naupd.
-	Aborting...
-
-Long story short, this indicates that the FEM mesh is too coarse for solutions for higher order Bloch modes (Eigenvaules) to converge. To see this run the simulation with FEM_debug = 1 (in mode_calcs.py) and it will print the number of converged Eigenvalues nconv != nval.
-This error is easily fixed by increasing the mesh resolution. Decrease 'lc_bkg' and/or increase 'lc2' etc.
-
-
-The second error is :: 
-
-	Error with _naupd, info_32 =           -8
-	Check the documentation in _naupd.
-	Aborting...
-
-This is the opposite problem, when the mesh is so fine that the simulation is overloading the memory of the machine. More accurately the memory depends on the number of Eigenvalues being calculated as well as the number of FEM mesh points.
-The best solution to this is to increase 'lc_bkg' and/or decrease 'lc2' etc.
+The 2D mode solver uses NGSolve to assemble Maxwell curl-curl / grad-div generalized eigenvalue pencils on periodic Nedelec (HCurl) and Lagrange (H1) finite element spaces. Convergence failures raise ``FEMConvergenceError`` rather than aborting.

@@ -96,10 +96,7 @@ def simulate_stack(light):
     return stack
 
 def setup_module(module):
-    # Run in parallel across wavelengths.
-    # This has to be in a setup_module otherwise nosetests will crash :(
-    pool = Pool(3)
-    module.stack_list = pool.map(simulate_stack, light_list)
+    module.stack_list = [simulate_stack(l) for l in light_list]
 
     active_layer_nu = 3 # Specify which layer is the active one (where absorption generates charge carriers).
     plotting.t_r_a_plots(stack_list, active_layer_nu=active_layer_nu, save_txt=True)
@@ -112,10 +109,13 @@ def setup_module(module):
     # testing.save_reference_data("case_0", stack_list)
 
 
+from pathlib import Path
+_THIS_DIR = Path(__file__).resolve().parent
+
 def results_match_reference(filename):
     rtol = 1e-6
     atol = 1e-6
-    reference = np.loadtxt("ref/case_0/" + filename)
+    reference = np.loadtxt(_THIS_DIR / "ref" / "case_0" / filename)
     result    = np.loadtxt(filename)
     np.testing.assert_allclose(result, reference, rtol, atol, filename)
 
@@ -134,25 +134,31 @@ def test_txt_results():
         "Lay_Trans_4_stack0001.txt",
         "Reflectance_stack0001.txt",
         "Transmittance_stack0001.txt",
-        )
+    )
     for f in result_files:
-        yield results_match_reference, f
+        results_match_reference(f)
 
-def test_stack_list_matches_saved(casefile_name = 'case_0'):
+def test_stack_list_matches_saved(casefile_name='case_0'):
     rtol = 1e-6
     atol = 1e-6
-    ref = np.load("ref/%s.npz" % casefile_name, allow_pickle=True, encoding='latin1')
-    yield assert_equal, len(stack_list), len(ref['stack_list'])
+    ref = np.load(_THIS_DIR / f"ref/{casefile_name}.npz", allow_pickle=True, encoding='latin1')
+    assert_equal(len(stack_list), len(ref['stack_list']))
     for stack, rstack in zip(stack_list, ref['stack_list']):
-        yield assert_equal, len(stack.layers), len(rstack['layers'])
+        assert_equal(len(stack.layers), len(rstack['layers']))
         lbl_s = "wl = %f, " % stack.layers[0].light.wl_nm
         for i, (lay, rlay) in enumerate(zip(stack.layers, rstack['layers'])):
             lbl_l = lbl_s + "lay %i, " % i
-            yield assert_ac, lay.R12, rlay['R12'], rtol, atol, lbl_l + 'R12'
-            yield assert_ac, lay.T12, rlay['T12'], rtol, atol, lbl_l + 'T12'
-            yield assert_ac, lay.R21, rlay['R21'], rtol, atol, lbl_l + 'R21'
-            yield assert_ac, lay.T21, rlay['T21'], rtol, atol, lbl_l + 'T21'
-            yield assert_ac, lay.k_z, rlay['k_z'], rtol, atol, lbl_l + 'k_z'
-            #TODO: yield assert_ac, lay.sol1, rlay['sol1']
-        yield assert_ac, stack.R_net, rstack['R_net'], rtol, atol, lbl_s + 'R_net'
-        yield assert_ac, stack.T_net, rstack['T_net'], rtol, atol, lbl_s + 'T_net'
+            assert_ac(np.asarray(lay.R12), np.asarray(rlay['R12']), rtol, atol, lbl_l + 'R12')
+            assert_ac(np.asarray(lay.T12), np.asarray(rlay['T12']), rtol, atol, lbl_l + 'T12')
+            assert_ac(np.asarray(lay.R21), np.asarray(rlay['R21']), rtol, atol, lbl_l + 'R21')
+            assert_ac(np.asarray(lay.T21), np.asarray(rlay['T21']), rtol, atol, lbl_l + 'T21')
+            assert_ac(np.asarray(lay.k_z), np.asarray(rlay['k_z']), rtol, atol, lbl_l + 'k_z')
+            #TODO: assert_ac(lay.sol1, rlay['sol1'])
+        assert_ac(np.asarray(stack.R_net), np.asarray(rstack['R_net']), rtol, atol, lbl_s + 'R_net')
+        assert_ac(np.asarray(stack.T_net), np.asarray(rstack['T_net']), rtol, atol, lbl_s + 'T_net')
+
+if __name__ == '__main__':
+    setup_module(sys.modules[__name__])
+    test_txt_results()
+    test_stack_list_matches_saved()
+    print("test_case_0 passed successfully!")

@@ -31,7 +31,7 @@ import numpy as np
 from scipy import optimize
 import csv
 import sys
-from multiprocessing import Pool
+from multiprocessing.dummy import Pool
 sys.path.append("../backend/")
 
 import objects
@@ -55,7 +55,7 @@ max_freq = 1.0*f_0
 n_freqs = 2
 min_kx = 0.6*k_0
 max_kx = 30*k_0
-n_kxs = 40
+n_kxs = 3
 freq_list = np.linspace(max_freq, min_freq, n_freqs)
 wl_list = (c_speed/freq_list)
 kx_list = np.linspace(min_kx, max_kx, n_kxs)
@@ -78,7 +78,7 @@ NW_diameter = NW_rads*2
 NW_array = objects.NanoStruct('2D_array', period, NW_diameter,
     height_nm=wl_0/(2*n), inclusion_a=materials.Material(0.0 + 1e6j),
     background=materials.Material(n), loss=True, hyperbolic=True,
-    make_mesh_now=True, force_mesh=True, lc_bkg=0.05, lc2=4.0)
+    make_mesh_now=True, force_mesh=False, lc_bkg=0.1, lc2=4.0)
 
 
 def simulate_stack(lyte):
@@ -87,7 +87,7 @@ def simulate_stack(lyte):
     light = objects.Light(wl, max_order_PWs=2,
                           k_parallel=[kx, 0.000000000001])
     ################ Evaluate each layer individually ##############
-    sim_NWs = NW_array.calc_modes(light)
+    sim_NWs = NW_array.calc_modes(light, num_BMs=30)
     sim_strate = strate.calc_modes(light)
     stack = Stack((sim_strate, sim_NWs, sim_strate))
     stack.calc_scat(pol='TE')
@@ -113,8 +113,10 @@ def mode_finder(xxx_todo_changeme):
             if np.imag(det_mat_slice[j])*np.imag(det_mat_slice[j+1]) < 0:
                 if j != 0:
                     diffreq = np.abs(det_mat_slice[j-1]-det_mat_slice[j])
-                else:
+                elif j + 2 < len(det_mat_slice):
                     diffreq = np.abs(det_mat_slice[j+2]-det_mat_slice[j+1])
+                else:
+                    diffreq = np.abs(det_mat_slice[j+1]-det_mat_slice[j])
                 # Check we are not just at a discontinuity
                 if np.abs(det_mat_slice[j+1]-det_mat_slice[j]) < 3*diffreq:
                     try:
@@ -146,7 +148,7 @@ datalist3 = open(filecsv3, 'w')
 for i in range(len(wl_list)):
     string3 = str(np.real(stacks_mat[0,i]))+','+str(np.imag(stacks_mat[0,i]))+','+str(np.real(stacks_mat[1,i]))+','+str(np.imag(stacks_mat[1,i]))+','+str(np.real(stacks_mat[2,i]))+','+str(np.imag(stacks_mat[2,i]))+','+'\n'
     datalist3.write(string3)
-datalist3.close
+datalist3.close()
 
 disp_input = []
 for i in range(len(kx_list)):
@@ -164,14 +166,14 @@ datalist = open(filecsv, 'w')
 for mode in displist:
     string = str(mode[0])+','+str(mode[1])+'\n'
     datalist.write(string)
-datalist.close
+datalist.close()
 
 filecsv2 = 'dispcurvenorm.csv'
 datalist2 = open(filecsv2, 'w')
 for mode in displist:
     string2 = str(1e-9*mode[0]/k_0)+','+str(1e-9*mode[1]/omega_0)+'\n'
     datalist2.write(string2)
-datalist2.close
+datalist2.close()
 
 ######################## Wrapping up ########################
 # Calculate and record the (real) time taken for simulation
