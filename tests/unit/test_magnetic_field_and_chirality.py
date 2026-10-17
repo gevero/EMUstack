@@ -6,9 +6,14 @@ import pytest
 
 backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../backend"))
 mesh_dir = os.path.join(backend_dir, "data", "meshes")
-for d in (backend_dir, mesh_dir):
+examples_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../examples"))
+for d in (backend_dir, mesh_dir, examples_dir):
     if d not in sys.path:
         sys.path.insert(0, d)
+
+import importlib
+simo_chiral = importlib.import_module("simo_100-chiral_qbic_chirality")
+compute_optical_chirality = simo_chiral.compute_optical_chirality
 
 import objects
 import materials
@@ -19,7 +24,7 @@ from stack import Stack
 
 
 def test_plane_wave_cpl_chirality_calibration():
-    """Verify that pure circular plane waves in free space give exactly C_hat = +/- 1."""
+    """Verify that pure circular plane waves in free space give exactly C_hat = +/- 1 via the helper function."""
     k0 = 2.0 * np.pi / 0.7  # wl = 700 nm in normalized units
 
     # In Tang & Cohen / Lipkin convention:
@@ -36,22 +41,31 @@ def test_plane_wave_cpl_chirality_calibration():
     # LCP
     E_lcp = np.array([1.0, 1j, 0.0]) / np.sqrt(2.0)
     H_lcp = np.array([-1j, 1.0, 0.0]) / np.sqrt(2.0)
-    C_lcp = field_eval.optical_chirality_density(E_lcp, H_lcp, k0)
-    C_hat_lcp = field_eval.optical_chirality_enhancement(C_lcp, k0, E0=1.0)
+    C_lcp, C_hat_lcp = compute_optical_chirality(
+        E_lcp[0], E_lcp[1], E_lcp[2],
+        H_lcp[0], H_lcp[1], H_lcp[2],
+        k0=k0, E0=1.0
+    )
     assert np.isclose(C_hat_lcp, 1.0, atol=1e-12)
 
     # RCP
     E_rcp = np.array([1.0, -1j, 0.0]) / np.sqrt(2.0)
     H_rcp = np.array([1j, 1.0, 0.0]) / np.sqrt(2.0)
-    C_rcp = field_eval.optical_chirality_density(E_rcp, H_rcp, k0)
-    C_hat_rcp = field_eval.optical_chirality_enhancement(C_rcp, k0, E0=1.0)
+    C_rcp, C_hat_rcp = compute_optical_chirality(
+        E_rcp[0], E_rcp[1], E_rcp[2],
+        H_rcp[0], H_rcp[1], H_rcp[2],
+        k0=k0, E0=1.0
+    )
     assert np.isclose(C_hat_rcp, -1.0, atol=1e-12)
 
     # Linearly polarized light (achiral)
     E_lp = np.array([1.0, 0.0, 0.0])
     H_lp = np.array([0.0, 1.0, 0.0])
-    C_lp = field_eval.optical_chirality_density(E_lp, H_lp, k0)
-    C_hat_lp = field_eval.optical_chirality_enhancement(C_lp, k0, E0=1.0)
+    C_lp, C_hat_lp = compute_optical_chirality(
+        E_lp[0], E_lp[1], E_lp[2],
+        H_lp[0], H_lp[1], H_lp[2],
+        k0=k0, E0=1.0
+    )
     assert np.isclose(C_hat_lp, 0.0, atol=1e-12)
 
 
@@ -252,23 +266,19 @@ def test_nanostruct_sol1_and_interpolators_full_stack():
     abs_e_val = AbsE(0.5, 0.5)
     assert np.isfinite(abs_e_val)
 
-    # 2. Enhanced mode: return_H=True returns FieldBundle
+    # 2. Enhanced mode: return_H=True returns FieldBundle (14-tuple)
     bundle = plotting.fields_interpolator_in_plane(stk, lay_interest=1, z_value=150.0, return_H=True)
     assert isinstance(bundle, plotting.FieldBundle)
-    assert len(bundle) == 15
+    assert len(bundle) == 14
 
-    # Can be unpacked as 15-tuple
-    rEx, iEx, rEy, iEy, rEz, iEz, aE, rHx, iHx, rHy, iHy, rHz, iHz, aH, C_int = bundle
+    # Can be unpacked as 14-tuple
+    rEx, iEx, rEy, iEy, rEz, iEz, aE, rHx, iHx, rHy, iHy, rHz, iHz, aH = bundle
     assert callable(aH)
-    assert callable(C_int)
 
     # Test evaluations at unit cell center
     e_val = bundle.Ex(0.5, 0.5)
     h_val = bundle.Hx(0.5, 0.5)
     abs_h_val = bundle.AbsH(0.5, 0.5)
-    c_val = bundle.C(0.5, 0.5)
-    c_hat_val = bundle.C_hat(0.5, 0.5)
-
     sz_val = bundle.Sz(0.5, 0.5)
 
     assert np.isfinite(e_val)
@@ -276,13 +286,21 @@ def test_nanostruct_sol1_and_interpolators_full_stack():
     assert np.isfinite(abs_h_val)
     assert abs_h_val >= 0.0
     assert np.isfinite(sz_val)
+
+    # 3. Test backward-compatibility alias return_h=True
+    bundle_lower = plotting.fields_interpolator_in_plane(stk, lay_interest=1, z_value=150.0, return_h=True)
+    assert isinstance(bundle_lower, plotting.FieldBundle)
+    assert np.isclose(bundle_lower.AbsH(0.5, 0.5), abs_h_val, rtol=1e-12)
+
+    # 4. Helper function compute_optical_chirality operating on returned E and H
+    k0 = 2.0 * np.pi / (wl / float(period))
+    c_val, c_hat_val = compute_optical_chirality(
+        bundle.Ex(0.5, 0.5), bundle.Ey(0.5, 0.5), bundle.Ez(0.5, 0.5),
+        bundle.Hx(0.5, 0.5), bundle.Hy(0.5, 0.5), bundle.Hz(0.5, 0.5),
+        k0=k0, E0=1.0
+    )
     assert np.isfinite(c_val)
     assert np.isfinite(c_hat_val)
-
-    # 3. Convenience helper optical_chirality_interpolator
-    c_i, chat_i = plotting.optical_chirality_interpolator(stk, lay_interest=1, z_value=150.0)
-    assert np.isclose(c_i(0.5, 0.5), c_val, rtol=1e-10)
-    assert np.isclose(chat_i(0.5, 0.5), c_hat_val, rtol=1e-10)
 
 
 def test_circular_dichroism_qbic():

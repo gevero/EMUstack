@@ -35,6 +35,18 @@ import plotting
 import field_eval
 from stack import Stack
 
+def compute_optical_chirality(Ex, Ey, Ez, Hx, Hy, Hz, k0=1.0, E0=1.0):
+    """Helper function operating on local E and H fields to compute optical chirality.
+    
+    C = -0.5 * k0 * Im(E* . H)
+    C_hat = C / |C_CPL| where |C_CPL| = 0.5 * k0 * |E0|^2
+    """
+    E_dot_H = np.conj(Ex) * Hx + np.conj(Ey) * Hy + np.conj(Ez) * Hz
+    C = -0.5 * float(k0) * np.imag(E_dot_H)
+    C_cpl = 0.5 * float(k0) * (abs(E0)**2)
+    C_hat = C / max(C_cpl, 1e-15)
+    return C, C_hat
+
 def main():
     start_time = time.time()
     plotting.clear_previous()
@@ -114,8 +126,8 @@ def main():
     R_lcp_arr = np.array(R_lcp_list)
     CD_arr = T_lcp_arr - T_rcp_arr
 
-    # 4. Near-Field Evaluation (E, H, and Optical Chirality)
-    print("\nEvaluating 2D near-field electromagnetic fields and optical chirality at resonance...")
+    # 4. Near-Field Evaluation (E, H, and Optical Chirality via helper function)
+    print("\nEvaluating 2D near-field electromagnetic fields (E and H) and optical chirality at resonance...")
     z_eval = height / 2.0  # Center plane of the metasurface
     bundle = plotting.fields_interpolator_in_plane(res_stack_rcp, lay_interest=1, z_value=z_eval, return_H=True)
 
@@ -124,9 +136,17 @@ def main():
     yg = np.linspace(0.02, 0.98, grid_n)
     X, Y = np.meshgrid(xg, yg)
 
+    k0 = 2.0 * np.pi / (res_wl / float(period))
+    Ex = bundle.Ex(X, Y)
+    Ey = bundle.Ey(X, Y)
+    Ez = bundle.Ez(X, Y)
+    Hx = bundle.Hx(X, Y)
+    Hy = bundle.Hy(X, Y)
+    Hz = bundle.Hz(X, Y)
+
     E_norm = bundle.AbsE(X, Y)
     H_norm = bundle.AbsH(X, Y)
-    C_hat = bundle.C_hat(X, Y)
+    C, C_hat = compute_optical_chirality(Ex, Ey, Ez, Hx, Hy, Hz, k0=k0, E0=1.0)
 
     max_E2 = float(np.nanmax(E_norm**2))
     max_H2 = float(np.nanmax(H_norm**2))

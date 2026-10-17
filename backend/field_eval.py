@@ -96,47 +96,6 @@ def field_value_plane_EH(*args, **kwargs) -> Tuple[np.ndarray, np.ndarray]:
     return field_value_plane(*args, **kwargs)
 
 
-def optical_chirality_density(
-    E: np.ndarray,
-    H: np.ndarray,
-    k0: float
-) -> np.ndarray:
-    """Compute local time-averaged optical chirality density:
-    C = - (k0 / 2) * Im(E* . H)
-    
-    Accepts arrays of shape (..., 3) for E and H. Returns array of shape (...).
-    """
-    E_dot_H = np.sum(np.conj(E) * H, axis=-1)
-    return -0.5 * float(k0) * np.imag(E_dot_H)
-
-
-def optical_chirality_enhancement(
-    C: np.ndarray,
-    k0: float,
-    E0: float = 1.0
-) -> np.ndarray:
-    """Compute normalized local optical chirality enhancement factor:
-    C_hat = C / |C_CPL|
-    where |C_CPL| = 0.5 * k0 * |E0|^2.
-    """
-    C_cpl = 0.5 * float(k0) * (abs(E0)**2)
-    if C_cpl == 0.0:
-        return np.zeros_like(C)
-    return C / C_cpl
-
-
-def chirality_value_plane(
-    m_E: np.ndarray,
-    m_H: np.ndarray,
-    k0: float
-) -> np.ndarray:
-    """Evaluate local optical chirality density at all element vertices in a plane.
-    
-    Returns m_C array of shape (n_msh_el, 6).
-    """
-    return optical_chirality_density(m_E, m_H, k0)
-
-
 def gmsh_plot_field(
     num_BMs: int,
     n_msh_el: int,
