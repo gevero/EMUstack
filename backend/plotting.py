@@ -2004,6 +2004,14 @@ class FieldBundle:
     def Hz(self, x, y):
         return self.ReHz(x, y) + 1j * self.ImHz(x, y)
 
+    def Sz(self, x, y):
+        """Evaluate z-component of time-averaged Poynting vector: Sz = 0.5 * Re(Ex * Hy^* - Ey * Hx^*)."""
+        ex = self.Ex(x, y)
+        ey = self.Ey(x, y)
+        hx = self.Hx(x, y)
+        hy = self.Hy(x, y)
+        return 0.5 * np.real(ex * np.conj(hy) - ey * np.conj(hx))
+
     def __iter__(self):
         return iter((
             self.ReEx, self.ImEx, self.ReEy, self.ImEy, self.ReEz, self.ImEz, self.AbsE,

@@ -76,7 +76,7 @@ def test_faraday_curl_consistency_mock():
     sol1[1, :, 0, :] = 0.0  # uy
     sol1[2, :, 0, :] = 0.0  # z
     sol1[3, :, 0, :] = 0.0  # hx_term = -uy - d_y z
-    sol1[4, :, 0, :] = 1.0  # hy_term = ux - d_x z
+    sol1[4, :, 0, :] = 1.0  # hy_term = ux + d_x z
     sol1[5, :, 0, :] = 0.0  # hz_term = curl(u)
 
     # Forward propagating mode only: coef_down = 1.0, coef_up = 0.0
@@ -96,6 +96,90 @@ def test_faraday_curl_consistency_mock():
     np.testing.assert_allclose(m_E[0, 0, 1], 0.0, atol=1e-12)
     np.testing.assert_allclose(m_H[0, 0, 0], 0.0, atol=1e-12)
     np.testing.assert_allclose(m_H[0, 0, 1], prop_expected, rtol=1e-10)
+
+
+def test_faraday_curl_with_longitudinal_gradient_and_backward_wave():
+    """Verify Faraday's law H = (1 / (i k0)) curl(E) with non-zero d_x z, d_y z, curl(u), and forward+backward waves."""
+    nel = 1
+    n_pts = 6
+    num_bms = 1
+    k0 = 2.0 * np.pi / 0.6  # wl = 600 nm
+    kz_val = 0.8 * k0
+    kz = np.array([kz_val])
+
+    table_nod = np.array([[1], [2], [3], [4], [5], [6]])
+    type_el = np.array([1])
+    eps = np.array([1.0])
+    x_arr = np.zeros((2, n_pts))
+
+    ux = 1.2 + 0.3j
+    uy = -0.5 + 0.8j
+    z_pot = 0.4 - 0.2j
+    gzx = 0.7 + 0.1j    # d_x z
+    gzy = -0.3 + 0.5j   # d_y z
+    curl_u = 1.5 - 0.4j # curl_perp(u)
+
+    # Faraday modal terms:
+    # Hx_term = -uy - d_y z
+    # Hy_term = ux + d_x z
+    # Hz_term = curl_perp(u)
+    hx_term = -uy - gzy
+    hy_term = ux + gzx
+    hz_term = curl_u
+
+    sol1 = np.zeros((6, 13, num_bms, nel), dtype=complex)
+    sol1[0, :, 0, 0] = ux
+    sol1[1, :, 0, 0] = uy
+    sol1[2, :, 0, 0] = z_pot
+    sol1[3, :, 0, 0] = hx_term
+    sol1[4, :, 0, 0] = hy_term
+    sol1[5, :, 0, 0] = hz_term
+
+    # Both forward and backward propagating coefficients
+    c_down = 1.0 + 0.2j
+    c_up = 0.3 - 0.1j
+    vec_coef = np.array([c_down, c_up])
+    h_norm = 1.0
+    z_val = 0.35
+
+    m_E, m_H = field_eval.field_value_plane(
+        num_BMs=1, n_msh_el=nel, n_msh_pts=n_pts, nnodes=6, nb_typ_el=1,
+        table_nod=table_nod, type_el=type_el, eps=eps, x_arr=x_arr,
+        k_z=kz, sol1=sol1, vec_coef=vec_coef, h_normed=h_norm, z_value=z_val,
+        k0=k0, return_H=True
+    )
+
+    prop_plus = c_down * np.exp(1j * kz_val * z_val) + c_up * np.exp(1j * kz_val * (h_norm - z_val))
+    prop_minus = c_down * np.exp(1j * kz_val * z_val) - c_up * np.exp(1j * kz_val * (h_norm - z_val))
+
+    # Analytical E:
+    E_expected = np.array([
+        prop_plus * ux,
+        prop_plus * uy,
+        prop_minus * (-1j * kz_val * z_pot)
+    ])
+    np.testing.assert_allclose(m_E[0, 0, :], E_expected, rtol=1e-12)
+
+    # Analytical H:
+    # Hx = (1 / (i k0)) (d_y Ez - d_z Ey)
+    # d_y Ez = prop_minus * (-1j * kz * gzy)
+    # d_z Ey = (i * kz * prop_minus) * uy
+    # d_y Ez - d_z Ey = -i * kz * prop_minus * (uy + gzy)
+    # Hx = (1 / (i k0)) * (-i * kz * prop_minus * (uy + gzy)) = (kz / k0) * prop_minus * (-uy - gzy)
+    Hx_expected = (kz_val / k0) * prop_minus * (-uy - gzy)
+
+    # Hy = (1 / (i k0)) (d_z Ex - d_x Ez)
+    # d_z Ex = (i * kz * prop_minus) * ux
+    # d_x Ez = prop_minus * (-1j * kz * gzx)
+    # d_z Ex - d_x Ez = i * kz * prop_minus * (ux + gzx)
+    # Hy = (1 / (i k0)) * (i * kz * prop_minus * (ux + gzx)) = (kz / k0) * prop_minus * (ux + gzx)
+    Hy_expected = (kz_val / k0) * prop_minus * (ux + gzx)
+
+    # Hz = (1 / (i k0)) curl_perp(E) = (1 / (i k0)) * prop_plus * curl_u
+    Hz_expected = (1.0 / (1j * k0)) * prop_plus * curl_u
+
+    H_expected = np.array([Hx_expected, Hy_expected, Hz_expected])
+    np.testing.assert_allclose(m_H[0, 0, :], H_expected, rtol=1e-12)
 
 
 def test_chiral_qbic_template_generation():
@@ -185,10 +269,13 @@ def test_nanostruct_sol1_and_interpolators_full_stack():
     c_val = bundle.C(0.5, 0.5)
     c_hat_val = bundle.C_hat(0.5, 0.5)
 
+    sz_val = bundle.Sz(0.5, 0.5)
+
     assert np.isfinite(e_val)
     assert np.isfinite(h_val)
     assert np.isfinite(abs_h_val)
     assert abs_h_val >= 0.0
+    assert np.isfinite(sz_val)
     assert np.isfinite(c_val)
     assert np.isfinite(c_hat_val)
 

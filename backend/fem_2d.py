@@ -532,7 +532,7 @@ def solve_bloch_modes_2d(
                     cu_val = complex(val_cu[0]) if isinstance(val_cu, (tuple, list)) else complex(val_cu)
 
                     hx_term = -uy - gzy
-                    hy_term = ux - gzx
+                    hy_term = ux + gzx
                     hz_term = cu_val
                     v_vals.append((ux, uy, zv, hx_term, hy_term, hz_term))
                 except Exception:
