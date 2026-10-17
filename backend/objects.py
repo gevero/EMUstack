@@ -372,7 +372,7 @@ class NanoStruct(object):
             self.make_mesh()
         else:
             self.mesh_file = mesh_file
-        if plotting_fields is True:
+        if bool(plotting_fields):
             self.plotting_fields = 1
             if periodicity == '2D_array':
                 if not os.path.exists("Bloch_fields"):

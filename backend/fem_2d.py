@@ -489,16 +489,55 @@ def solve_bloch_modes_2d(
     sol1 = None
     if plotting_fields and structure is not None and hasattr(structure, "table_nod") and structure.table_nod is not None:
         nel = structure.n_msh_el
-        sol1 = np.zeros((3, 13, num_BMs, nel), dtype=complex)
-        for n in range(num_BMs):
-            gf_n = GridFunction(fes_E)
-            gf_n.vec.data = Phi_pri[:fes_E.ndof, n]
-            v_vals = []
-            for p in structure.x_arr.T:
+        sol1 = np.zeros((6, 13, num_BMs, nel), dtype=complex)
+        
+        # Precompute Netgen mesh points for unique mesh vertices
+        pts = []
+        for p in structure.x_arr.T:
+            px = float(p[0])
+            py = float(p[1])
+            try:
+                pts.append(mesh(px, py))
+            except Exception:
+                px_c = np.clip(px, 1e-7, period_x - 1e-7)
+                py_c = np.clip(py, 1e-7, dy - 1e-7)
                 try:
-                    v_vals.append(gf_n(mesh(p[0], p[1])))
+                    pts.append(mesh(px_c, py_c))
                 except Exception:
-                    v_vals.append((0.0, 0.0))
+                    pts.append(None)
+
+        for n in range(num_BMs):
+            gf_n = GridFunction(fes)
+            gf_n.vec.data = Phi_pri[:, n]
+            u_n, z_n = gf_n.components
+            grad_z = ngs.grad(z_n)
+            curl_u = ngs.curl(u_n)
+
+            v_vals = []
+            for pt in pts:
+                if pt is None:
+                    v_vals.append((0.0, 0.0, 0.0, 0.0, 0.0, 0.0))
+                    continue
+                try:
+                    val_u = u_n(pt)
+                    val_z = z_n(pt)
+                    val_gz = grad_z(pt)
+                    val_cu = curl_u(pt)
+
+                    ux = complex(val_u[0])
+                    uy = complex(val_u[1])
+                    zv = complex(val_z)
+                    gzx = complex(val_gz[0])
+                    gzy = complex(val_gz[1])
+                    cu_val = complex(val_cu[0]) if isinstance(val_cu, (tuple, list)) else complex(val_cu)
+
+                    hx_term = -uy - gzy
+                    hy_term = ux - gzx
+                    hz_term = cu_val
+                    v_vals.append((ux, uy, zv, hx_term, hy_term, hz_term))
+                except Exception:
+                    v_vals.append((0.0, 0.0, 0.0, 0.0, 0.0, 0.0))
+
             for iel in range(nel):
                 for inod in range(min(6, structure.table_nod.shape[0])):
                     g_idx = structure.table_nod[inod, iel] - 1
@@ -506,6 +545,10 @@ def solve_bloch_modes_2d(
                         val = v_vals[g_idx]
                         sol1[0, inod, n, iel] = val[0]
                         sol1[1, inod, n, iel] = val[1]
+                        sol1[2, inod, n, iel] = val[2]
+                        sol1[3, inod, n, iel] = val[3]
+                        sol1[4, inod, n, iel] = val[4]
+                        sol1[5, inod, n, iel] = val[5]
 
     # Degenerate cluster labelling (§6.3 step 5)
     cluster = np.zeros(num_BMs, dtype=int)

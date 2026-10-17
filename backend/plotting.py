@@ -1951,11 +1951,82 @@ def fields_in_plane(stacks_list, lay_interest=1, z_values=[0.1, 3.6],
             # # vec_coef_down[neq_PW] = 1.0
 
 
-# field interpolators for Nanostruct layers
-def fields_interpolator_in_plane(pstack, lay_interest=1, z_value=0.1):
+class FieldBundle:
+    """Container for 2D in-plane electromagnetic field and optical chirality interpolators.
+
+    Can be unpacked as a 15-tuple:
+    (ReEx, ImEx, ReEy, ImEy, ReEz, ImEz, AbsE, ReHx, ImHx, ReHy, ImHy, ReHz, ImHz, AbsH, C)
+    or accessed via named attributes.
     """
-    Returns linear interpolators in the x-y plane at chosen value of z for
-    Re[Ex],Re[Ey],Re[Ez],Im[Ex],Im[Ey],Im[Ez],|E|.
+    def __init__(
+        self,
+        ReEx, ImEx, ReEy, ImEy, ReEz, ImEz, AbsE,
+        ReHx, ImHx, ReHy, ImHy, ReHz, ImHz, AbsH,
+        C,
+        C_hat=None,
+        k0=None,
+        E0=1.0
+    ):
+        self.ReEx = ReEx
+        self.ImEx = ImEx
+        self.ReEy = ReEy
+        self.ImEy = ImEy
+        self.ReEz = ReEz
+        self.ImEz = ImEz
+        self.AbsE = AbsE
+        self.ReHx = ReHx
+        self.ImHx = ImHx
+        self.ReHy = ReHy
+        self.ImHy = ImHy
+        self.ReHz = ReHz
+        self.ImHz = ImHz
+        self.AbsH = AbsH
+        self.C = C
+        self.C_hat = C_hat
+        self.k0 = k0
+        self.E0 = E0
+
+    def Ex(self, x, y):
+        return self.ReEx(x, y) + 1j * self.ImEx(x, y)
+
+    def Ey(self, x, y):
+        return self.ReEy(x, y) + 1j * self.ImEy(x, y)
+
+    def Ez(self, x, y):
+        return self.ReEz(x, y) + 1j * self.ImEz(x, y)
+
+    def Hx(self, x, y):
+        return self.ReHx(x, y) + 1j * self.ImHx(x, y)
+
+    def Hy(self, x, y):
+        return self.ReHy(x, y) + 1j * self.ImHy(x, y)
+
+    def Hz(self, x, y):
+        return self.ReHz(x, y) + 1j * self.ImHz(x, y)
+
+    def __iter__(self):
+        return iter((
+            self.ReEx, self.ImEx, self.ReEy, self.ImEy, self.ReEz, self.ImEz, self.AbsE,
+            self.ReHx, self.ImHx, self.ReHy, self.ImHy, self.ReHz, self.ImHz, self.AbsH,
+            self.C
+        ))
+
+    def __getitem__(self, idx):
+        return tuple(self)[idx]
+
+    def __len__(self):
+        return 15
+
+
+# field interpolators for Nanostruct layers
+def fields_interpolator_in_plane(pstack, lay_interest=1, z_value=0.1, return_H=False):
+    """
+    Returns linear interpolators in the x-y plane at chosen value of z.
+    
+    If return_H is False (default):
+        Returns 7-tuple: (ReEx, ImEx, ReEy, ImEy, ReEz, ImEz, AbsE).
+    If return_H is True:
+        Returns FieldBundle containing interpolators for E, H, AbsE, AbsH, and C.
 
     Requires matplotlib v1.3.0 or later.
 
@@ -1970,6 +2041,9 @@ def fields_interpolator_in_plane(pstack, lay_interest=1, z_value=0.1):
                 at which to calculate fields. If layer is semi-inf substrate \
                 then z_value is distance from top of this layer (i.e. bottom \
                 interface of stack).
+                
+            return_H (bool): If True, compute both E and H fields and optical \
+                chirality, returning a FieldBundle instance.
     """
     import field_eval
 
@@ -1989,6 +2063,7 @@ def fields_interpolator_in_plane(pstack, lay_interest=1, z_value=0.1):
             z_value = z_value/float(meat.structure.period)
             z_value = h_normed - z_value
             wl_normed = pstack.layers[lay_interest].wl_norm()
+            k0 = 2.0 * np.pi / float(wl_normed)
 
             nnodes = 6
 
@@ -1997,12 +2072,23 @@ def fields_interpolator_in_plane(pstack, lay_interest=1, z_value=0.1):
             vec_coef = np.concatenate((pstack.vec_coef_down[vec_index], pstack.vec_coef_up[vec_index]))
 
             # piling up of all the bloch modes to get all the fields
-            m_E = field_eval.field_value_plane(meat.num_BMs,
-                                             meat.n_msh_el, meat.n_msh_pts, nnodes,
-                                             meat.structure.nb_typ_el,
-                                             meat.table_nod, meat.type_el,
-                                             eps, meat.x_arr, meat.k_z, meat.sol1,
-                                             vec_coef, h_normed, z_value)
+            if return_H:
+                m_E, m_H = field_eval.field_value_plane(
+                    meat.num_BMs, meat.n_msh_el, meat.n_msh_pts, nnodes,
+                    meat.structure.nb_typ_el, meat.table_nod, meat.type_el,
+                    eps, meat.x_arr, meat.k_z, meat.sol1,
+                    vec_coef, h_normed, z_value, k0=k0, wl_normed=wl_normed, return_H=True
+                )
+                m_C = field_eval.optical_chirality_density(m_E, m_H, k0)
+            else:
+                m_E = field_eval.field_value_plane(
+                    meat.num_BMs, meat.n_msh_el, meat.n_msh_pts, nnodes,
+                    meat.structure.nb_typ_el, meat.table_nod, meat.type_el,
+                    eps, meat.x_arr, meat.k_z, meat.sol1,
+                    vec_coef, h_normed, z_value, k0=k0, wl_normed=wl_normed, return_H=False
+                )
+                m_H = None
+                m_C = None
 
             # unrolling data for the interpolators
             table_nod = meat.table_nod.T
@@ -2017,6 +2103,11 @@ def fields_interpolator_in_plane(pstack, lay_interest=1, z_value=0.1):
                 v_Ex6p = np.zeros(6*meat.n_msh_el, dtype=np.complex128)
                 v_Ey6p = np.zeros(6*meat.n_msh_el, dtype=np.complex128)
                 v_Ez6p = np.zeros(6*meat.n_msh_el, dtype=np.complex128)
+                if return_H:
+                    v_Hx6p = np.zeros(6*meat.n_msh_el, dtype=np.complex128)
+                    v_Hy6p = np.zeros(6*meat.n_msh_el, dtype=np.complex128)
+                    v_Hz6p = np.zeros(6*meat.n_msh_el, dtype=np.complex128)
+                    v_C6p = np.zeros(6*meat.n_msh_el, dtype=float)
                 v_triang6p = []
 
                 i = 0
@@ -2035,6 +2126,11 @@ def fields_interpolator_in_plane(pstack, lay_interest=1, z_value=0.1):
                         v_Ex6p[i] = m_E[i_el, i_node, 0]
                         v_Ey6p[i] = m_E[i_el, i_node, 1]
                         v_Ez6p[i] = m_E[i_el, i_node, 2]
+                        if return_H:
+                            v_Hx6p[i] = m_H[i_el, i_node, 0]
+                            v_Hy6p[i] = m_H[i_el, i_node, 1]
+                            v_Hz6p[i] = m_H[i_el, i_node, 2]
+                            v_C6p[i] = m_C[i_el, i_node]
                         i += 1
 
                 v_E6p = np.sqrt(np.abs(v_Ex6p)**2 +
@@ -2064,12 +2160,36 @@ def fields_interpolator_in_plane(pstack, lay_interest=1, z_value=0.1):
                 ImEz = matplotlib.tri.LinearTriInterpolator(triang6p,v_Ez6p.imag,trifinder=finder)
                 AbsE = matplotlib.tri.LinearTriInterpolator(triang6p,v_E6p,trifinder=finder)
 
+                if return_H:
+                    v_H6p = np.sqrt(np.abs(v_Hx6p)**2 + np.abs(v_Hy6p)**2 + np.abs(v_Hz6p)**2)
+                    ReHx = matplotlib.tri.LinearTriInterpolator(triang6p, v_Hx6p.real, trifinder=finder)
+                    ImHx = matplotlib.tri.LinearTriInterpolator(triang6p, v_Hx6p.imag, trifinder=finder)
+                    ReHy = matplotlib.tri.LinearTriInterpolator(triang6p, v_Hy6p.real, trifinder=finder)
+                    ImHy = matplotlib.tri.LinearTriInterpolator(triang6p, v_Hy6p.imag, trifinder=finder)
+                    ReHz = matplotlib.tri.LinearTriInterpolator(triang6p, v_Hz6p.real, trifinder=finder)
+                    ImHz = matplotlib.tri.LinearTriInterpolator(triang6p, v_Hz6p.imag, trifinder=finder)
+                    AbsH = matplotlib.tri.LinearTriInterpolator(triang6p, v_H6p, trifinder=finder)
+                    InterpC = matplotlib.tri.LinearTriInterpolator(triang6p, v_C6p, trifinder=finder)
+                    C_cpl = 0.5 * k0 * 1.0
+                    v_Chat6p = v_C6p / max(C_cpl, 1e-15)
+                    InterpChat = matplotlib.tri.LinearTriInterpolator(triang6p, v_Chat6p, trifinder=finder)
+                    return FieldBundle(
+                        ReEx, ImEx, ReEy, ImEy, ReEz, ImEz, AbsE,
+                        ReHx, ImHx, ReHy, ImHy, ReHz, ImHz, AbsH,
+                        InterpC, C_hat=InterpChat, k0=k0, E0=1.0
+                    )
+
                 return ReEx, ImEx, ReEy, ImEy, ReEz, ImEz, AbsE
             else:
                 # 3-node linear triangles
                 v_Ex_nod = np.zeros(meat.n_msh_pts, dtype=np.complex128)
                 v_Ey_nod = np.zeros(meat.n_msh_pts, dtype=np.complex128)
                 v_Ez_nod = np.zeros(meat.n_msh_pts, dtype=np.complex128)
+                if return_H:
+                    v_Hx_nod = np.zeros(meat.n_msh_pts, dtype=np.complex128)
+                    v_Hy_nod = np.zeros(meat.n_msh_pts, dtype=np.complex128)
+                    v_Hz_nod = np.zeros(meat.n_msh_pts, dtype=np.complex128)
+                    v_C_nod = np.zeros(meat.n_msh_pts, dtype=float)
                 counts = np.zeros(meat.n_msh_pts)
                 v_triang = []
                 for i_el in range(meat.n_msh_el):
@@ -2080,6 +2200,11 @@ def fields_interpolator_in_plane(pstack, lay_interest=1, z_value=0.1):
                         v_Ex_nod[node_idx] += m_E[i_el, inod, 0]
                         v_Ey_nod[node_idx] += m_E[i_el, inod, 1]
                         v_Ez_nod[node_idx] += m_E[i_el, inod, 2]
+                        if return_H:
+                            v_Hx_nod[node_idx] += m_H[i_el, inod, 0]
+                            v_Hy_nod[node_idx] += m_H[i_el, inod, 1]
+                            v_Hz_nod[node_idx] += m_H[i_el, inod, 2]
+                            v_C_nod[node_idx] += m_C[i_el, inod]
                         counts[node_idx] += 1
                 c = np.maximum(counts, 1)
                 v_Ex_nod /= c
@@ -2096,6 +2221,29 @@ def fields_interpolator_in_plane(pstack, lay_interest=1, z_value=0.1):
                 ImEz = matplotlib.tri.LinearTriInterpolator(triang, v_Ez_nod.imag)
                 AbsE = matplotlib.tri.LinearTriInterpolator(triang, v_E_nod)
 
+                if return_H:
+                    v_Hx_nod /= c
+                    v_Hy_nod /= c
+                    v_Hz_nod /= c
+                    v_C_nod /= c
+                    v_H_nod = np.sqrt(np.abs(v_Hx_nod)**2 + np.abs(v_Hy_nod)**2 + np.abs(v_Hz_nod)**2)
+                    ReHx = matplotlib.tri.LinearTriInterpolator(triang, v_Hx_nod.real)
+                    ImHx = matplotlib.tri.LinearTriInterpolator(triang, v_Hx_nod.imag)
+                    ReHy = matplotlib.tri.LinearTriInterpolator(triang, v_Hy_nod.real)
+                    ImHy = matplotlib.tri.LinearTriInterpolator(triang, v_Hy_nod.imag)
+                    ReHz = matplotlib.tri.LinearTriInterpolator(triang, v_Hz_nod.real)
+                    ImHz = matplotlib.tri.LinearTriInterpolator(triang, v_Hz_nod.imag)
+                    AbsH = matplotlib.tri.LinearTriInterpolator(triang, v_H_nod)
+                    InterpC = matplotlib.tri.LinearTriInterpolator(triang, v_C_nod)
+                    C_cpl = 0.5 * k0 * 1.0
+                    v_Chat_nod = v_C_nod / max(C_cpl, 1e-15)
+                    InterpChat = matplotlib.tri.LinearTriInterpolator(triang, v_Chat_nod)
+                    return FieldBundle(
+                        ReEx, ImEx, ReEy, ImEy, ReEz, ImEz, AbsE,
+                        ReHx, ImHx, ReHy, ImHy, ReHz, ImHz, AbsH,
+                        InterpC, C_hat=InterpChat, k0=k0, E0=1.0
+                    )
+
                 return ReEx, ImEx, ReEy, ImEy, ReEz, ImEz, AbsE
 
         except ValueError as e:
@@ -2103,10 +2251,17 @@ def fields_interpolator_in_plane(pstack, lay_interest=1, z_value=0.1):
             print("fields_in_plane cannot plot fields in 1D-arrays."\
                   "\nPlease select a different lay_interest.\n")
 
+
     # If selected z location is within a ThinFilm layer
     # plot fields in Plane Wave Basis using python routine.
     else:
         raise Exception("Not a NanoStruct Layer")
+
+
+def optical_chirality_interpolator(pstack, lay_interest=1, z_value=0.1):
+    """Convenience helper returning (C_interp, C_hat_interp) in the specified plane."""
+    bundle = fields_interpolator_in_plane(pstack, lay_interest=lay_interest, z_value=z_value, return_H=True)
+    return bundle.C, bundle.C_hat
 
 
 def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,

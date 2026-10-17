@@ -24,7 +24,7 @@ class BlochModes:
     pairs: np.ndarray                      # (nbm,) int
     cluster: np.ndarray                    # (nbm,) int
     solver_info: Dict[str, Any] = field(default_factory=dict)
-    sol1: Optional[np.ndarray] = None      # 2D: (3,13,nbm,nel) | 1D: (3,3,nbm,nel)
+    sol1: Optional[np.ndarray] = None      # 2D: (6,13,nbm,nel) | 1D: (3,3,nbm,nel)
     mode_pol: Optional[np.ndarray] = None  # (4, nbm)
     _J_1d: Optional[np.ndarray] = None
     _J_dag_1d: Optional[np.ndarray] = None

@@ -27,24 +27,44 @@ def field_value_plane(
     h_normed: float,
     z_value: float,
     *args,
+    k0: Optional[float] = None,
+    wl_normed: Optional[float] = None,
+    return_H: bool = False,
     **kwargs
-) -> np.ndarray:
-    """Evaluate 3D electric field (Ex, Ey, Ez) at element nodes in a horizontal plane (§9.1).
+) -> Any:
+    """Evaluate 3D electric (and optionally magnetic) fields (Ex, Ey, Ez, Hx, Hy, Hz)
+    at element nodes in a horizontal plane (§9.1).
     
-    Returns array m_E of shape (n_msh_el, 6, 3) with complex values.
+    Returns array m_E of shape (n_msh_el, 6, 3), or tuple (m_E, m_H) if return_H is True.
     """
     m_E = np.zeros((n_msh_el, 6, 3), dtype=np.complex128)
+    m_H = np.zeros((n_msh_el, 6, 3), dtype=np.complex128)
     if sol1 is None:
-        return m_E
+        return (m_E, m_H) if return_H else m_E
 
     num_modes = min(num_BMs, sol1.shape[2], len(k_z))
     vec_coef = np.asarray(vec_coef).flatten()
-    k_z_arr = np.asarray(k_z).flatten()
+    k_z_arr = np.asarray(k_z).flatten()[:num_modes]
     coef_down = vec_coef[:num_modes]
     coef_up = vec_coef[num_modes:2 * num_modes]
 
-    prop = coef_down * np.exp(1j * k_z_arr[:num_modes] * z_value) + \
-           coef_up * np.exp(1j * k_z_arr[:num_modes] * (h_normed - z_value))
+    prop_plus = coef_down * np.exp(1j * k_z_arr * z_value) + \
+                coef_up * np.exp(1j * k_z_arr * (h_normed - z_value))
+    prop_minus = coef_down * np.exp(1j * k_z_arr * z_value) - \
+                 coef_up * np.exp(1j * k_z_arr * (h_normed - z_value))
+
+    # Resolve k0
+    if k0 is None:
+        k0 = kwargs.get("k_0", None)
+    if k0 is None:
+        if wl_normed is not None and wl_normed > 0:
+            k0 = 2.0 * np.pi / float(wl_normed)
+        elif len(k_z_arr) > 0 and np.abs(k_z_arr[0]) > 0:
+            k0 = float(np.abs(k_z_arr[0]))
+        else:
+            k0 = 2.0 * np.pi
+
+    has_H = (sol1.shape[0] >= 6)
 
     for iel in range(n_msh_el):
         for inod in range(min(6, sol1.shape[1])):
@@ -52,11 +72,69 @@ def field_value_plane(
             ey_modes = np.asarray(sol1[1, inod, :num_modes, iel]).flatten()
             ez_modes = np.asarray(sol1[2, inod, :num_modes, iel]).flatten()
 
-            m_E[iel, inod, 0] = np.sum(prop * ex_modes)
-            m_E[iel, inod, 1] = np.sum(prop * ey_modes)
-            m_E[iel, inod, 2] = np.sum(prop * (-1j * k_z_arr[:num_modes] * ez_modes))
+            m_E[iel, inod, 0] = np.sum(prop_plus * ex_modes)
+            m_E[iel, inod, 1] = np.sum(prop_plus * ey_modes)
+            m_E[iel, inod, 2] = np.sum(prop_minus * (-1j * k_z_arr * ez_modes))
 
+            if has_H:
+                hx_modes = np.asarray(sol1[3, inod, :num_modes, iel]).flatten()
+                hy_modes = np.asarray(sol1[4, inod, :num_modes, iel]).flatten()
+                hz_modes = np.asarray(sol1[5, inod, :num_modes, iel]).flatten()
+
+                m_H[iel, inod, 0] = np.sum(prop_minus * (k_z_arr / k0) * hx_modes)
+                m_H[iel, inod, 1] = np.sum(prop_minus * (k_z_arr / k0) * hy_modes)
+                m_H[iel, inod, 2] = np.sum(prop_plus * (1.0 / (1j * k0)) * hz_modes)
+
+    if return_H:
+        return m_E, m_H
     return m_E
+
+
+def field_value_plane_EH(*args, **kwargs) -> Tuple[np.ndarray, np.ndarray]:
+    """Evaluate both 3D electric and magnetic fields (m_E, m_H) at element nodes in a horizontal plane."""
+    kwargs["return_H"] = True
+    return field_value_plane(*args, **kwargs)
+
+
+def optical_chirality_density(
+    E: np.ndarray,
+    H: np.ndarray,
+    k0: float
+) -> np.ndarray:
+    """Compute local time-averaged optical chirality density:
+    C = - (k0 / 2) * Im(E* . H)
+    
+    Accepts arrays of shape (..., 3) for E and H. Returns array of shape (...).
+    """
+    E_dot_H = np.sum(np.conj(E) * H, axis=-1)
+    return -0.5 * float(k0) * np.imag(E_dot_H)
+
+
+def optical_chirality_enhancement(
+    C: np.ndarray,
+    k0: float,
+    E0: float = 1.0
+) -> np.ndarray:
+    """Compute normalized local optical chirality enhancement factor:
+    C_hat = C / |C_CPL|
+    where |C_CPL| = 0.5 * k0 * |E0|^2.
+    """
+    C_cpl = 0.5 * float(k0) * (abs(E0)**2)
+    if C_cpl == 0.0:
+        return np.zeros_like(C)
+    return C / C_cpl
+
+
+def chirality_value_plane(
+    m_E: np.ndarray,
+    m_H: np.ndarray,
+    k0: float
+) -> np.ndarray:
+    """Evaluate local optical chirality density at all element vertices in a plane.
+    
+    Returns m_C array of shape (n_msh_el, 6).
+    """
+    return optical_chirality_density(m_E, m_H, k0)
 
 
 def gmsh_plot_field(
