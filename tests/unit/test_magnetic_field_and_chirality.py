@@ -6,14 +6,9 @@ import pytest
 
 backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../backend"))
 mesh_dir = os.path.join(backend_dir, "data", "meshes")
-examples_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../examples"))
-for d in (backend_dir, mesh_dir, examples_dir):
+for d in (backend_dir, mesh_dir):
     if d not in sys.path:
         sys.path.insert(0, d)
-
-import importlib
-simo_chiral = importlib.import_module("simo_100-chiral_qbic_chirality")
-compute_optical_chirality = simo_chiral.compute_optical_chirality
 
 import objects
 import materials
@@ -21,6 +16,15 @@ import mode_calcs
 import field_eval
 import plotting
 from stack import Stack
+
+
+def compute_optical_chirality(Ex, Ey, Ez, Hx, Hy, Hz, k0=1.0, E0=1.0):
+    """Local helper for chirality testing: C = -0.5*k0*Im(E* . H), C_hat = C / |C_CPL|."""
+    E_dot_H = np.conj(Ex) * Hx + np.conj(Ey) * Hy + np.conj(Ez) * Hz
+    C = -0.5 * float(k0) * np.imag(E_dot_H)
+    C_cpl = 0.5 * float(k0) * (abs(E0)**2)
+    C_hat = C / max(C_cpl, 1e-15)
+    return C, C_hat
 
 
 def test_plane_wave_cpl_chirality_calibration():
