@@ -18,15 +18,12 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-from __future__ import print_function
-
 import numpy as np
 import sys
 # from scipy import sqrt
 import os
-import paths
-sys.path.append(paths.backend_path)
-from linalg import mat
+from EMUstack.backend import paths
+from EMUstack.backend.linalg import mat
 
 
 
@@ -34,7 +31,7 @@ _interfaces_i_have_known = {}
 pi = np.pi
 
 
-class Modes(object):
+class Modes:
     """ Super-class from which Simmo and Anallo inherit common functionality. """
     def k_pll_norm(self):
         return self.light.k_pll * self.structure.period

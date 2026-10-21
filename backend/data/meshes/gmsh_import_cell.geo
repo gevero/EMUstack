@@ -1,0 +1,18 @@
+SetFactory("OpenCASCADE");
+lc = 0.09; lcinc = 0.02; H = 0.8;
+Point(1)  = {0, 0, 0, lc};   Point(2)  = {1, 0, 0, lc};
+Point(3)  = {1, H, 0, lc};   Point(4)  = {0, H, 0, lc};
+Line(11)  = {1, 2};  Line(12) = {2, 3};  Line(13) = {3, 4};  Line(14) = {4, 1};
+Point(5)  = {0.5, 0.4, 0, lcinc};
+Point(6)  = {0.4, 0.4, 0, lcinc};  Point(7) = {0.5, 0.5, 0, lcinc};
+Point(8)  = {0.6, 0.4, 0, lcinc};  Point(9) = {0.5, 0.3, 0, lcinc};
+Circle(21) = {6, 5, 7};  Circle(22) = {7, 5, 8};  Circle(23) = {8, 5, 9};  Circle(24) = {9, 5, 6};
+Curve Loop(31) = {11, 12, 13, 14};
+Curve Loop(32) = {21, 22, 23, 24};
+Plane Surface(41) = {31, -32};
+Plane Surface(42) = {32};
+Physical Surface("bg") = {41};
+Physical Surface("inc") = {42};
+Physical Line("bottom") = {11};  Physical Line("right") = {12};
+Physical Line("top") = {13};     Physical Line("left") = {14};
+Physical Line("inc") = {21, 22, 23, 24};

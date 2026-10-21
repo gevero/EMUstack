@@ -22,13 +22,15 @@
 import numpy as np
 from scipy.interpolate import interp1d
 import matplotlib
-import paths
-matplotlib.use('pdf')
+try:
+    from EMUstack.backend import paths
+except ImportError:
+    import paths
 import matplotlib.pyplot as plt
 
 data_location = paths.data_path
 
-class Material(object):
+class Material:
     """ Represents a material with a refractive index n.
 
         If the material is dispersive, the refractive index at a given

@@ -1,4 +1,4 @@
-"""Mode matching module for EMUstack (PORTING_PLAN §8).
+"""Mode matching module for EMUstack.
 
 Provides:
 - Interface reflection/transmission matrices for Simmo <-> Simmo interfaces (r_t_mat_ns_ns)
@@ -11,7 +11,7 @@ from linalg import mat
 
 
 def _assert_fem_fem_compatible(sim1, sim2):
-    """Verify geometrical and physical compatibility of two layers for mode matching (§8.6)."""
+    """Verify geometrical and physical compatibility of two layers for mode matching."""
     assert sim1.structure.period == sim2.structure.period, "Layers must have identical period"
     assert sim1.structure.period_y == sim2.structure.period_y, "Layers must have identical period_y"
     assert sim1.structure.world_1d == sim2.structure.world_1d, "Layers must have identical world_1d"
@@ -20,7 +20,7 @@ def _assert_fem_fem_compatible(sim1, sim2):
 
 
 def solve_rt_from_PQ(P: np.ndarray, Q: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Solve the 4 interface scattering blocks from continuity matrices P and Q (§8.3).
+    """Solve the 4 interface scattering blocks from continuity matrices P and Q.
     
     P: (N1, N2)
     Q: (N2, N1)
@@ -39,7 +39,7 @@ def solve_rt_from_PQ(P: np.ndarray, Q: np.ndarray) -> Tuple[np.ndarray, np.ndarr
     I1 = np.eye(N1, dtype=complex)
     I2 = np.eye(N2, dtype=complex)
 
-    # Closed-form canonical formulas (§8.3)
+    # Closed-form canonical interface scattering formulas:
     # T12 = 2 * solve(I2 + QP, Q)
     # R12 = solve(I1 + PQ, PQ - I1)
     # R21 = solve(I2 + QP, I2 - QP)
@@ -54,7 +54,7 @@ def solve_rt_from_PQ(P: np.ndarray, Q: np.ndarray) -> Tuple[np.ndarray, np.ndarr
 
 
 def interface_completeness(sim1, sim2, P: Optional[np.ndarray] = None, Q: Optional[np.ndarray] = None) -> Dict[str, Any]:
-    """Compute interface diagnostics: eps_trunc, rank, singular values, and condition number (§8.5)."""
+    """Compute interface diagnostics: eps_trunc, rank, singular values, and condition number."""
     if P is None or Q is None:
         P, Q = compute_PQ(sim1, sim2)
 
@@ -101,7 +101,7 @@ def compute_PQ(sim1, sim2) -> Tuple[np.ndarray, np.ndarray]:
 
 
 def r_t_mat_ns_ns(sim1, sim2, interface_mode: str = "air"):
-    """Compute R12, T12, R21, T21 at a Simmo-Simmo interface (PORTING_PLAN §8).
+    """Compute R12, T12, R21, T21 at a Simmo-Simmo interface.
     
     Parameters:
     - sim1: incident Simmo layer
@@ -111,7 +111,7 @@ def r_t_mat_ns_ns(sim1, sim2, interface_mode: str = "air"):
     _assert_fem_fem_compatible(sim1, sim2)
 
     if interface_mode == "air":
-        # Mediated through zero-thickness air reference (§8.4 fallback)
+        # Mediated through zero-thickness air reference (fallback)
         import mode_calcs
         air = sim1.air_ref()
 
@@ -150,7 +150,7 @@ def r_t_mat_ns_ns(sim1, sim2, interface_mode: str = "air"):
         return mat(R12), mat(T12), mat(R21), mat(T21)
 
     else:
-        # Direct P, Q interface solve (§8.3)
+        # Direct P, Q interface solve
         P, Q = compute_PQ(sim1, sim2)
         R12, T12, R21, T21 = solve_rt_from_PQ(P, Q)
         return mat(R12), mat(T12), mat(R21), mat(T21)

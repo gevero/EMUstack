@@ -18,13 +18,13 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-from __future__ import print_function
-
 import numpy as np
-from mode_calcs import r_t_mat
-from mode_calcs import Anallo
+try:
+    from .mode_calcs import r_t_mat, Anallo
+except ImportError:
+    from mode_calcs import r_t_mat, Anallo
 
-class Stack(object):
+class Stack:
     """ Represents a stack of layers evaluated at one frequency.
 
         This includes the semi-infinite input and output layers.
@@ -49,10 +49,10 @@ class Stack(object):
                 | TE -> TE | TM -> TE | \
                 | TE -> TM | TM -> TM |
     """
-    def __init__(self, layers, heights_nm = None, shears = None):
+    def __init__(self, layers, heights_nm = None, shears = None, shear = None):
         self.layers = tuple(layers)
         self._heights_nm = heights_nm
-        self.shears = shears
+        self.shears = shears if shears is not None else shear
         self.period = float(layers[0].structure.period)
         self.period_y = float(layers[0].structure.period_y)
         self._check_periods_are_consistent()

@@ -49,19 +49,19 @@ Python Backend
     stack
     plotting
 
-==================
-Fortran Backends
-==================
+============================================
+Finite Element Mode Solvers & Meshing
+============================================
 
-The intention of EMUstack is that the Fortran FEM routines are essentially black boxes. They are called from mode_calcs.py and return the modes (Eigenvalues) of a structured layer, as well as some matrices of overlap integrals that are then used to compute the scattering matrices.
-
-There are however a few important things to know about the workings of these routines.
+EMUstack calculates the electromagnetic Bloch modes of periodically structured layers using modern finite element methods: pure Python/SciPy for 1D gratings and NGSolve/Netgen for 2D nanostructures.
 
 .. toctree::
     :maxdepth: 4
 
     fem_1d
     fem_2d
+    meshing
+    field_eval
 
 
 

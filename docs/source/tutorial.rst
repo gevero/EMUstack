@@ -1,237 +1,211 @@
-Simulation Structure
-------------------------------------------------
+Tutorials and Examples Guide
+==============================
 
-Simulations with EMUstack are generally carried out using a python script file.
-This file is kept in its own directory which is placed in the EMUstack directory.
-All results of the simulation are automatically created within this directory. This directory then serves as a complete record of the calculation. Often, we will also save the simulation objects (scattering matrices, propagation constants etc.) within this folder for future inspection, manipulation, plotting, etc.
-Traditionally the name of the python script file begins with simo\_. This is convenient for setting terminal alias' for running the script.
-Throughout the tutorial the script file will be called simo.py.
+EMUstack v2.0 provides an interactive, notebook-first workflow. All examples are organized into two distinct directories to demonstrate the two supported meshing paradigms:
 
-To start a simulation open a terminal and change into the directory containing the simo.py file.
-To run this script::
+1. **Classic Mesh Workflow (``EMUstack/examples/`` — 22 Notebooks):**
+   Demonstrates the classic EMUstack workflow where 2D nanostructured layers either load pre-generated meshes (``.mail``, ``.msh``) or invoke Gmsh on parameterized ``.geo`` templates from ``EMUstack/backend/data/meshes/``.
 
-    $ python simo.py
+2. **Native In-Memory Netgen Workflow (``EMUstack/examples_netgen/`` — 23 Notebooks):**
+   Demonstrates the modern pure-Python workflow where 2D nanostructured layers generate curved quadratic meshes directly in memory via ``geo_params`` dictionaries or Python geometry templates (``*_template.py``) from ``EMUstack/backend/data/meshes/``, requiring zero external Gmsh installation or disk files.
 
-To have direct access to the simulation objects upon the completion of the script use,::
+.. note::
+   Every tutorial notebook is self-contained and pre-executed with inline figures and xarray outputs. They can be viewed directly on GitHub or run interactively in Jupyter Lab / Notebook.
 
-    $ python -i simo.py
+Simulation Workflow
+-------------------
 
-This will return you into an interactive python session in which all simulation objects are accessible. In this session you can access the docstrings of objects, classes and methods. For example::
+Simulations in EMUstack follow a concise, 5-step pattern:
 
-    >>> from pydoc import help
-    >>> help(objects.Light)
+1. Define Illumination
+~~~~~~~~~~~~~~~~~~~~~~
 
-where we have accessed the docstring of the Light class from objects.py
+Configure the incident wavelength range, polarization, and angle of incidence:
 
+.. code-block:: python
 
-In the remainder of the guide we go through a number of example simo.py files. These cover a wide range (though non-exhaustive) of established applications of EMUstack. The source files for these examples are in EMUstack/examples/
-The first 8 examples are pretty essential for using EMUstack, while those thereafter show EMUstack applied to a number of (IMHO) interesting situations.
+    import numpy as np
+    from EMUstack.backend import objects, materials, stack, plotting
 
-Another tip to mention before diving into the examples is running simulations within :ref:`screen_sesh`. These allow you to disconnect from the terminal instance and are discusses in :ref:`screen_sesh`.
+    # Wavelength sweep (e.g. 500 nm to 800 nm, 61 points)
+    light = objects.Light(
+        wl_nm=np.linspace(500.0, 800.0, 61),
+        theta=0.0,
+        phi=0.0,
+        max_order_PWs=3,
+    )
 
-
-
-
-Single Interface
-------------------------------------------------
-
-.. literalinclude:: ../../examples/simo_010-single_interface.py
-    :lines: 20-
-
-
-Dispersion & Parallel Computation
-------------------------------------------------
-
-.. literalinclude:: ../../examples/simo_011-single_interface-dispersive.py
-    :lines: 20-
-
-
-Thin Film Stack
-------------------------------------------------
-
-.. literalinclude:: ../../examples/simo_020-thin_film_multilayered_stack.py
-    :lines: 20-
-
-
-Including Metals
-------------------------------------------------
-
-.. literalinclude:: ../../examples/simo_021-thin_film_mirror.py
-    :lines: 20-
-
-
-1D Grating
-------------------------------------------------
-
-.. literalinclude:: ../../examples/simo_030-1D_grating.py
-    :lines: 20-
-
-
-2D Grating
-------------------------------------------------
-
-.. literalinclude:: ../../examples/simo_040-2D_array.py
-    :lines: 20-
-
-
-Angles of Incidence & Eliptical Inclusions
-------------------------------------------------
-
-.. literalinclude:: ../../examples/simo_042-eliptical_holes-CD.py
-    :lines: 20-
-
-
-Plotting Fields 1D
-------------------------------------------------
-
-.. literalinclude:: ../../examples/simo_050-plotting_fields_1d.py
-    :lines: 20-
-
-
-Plotting Fields 2D
-------------------------------------------------
-
-.. literalinclude:: ../../examples/simo_051-plotting_fields_2d.py
-    :lines: 20-
-
-
-Plotting Amplitudes
-------------------------------------------------
-
-.. literalinclude:: ../../examples/simo_052-plotting_amplitudes.py
-    :lines: 20-
-
-
-Shear Transformations
-------------------------------------------------
-
-.. literalinclude:: ../../examples/simo_060-shear_transformations.py
-    :lines: 20-
-
-
-Ultrathin Absorption Limit - Varying n
-------------------------------------------------
-
-.. literalinclude:: ../../examples/simo_070-ultrathin_limit.py
-    :lines: 20-
-
-
-Varying a Layer of a Stack
-------------------------------------------------
-
-.. literalinclude:: ../../examples/simo_071-many_substrates.py
-    :lines: 20-
-
-
-Convergence Testing
-------------------------------------------------
-
-.. literalinclude:: ../../examples/simo_080-convergence-stacked_gratings.py
-    :lines: 20-
-
-
-Extraordinary Optical Transmission
-------------------------------------------------
-
-.. literalinclude:: ../../examples/simo_090-EOT.py
-    :lines: 20-
-
-
-Screen Sessions
-------------------------------------------------
-::
-
-    screen
-
-is an extremely useful little linux command. In the context of long-ish calculations it has two important applications; ensuring your calculation is unaffected if your connection to a remote machine breaks, and terminating calculations that have hung without closing the terminal.
-For more information see the manual::
-
-    $ man screen
-
-or see online discussions `here <http://www.howtoforge.com/linux_screen>`_, `and here <http://www.rackaid.com/blog/linux-screen-tutorial-and-how-to/>`_.
-
-
-The screen session or also called screen instance looks just like your regular terminal/putty, but you can disconnect from it (close putty, turn off your computer etc.) and later reconnect to the screen session and everything inside of this will have kept running. You can also reconnect to the session from a different computer via ssh.
-
-Basic Usage
-,,,,,,,,,,,,,,,,,,,,,
-
-To install screen::
-
-    $ sudo apt-get install screen
-
-To open a new screen session::
-
-    $ screen
-
-We can start a new calculation here::
-
-    $ cd EMUstack/examples/
-    $ python simo_040-2D_array.py
-
-We can then detach from the session (leaving everything in the screen running) by typing::
-
-    Ctrl +a
-    Ctrl +d
-
-We can now monitor the processes in that session::
-
-    $ top
-
-Where we note the numerous running python processes that EMUstack has started. Watching the number of processes is useful for checking if a long simulation is near completion (which is indicated by the number of processes dropping to less than the specified num_cores).
-
-We could now start another screen and run some more calculations in this terminal (or do anything else).
-If we want to access the first session we 'reattach' by typing::
-
-    Ctrl +a +r
-
-Or entering the following into the terminal::
-
-    $ screen -r
-
-If there are multiple sessions use::
-
-    $ screen -ls
-
-to get a listing of the sessions and their ID numbers. To reattach to a particular screen, with ID 1221::
-
-    $ screen -r 1221
-
-To terminate a screen from within type::
-
-    Ctrl+d
-
-Or, taking the session ID from the previous example::
-
-    screen -X -S 1221 kill
-
-
-
-Terminating EMU stacks
-,,,,,,,,,,,,,,,,,,,,,,,
-
-
-If (for some estranged reason) a simulation hangs, we can kill all python instances upon the machine::
-
-    $ pkill python
-
-If a calculation hangs from within a screen session one must first detach from that session then kill python. A more targeted way to kill processes is using their PID::
-
-    $ kill PID
-
-Or if this does not suffice be a little more forceful::
-
-    $ kill -9 PID
-
-The PID is found from one of two ways::
-
-    $ top
-    $ ps -fe | grep username
-
-.. Screen Sessions
-.. ------------------------------------------------
-.. .. toctree::
-..     :maxdepth: 4
-
-..     screen_sesh
-
+2. Define Materials and Layers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Create homogeneous thin films and periodic nanostructures:
+
+.. code-block:: python
+
+    # Homogeneous substrate (semi-infinite glass)
+    glass = materials.Material(1.52)
+    sub = objects.ThinFilm(period=600.0, material=glass, loss=False)
+
+    # 2D Periodic nanostructure (Silicon nanopillars)
+    # Native Netgen workflow (examples_netgen):
+    meta = objects.NanoStruct(
+        period=600.0,
+        background=materials.Air,
+        inclusion_a=materials.Si_c,
+        thickness=200.0,
+        geo_params={'period': 600.0, 'a1': 240.0, 'lc': 0.1, 'lc2': 2.0},
+    )
+
+    # Superstrate (semi-infinite air)
+    sup = objects.ThinFilm(period=600.0, material=materials.Air, loss=False)
+
+3. Compute Eigenmodes
+~~~~~~~~~~~~~~~~~~~~~
+
+Solve for the electromagnetic modes of each layer across all wavelengths:
+
+.. code-block:: python
+
+    modes_sub = sub.calc_modes(light)
+    modes_meta = meta.calc_modes(light, num_BMs=30)
+    modes_sup = sup.calc_modes(light)
+
+4. Stack and Calculate Scattering
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Assemble the stack and cascade the layers using scattering matrices:
+
+.. code-block:: python
+
+    sim_stack = stack.Stack((modes_sub, modes_meta, modes_sup))
+    sim_stack.calc_scat(pol='TE')
+
+5. Visualize and Export Data
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Plot spectra or inspect local fields inline without disk side effects:
+
+.. code-block:: python
+
+    # Export spectra to xarray Dataset
+    ds = plotting.spectra_to_xarray([sim_stack])
+
+    # Evaluate 3D electromagnetic near-fields on an in-plane slice (xy)
+    bundle = plotting.fields_interpolator_in_plane(
+        sim_stack, lay_interest=1, z_value=100.0, return_H=True
+    )
+    Ex, Ey, Ez = bundle.Ex(X, Y), bundle.Ey(X, Y), bundle.Ez(X, Y)
+
+    # Evaluate vertical cross-sections (xz or yz) across the full stack
+    cross_bundle = plotting.fields_interpolator_cross_section(
+        sim_stack, plane="xz", slice_coord=300.0
+    )
+
+Available Tutorial Notebooks
+----------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 35 15 15 35
+
+   * - Notebook Name
+     - In ``examples/``
+     - In ``examples_netgen/``
+     - Physics Topic
+   * - ``simo_010-single_interface.ipynb``
+     - Yes
+     - Yes
+     - Single Non-Dispersive Interface: Fresnel transmission/reflection.
+   * - ``simo_011-single_interface-dispersive.ipynb``
+     - Yes
+     - Yes
+     - Single Dispersive Interface: Tabulated refractive indices (Si).
+   * - ``simo_020-thin_film_multilayered_stack.ipynb``
+     - Yes
+     - Yes
+     - Multilayered Thin-Film Stack: Fabry–Pérot resonance.
+   * - ``simo_021-thin_film_mirror.ipynb``
+     - Yes
+     - Yes
+     - Metallic Back-Reflector: Modeling lossy finite mirrors.
+   * - ``simo_030-1D_grating.ipynb``
+     - Yes
+     - Yes
+     - 1D Lamellar Grating: TE vs TM diffraction spectra.
+   * - ``simo_031-1D_grating-2_inclusions.ipynb``
+     - Yes
+     - Yes
+     - Multi-Inclusion 1D Grating: Asymmetric diffraction profiles.
+   * - ``simo_032-1D_grating-3_inclusions.ipynb``
+     - Yes
+     - Yes
+     - 3-Element 1D Grating: Resonance engineering.
+   * - ``simo_040-2D_array.ipynb``
+     - Yes
+     - Yes
+     - 2D Nanowire Array: Photovoltaic absorption and omega-k plots.
+   * - ``simo_041-combining_1D_and_2D_array.ipynb``
+     - Yes
+     - Yes
+     - Hybrid 1D/2D Stack: Direct Simmo-to-Simmo mode matching.
+   * - ``simo_042-eliptical_holes-CD.ipynb``
+     - Yes
+     - Yes
+     - Elliptical Nanohole Array: Circular dichroism under CPL.
+   * - ``simo_050-plotting_fields_1d.ipynb``
+     - Yes
+     - Yes
+     - 1D Bloch Modes & Field Maps: Near-field visualization.
+   * - ``simo_051-plotting_fields_2d.ipynb``
+     - Yes
+     - Yes
+     - 2D Array Near-Fields: In-plane and vertical cuts.
+   * - ``simo_052-plotting_amplitudes.ipynb``
+     - Yes
+     - Yes
+     - Mode Amplitudes: Bloch and plane-wave coupling strengths.
+   * - ``simo_053-plotting_k_space_amps.ipynb``
+     - Yes
+     - Yes
+     - In-Plane Momentum Spectrum: Guided-mode coupling.
+   * - ``simo_060-shear_transformations.ipynb``
+     - Yes
+     - Yes
+     - Lateral Layer Shifts: S-matrix shear transformations.
+   * - ``simo_070-ultrathin_limit.ipynb``
+     - Yes
+     - Yes
+     - Ultrathin Film Limit: Coherent 50% absorption bound.
+   * - ``simo_071-many_substrates.ipynb``
+     - Yes
+     - Yes
+     - Substrate Sweeps: Reusing layer modes across 100 substrates.
+   * - ``simo_080-convergence-stacked_gratings.ipynb``
+     - Yes
+     - Yes
+     - Grating Convergence: Replication of Handmer et al. (2010).
+   * - ``simo_090-EOT.ipynb``
+     - Yes
+     - Yes
+     - Extraordinary Optical Transmission: Liu & Lalanne (2008).
+   * - ``simo_091-slab_mode_finding.ipynb``
+     - Yes
+     - Yes
+     - Guided Slab Modes: Metamaterial dispersion finding.
+   * - ``Au Nanodisk Array with Interpolators.ipynb``
+     - Yes
+     - Yes
+     - Showcase: 3-plane (xy, xz, yz) near-fields of plasmonic disks.
+   * - ``Elliptical Nanohole Array (custom target interface).ipynb``
+     - Yes
+     - Yes
+     - Showcase: Custom unit-cell templates & 3-plane field maps.
+   * - ``Chiral_qBIC_Optical_Chirality.ipynb``
+     - No
+     - Yes
+     - Flagship: Chiral quasi-BIC and 3-plane optical chirality maps.
+
+.. toctree::
+   :hidden:
+
+   screen_sesh

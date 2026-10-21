@@ -33,14 +33,9 @@ backend_path = str(_backend_dir)
 # folder containing relevant data as the optical constants
 data_path = str(_backend_dir / 'data') + '/'
 
-# where template.geo files and meshes are stored
-_msh_dir = _backend_dir / 'data' / 'meshes'
-if not _msh_dir.exists():
-    _msh_dir = _backend_dir.parent / 'tests' / 'data' / 'meshes'
+# Dedicated directory where all .geo, *_template.py, .msh, and .mail files are stored
+_msh_dir = _backend_dir / "data" / "meshes"
+template_path = str(_msh_dir) + "/"
+msh_path = str(_msh_dir) + "/"
 
-template_path = str(_msh_dir) + '/'
-
-# where existing .msh and .mail files are stored and
-# new .msh and .mail files are created
-msh_path = str(_msh_dir) + '/'
 

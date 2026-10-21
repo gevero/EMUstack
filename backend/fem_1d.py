@@ -1,6 +1,6 @@
-"""Pure Python 1D Finite Element Maxwell Solver (PORTING_PLAN §7).
+"""Pure Python 1D Finite Element Maxwell Solver.
 
-Implements the discontinuous P2 (Ex) + continuous periodic P3 (Ey, Ez) pencil
+Implements coupled wave equations using discontinuous P2 (Ex) + continuous periodic P3 (Ey, Ez) elements
 using exact rational element matrices and SciPy sparse shift-invert (splu + eigs).
 
 NO NGSolve or Netgen dependency (enforced by DoD-3).
@@ -12,7 +12,7 @@ from modes import BlochModes, FEMConvergenceError
 
 
 def elem_matrices(h):
-    """Exact rational element matrices (§7.2)."""
+    """Exact rational element matrices."""
     Mxx = (h / 30.0) * np.array([
         [4.0, -1.0, 2.0],
         [-1.0, 4.0, 2.0],
@@ -39,8 +39,8 @@ def elem_matrices(h):
     return Mxx, Myy, Kxy, Kyx, Kyy
 
 
-def build_sparse_pencil_1d(nel, eps_list, k0, kx, ky, period_x=1.0):
-    """Assemble the 1D Maxwell pencil (K, M) as SciPy CSR matrices.
+def build_sparse_system_1d(nel, eps_list, k0, kx, ky, period_x=1.0):
+    """Assemble the 1D Maxwell eigenvalue system (K, M) as SciPy CSR matrices.
     
     Total equations neq = 9 * nel.
     """
@@ -318,7 +318,7 @@ def solve_bloch_modes_1d(
         sigma = shift
         
     # 2. Primal assembly & solve
-    K_pri, M_pri, neq = build_sparse_pencil_1d(nel, eps_list, k0, bloch_vec_x, bloch_vec_y, period_x)
+    K_pri, M_pri, neq = build_sparse_system_1d(nel, eps_list, k0, bloch_vec_x, bloch_vec_y, period_x)
     ncv = min(2 * num_BMs + num_BMs // 2 + 3, neq - 1)
     
     if v0 is None:
@@ -345,7 +345,7 @@ def solve_bloch_modes_1d(
     vecs_pri = vecs_pri[:, order_pri]
     
     # 3. Adjoint solve at (-kx, -ky)
-    K_adj, M_adj, _ = build_sparse_pencil_1d(nel, eps_list, k0, -bloch_vec_x, -bloch_vec_y, period_x)
+    K_adj, M_adj, _ = build_sparse_system_1d(nel, eps_list, k0, -bloch_vec_x, -bloch_vec_y, period_x)
     lu_adj = splu((K_adj - sigma * M_adj).tocsc())
     OP_adj = LinearOperator((neq, neq), matvec=lambda x: lu_adj.solve(M_adj @ x), dtype=complex)
     vals_adj, vecs_adj = eigs(OP_adj, k=num_BMs, which='LM', ncv=ncv, maxiter=itermax, tol=0.0, v0=v0_use)
@@ -417,7 +417,7 @@ def solve_bloch_modes_1d(
     L_normed = np.diag(scales) @ L @ np.diag(scales)
     norm_res = float(np.linalg.norm(L_normed - np.eye(num_BMs)))
     
-    # Mode self-flux F (primal in both slots, PORTING_PLAN §3.6)
+    # Mode self-flux F (primal in both slots)
     F = np.zeros((num_BMs, num_BMs), dtype=complex)
     for e in range(nel):
         for m in range(num_BMs):

@@ -1,71 +1,33 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "emustack-fem"
 version = "2.0.0"
-description = "Modernized Finite Element Maxwell mode-matching solver for nanophotonic multilayer stacks"
+description = "Generalized scattering-matrix and finite-element (NGSolve/Netgen) electromagnetic simulator for multilayered periodic nanostructures"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 authors = [
-  {name = "Bjorn Sturmberg", email = "bcs.research@gmail.com"},
-  {name = "Kokou Dossou"},
-  {name = "Felix Lawrence"},
-  {name = "Lindsay Botten"},
-]
-maintainers = [
-  {name = "EMUstack Modernization Team"},
-]
-keywords = [
-  "nanophotonics",
-  "optics",
-  "finite-element-method",
-  "maxwell-equations",
-  "ngsolve",
-  "scattering-matrix",
-  "bloch-modes",
-  "metamaterials",
-  "plasmonics",
-  "photovoltaics",
-]
-classifiers = [
-  "Development Status :: 5 - Production/Stable",
-  "Intended Audience :: Science/Research",
-  "Topic :: Scientific/Engineering :: Physics",
-  "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
-  "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Operating System :: POSIX :: Linux",
+    {name = "Bjorn Sturmberg"},
+    {name = "Kokou Dossou"},
+    {name = "Felix Lawrence"},
+    {name = "EMUstack Contributors"},
 ]
 dependencies = [
-  "numpy>=1.26,<3",
-  "scipy>=1.11",
-  "matplotlib>=3.8",
-  "ngsolve>=6.2.2600",
-  "netgen-mesher>=6.2.2600",
+    "numpy>=1.22",
+    "scipy>=1.9",
+    "matplotlib>=3.6",
+    "ngsolve>=6.2.2401",
+    "netgen-mesher>=6.2.2401",
+    "xarray>=2023.1",
 ]
 
 [project.optional-dependencies]
-fast = ["mkl"]
-dev = [
-  "pytest>=8",
-  "pytest-xdist",
-  "build",
-  "twine",
-]
-notebooks = [
-  "jupyterlab",
-  "ipywidgets",
-]
-
-[project.urls]
-Homepage = "https://github.com/bjornsturmberg/EMUstack"
-Documentation = "https://emustack.readthedocs.io"
-Repository = "https://github.com/bjornsturmberg/EMUstack"
-Issues = "https://github.com/bjornsturmberg/EMUstack/issues"
+dev = ["pytest>=7.0", "ruff>=0.4"]
+notebooks = ["jupyter>=1.0", "nbconvert>=7.0", "ipykernel>=6.0", "adaptive>=1.0"]
+docs = ["sphinx>=7.0", "sphinx-rtd-theme>=2.0"]
 
 [tool.setuptools]
 packages = ["EMUstack", "EMUstack.backend"]
@@ -76,18 +38,19 @@ packages = ["EMUstack", "EMUstack.backend"]
 
 [tool.setuptools.package-data]
 "EMUstack.backend" = [
-  "data/*.txt",
-  "data/meshes/*.geo",
-  "data/meshes/*.mail",
-  "data/meshes/*.py",
+    "data/*.txt",
+    "data/*.dat",
+    "data/meshes/*.geo",
+    "data/meshes/*.mail",
+    "data/meshes/*.msh",
+    "data/meshes/*.py",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-python_functions = ["test_*"]
-addopts = "-v --tb=short"
-filterwarnings = [
-  "ignore::DeprecationWarning",
-  "ignore::UserWarning",
-]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["docs", "build", "*.ipynb"]

@@ -1,8 +1,8 @@
-"""Test Gmsh mesh import and periodic boundary conditions (Path IIA and Path IIB).
+"""Test Gmsh mesh import and periodic boundary conditions (Gmsh Template Import and Periodic Boundary Coupling).
 
 Verifies:
-- Path IIA: Gmsh MSH 2.2 import + ngm.dim=2 + 1-based AddPointIdentification -> native Periodic
-- Path IIB: Explicit algebraic constraint matrix C, null space T, and C1-C3 obligations.
+- Gmsh Template Import: Gmsh MSH 2.2 import + ngm.dim=2 + 1-based AddPointIdentification -> native Periodic
+- Periodic Boundary Coupling: Explicit algebraic constraint matrix C, null space T, and C1-C3 obligations.
 """
 from pathlib import Path
 import pytest
@@ -13,8 +13,9 @@ from scipy.linalg import svd
 from netgen.read_gmsh import ReadGmsh
 from netgen.meshing import IdentificationType
 
-_REPO_ROOT = Path(__file__).resolve().parents[3]
-_MSH_PATH = _REPO_ROOT / "research" / "gmsh_import_cell.order1.msh"
+from EMUstack.backend import paths
+
+_MSH_PATH = Path(paths.msh_path) / "gmsh_import_cell.order1.msh"
 
 
 def to_scipy(bform):

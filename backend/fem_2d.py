@@ -1,10 +1,10 @@
-"""2D Finite Element Maxwell Bloch Solver using NGSolve (PORTING_PLAN §6).
+"""2D Finite Element Maxwell Bloch Solver using NGSolve.
 
-Solves the coupled de Rham pencil on Periodic(HCurl(p) * H1(p+1)):
+Solves the coupled Maxwell eigenvalue equation on Periodic(HCurl(p) * H1(p+1)):
 K u = lambda M u with lambda = zeta^2.
 
-Bloch formulation: quasi-periodic space via ngsolve.Periodic (Option A in §6.1),
-assembled with plain curl/grad.
+Bloch formulation: quasi-periodic space via ngsolve.Periodic,
+assembled with mixed vector-scalar finite elements.
 """
 import os
 import time
@@ -21,7 +21,7 @@ import meshing
 import paths
 
 
-def assemble_pencil_2d(
+def assemble_system_2d(
     mesh: ngs.Mesh,
     dy: float,
     eps_cf: ngs.CoefficientFunction,
@@ -31,9 +31,9 @@ def assemble_pencil_2d(
     order: int = 2,
     period_x: float = 1.0
 ) -> Tuple[BilinearForm, BilinearForm, ngs.comp.FESpace, ngs.comp.FESpace]:
-    """Assemble the Maxwell weak form (K, M) on the quasi-periodic product space (§6.2).
+    """Assemble the Maxwell weak form (K, M) on the quasi-periodic product space.
     
-    Option A (§6.1): quasi-periodic space via ngsolve.Periodic, plain curl/grad.
+    Quasi-periodic space via ngsolve.Periodic, plain curl/grad.
     """
     fes = HCurl(mesh, order=order, complex=True) * H1(mesh, order=order + 1, complex=True)
     phase = [np.exp(+1j * kx * period_x), np.exp(+1j * ky * dy)]
@@ -68,7 +68,7 @@ def assemble_bilinear_B(
     space_adj: Optional[ngs.comp.FESpace] = None,
     order: int = 2
 ) -> sp.csr_matrix:
-    """Assemble un-conjugated bilinear form B on trialspace=space_pri, testspace=space_adj (§6.4, Eq. 26).
+    """Assemble un-conjugated bilinear form B on trialspace=space_pri, testspace=space_adj.
     
     B = int_Omega mu^-1 (u - grad z) . v dA
     """
@@ -92,7 +92,7 @@ def assemble_bilinear_B(
     return sp.csr_matrix((np.array(vals), np.array(col), np.array(row)), shape=B_form.mat.shape)
 
 
-def solve_pencil_modes(
+def solve_system_modes(
     K: BilinearForm,
     M: BilinearForm,
     space: ngs.comp.FESpace,
@@ -111,7 +111,7 @@ def solve_pencil_modes(
     M_vals, M_col, M_row = M.mat.CSR()
     M_csr = sp.csr_matrix((np.array(M_vals), np.array(M_col), np.array(M_row)), shape=M.mat.shape)
 
-    # Infinite eigenvalue cap (§6.3 step 1)
+    # Infinite eigenvalue cap
     lam_cap = 1.5 * (n_max * k0)**2 + 200.0 + (2.0 * np.pi * max(max_order_PWs, 2))**2
 
     valid_zeta = []
@@ -133,11 +133,11 @@ def solve_pencil_modes(
             continue
         res = np.linalg.norm(Kc - l * Mc) / denom
 
-        if res > 1e-3:  # Spurious mode filter (§6.3 step 2)
+        if res > 1e-3:  # Spurious mode filter
             continue
 
         z = np.sqrt(l)
-        # Branch selection (§6.3 step 3, Eq. 22)
+        # Branch selection: physical propagating/decaying convention
         if abs(z.imag) <= 1e-8 * k0:
             if z.real < 0:
                 z = -z
@@ -157,7 +157,7 @@ def solve_pencil_modes(
     valid_coeffs = np.column_stack(valid_coeffs)
     valid_res = np.array(valid_res)
 
-    # Sorting (§6.3 step 4 / z_indexx.f): descending Re(zeta^2) = Re^2 - Im^2
+    # Sorting: descending Re(zeta^2) = Re^2 - Im^2
     sort_order = np.argsort(-np.real(valid_zeta**2), kind='stable')
 
     return valid_zeta[sort_order], valid_coeffs[:, sort_order], valid_res[sort_order]
@@ -177,7 +177,7 @@ def compute_overlaps_2d(
     space_pri: Optional[ngs.comp.FESpace] = None,
     space_adj: Optional[ngs.comp.FESpace] = None
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Compute projection overlaps J (divided by dy) and J_dag (un-normalized) via LinearForm assembly on periodic spaces (§6.5)."""
+    """Compute projection overlaps J (divided by dy) and J_dag (un-normalized) via LinearForm assembly on periodic spaces."""
     if space_pri is None or space_adj is None:
         fes = HCurl(mesh, order=order, complex=True) * H1(mesh, order=order + 1, complex=True)
         space_pri = ngs.Periodic(fes, phase=[np.exp(+1j * kx * period_x), np.exp(+1j * ky * dy)])
@@ -264,7 +264,7 @@ def solve_bloch_modes_2d(
     num_pw_per_pol: Optional[int] = None,
     **kwargs
 ) -> BlochModes:
-    """Solve 2D Bloch modes via NGSolve (PORTING_PLAN §6)."""
+    """Solve 2D Bloch modes via NGSolve."""
     t_start = time.perf_counter()
     k0 = 2.0 * np.pi / wl_norm
     kx, ky = float(k_pll[0]), float(k_pll[1])
@@ -374,10 +374,10 @@ def solve_bloch_modes_2d(
     else:
         sigma = shift
 
-    # 3. Assemble pencils
+    # 3. Assemble system
     t_asm = time.perf_counter()
-    K_pri, M_pri, space_pri, fes = assemble_pencil_2d(mesh, dy, eps_cf, k0, kx, ky, order=order, period_x=period_x)
-    K_adj, M_adj, space_adj, _ = assemble_pencil_2d(mesh, dy, eps_cf, k0, -kx, -ky, order=order, period_x=period_x)
+    K_pri, M_pri, space_pri, fes = assemble_system_2d(mesh, dy, eps_cf, k0, kx, ky, order=order, period_x=period_x)
+    K_adj, M_adj, space_adj, _ = assemble_system_2d(mesh, dy, eps_cf, k0, -kx, -ky, order=order, period_x=period_x)
     B_csr = assemble_bilinear_B(mesh, space_pri, space_adj, order=order)
     time_asm = time.perf_counter() - t_asm
 
@@ -385,20 +385,20 @@ def solve_bloch_modes_2d(
     t_arnoldi = time.perf_counter()
     numeig = max(num_BMs * 3, num_BMs + 40)
 
-    zeta_pri, Phi_pri, res_pri = solve_pencil_modes(
+    zeta_pri, Phi_pri, res_pri = solve_system_modes(
         K_pri, M_pri, space_pri, sigma, numeig, k0, max_order_PWs, n_max
     )
-    zeta_adj, Phi_adj, res_adj = solve_pencil_modes(
+    zeta_adj, Phi_adj, res_adj = solve_system_modes(
         K_adj, M_adj, space_adj, sigma, numeig, k0, max_order_PWs, n_max
     )
 
     if len(zeta_pri) < num_BMs or len(zeta_adj) < num_BMs:
         # Retry once with expanded numeig
         numeig_retry = int(numeig * 1.5)
-        zeta_pri, Phi_pri, res_pri = solve_pencil_modes(
+        zeta_pri, Phi_pri, res_pri = solve_system_modes(
             K_pri, M_pri, space_pri, sigma, numeig_retry, k0, max_order_PWs, n_max
         )
-        zeta_adj, Phi_adj, res_adj = solve_pencil_modes(
+        zeta_adj, Phi_adj, res_adj = solve_system_modes(
             K_adj, M_adj, space_adj, sigma, numeig_retry, k0, max_order_PWs, n_max
         )
         if len(zeta_pri) < num_BMs or len(zeta_adj) < num_BMs:
@@ -407,7 +407,7 @@ def solve_bloch_modes_2d(
                 f"obtained primal {len(zeta_pri)}, adjoint {len(zeta_adj)}"
             )
 
-    # Nearest-neighbor mode pairing between primal and adjoint eigenspectra (§3.3)
+    # Nearest-neighbor mode pairing between primal and adjoint eigenspectra
     paired_adj = []
     avail = set(range(len(zeta_adj)))
     for n in range(num_BMs):
@@ -421,11 +421,11 @@ def solve_bloch_modes_2d(
     Phi_adj = Phi_adj[:, paired_adj]
     time_arnoldi = time.perf_counter() - t_arnoldi
 
-    # 5. Biorthogonal pairing and normalization (§3.3, §6.4)
+    # 5. Biorthogonal pairing and normalization
     # L_mn = (zeta_n / k0) * Phi_adj[m]^T @ B @ Phi_pri[n]
     L = (1.0 / k0) * (Phi_adj.T @ B_csr @ Phi_pri) @ np.diag(zeta_pri)
 
-    # Conjugate-pair repair (§3.3, §7.6 step 6)
+    # Conjugate-pair repair
     swaps = 0
     for j in range(num_BMs):
         if abs(L[j, j]) <= 1e-7:
@@ -437,7 +437,7 @@ def solve_bloch_modes_2d(
                     L = (1.0 / k0) * (Phi_adj.T @ B_csr @ Phi_pri) @ np.diag(zeta_pri)
                     break
 
-    # Algebraic biorthogonal repair Phi_adj <- Phi_adj @ L^-T (§3.3, G1.4)
+    # Algebraic biorthogonal repair Phi_adj <- Phi_adj @ L^-T
     try:
         Phi_adj = Phi_adj @ np.linalg.inv(L).T
         L = (1.0 / k0) * (Phi_adj.T @ B_csr @ Phi_pri) @ np.diag(zeta_pri)
@@ -450,7 +450,7 @@ def solve_bloch_modes_2d(
 
     norm_res = float(np.linalg.norm(L - np.eye(num_BMs)))
 
-    # 6. Mode self-flux matrix F (primal in both slots, §3.6)
+    # 6. Mode self-flux matrix F (primal in both slots)
     bform_pri = ngs.BilinearForm(space_pri, symmetric=False)
     (u_p, z_p) = space_pri.TrialFunction()
     (v_p, w_p) = space_pri.TestFunction()
@@ -471,7 +471,7 @@ def solve_bloch_modes_2d(
     )
     time_ov = time.perf_counter() - t_ov
 
-    # 8. Mode polarization / energy fractions (§9.4)
+    # 8. Mode polarization / energy fractions
     mode_pol = np.zeros((4, num_BMs), dtype=float)
     fes_E = HCurl(mesh, order=order, complex=True)
     for n in range(num_BMs):
@@ -485,7 +485,7 @@ def solve_bloch_modes_2d(
         except Exception:
             pass
 
-    # 9. Sol1 tensor reconstruction if requested (§9.1)
+    # 9. Sol1 tensor reconstruction if requested
     sol1 = None
     if plotting_fields and structure is not None and hasattr(structure, "table_nod") and structure.table_nod is not None:
         nel = structure.n_msh_el
@@ -550,7 +550,7 @@ def solve_bloch_modes_2d(
                         sol1[4, inod, n, iel] = val[4]
                         sol1[5, inod, n, iel] = val[5]
 
-    # Degenerate cluster labelling (§6.3 step 5)
+    # Degenerate cluster labelling
     cluster = np.zeros(num_BMs, dtype=int)
     c_id = 0
     for i in range(num_BMs):

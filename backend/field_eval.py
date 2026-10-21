@@ -1,4 +1,4 @@
-"""Field evaluation and plotting support for EMUstack (PORTING_PLAN §9).
+"""Field evaluation and plotting support for EMUstack.
 
 Pure Python / NumPy replacement for legacy Fortran routines:
 - field_value_plane
@@ -33,7 +33,7 @@ def field_value_plane(
     **kwargs
 ) -> Any:
     """Evaluate 3D electric (and optionally magnetic) fields (Ex, Ey, Ez, Hx, Hy, Hz)
-    at element nodes in a horizontal plane (§9.1).
+    at element nodes in a horizontal plane.
     
     Returns array m_E of shape (n_msh_el, 6, 3), or tuple (m_E, m_H) if return_H is True.
     """
@@ -119,7 +119,7 @@ def gmsh_plot_field(
     *args,
     **kwargs
 ):
-    """Write in-plane field values into Gmsh .pos view file (§9.1)."""
+    """Write in-plane field values into Gmsh .pos view file."""
     dir_name = "in_plane_fields"
     if not os.path.exists(dir_name):
         os.makedirs(dir_name, exist_ok=True)
@@ -149,7 +149,7 @@ def gmsh_plot_field(
 
 
 def gmsh_plot_slice(*args, **kwargs):
-    """Write vertical field slice into Gmsh .pos view file (§9.1)."""
+    """Write vertical field slice into Gmsh .pos view file."""
     dir_name = "fields_vertically"
     if not os.path.exists(dir_name):
         os.makedirs(dir_name, exist_ok=True)
@@ -160,7 +160,7 @@ def gmsh_plot_slice(*args, **kwargs):
 
 
 def gmsh_plot_field_3d(*args, **kwargs):
-    """Write 3D field into Gmsh .pos view file (§9.1)."""
+    """Write 3D field into Gmsh .pos view file."""
     dir_name = "3d_fields"
     if not os.path.exists(dir_name):
         os.makedirs(dir_name, exist_ok=True)

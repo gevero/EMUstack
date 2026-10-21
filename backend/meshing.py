@@ -1,11 +1,10 @@
-"""Geometry and Meshing Module for EMUstack (PORTING_PLAN §5).
+"""Geometry and Meshing Module for EMUstack.
 
 Provides:
-- Path I: Native Netgen SplineGeometry cell builder (unit_cell) with periodic boundaries
-  and exact Bézier curved inclusions.
-- Path II: Gmsh MSH 2.2 importer (import_gmsh_mesh) with Path IIA 1-based AddPointIdentification.
+- Built-in Netgen Meshing: Native Netgen SplineGeometry cell builder (unit_cell) with periodic boundaries and exact Bézier curved inclusions.
+- Gmsh Template Import: Gmsh MSH 2.2 importer (import_gmsh_mesh) with 1-based AddPointIdentification.
 - .mail file reader and importer (read_mail_file) converting legacy .mail to linear MSH 2.2.
-- Path IIB algebraic constraint operator (bloch_constraint).
+- Periodic Boundary Coupling: algebraic constraint operator (bloch_constraint).
 - Bloch product spaces (bloch_spaces) with mandatory assertions.
 """
 import os
@@ -28,7 +27,7 @@ from ngsolve.fem import NODE_TYPE
 
 @dataclass
 class Refine:
-    """Mesh refinement control parameters (§5.5)."""
+    """Mesh refinement control parameters."""
     bg: float = 0.1
     inc: float = 0.05
     arc: int = 12
@@ -52,7 +51,7 @@ def arc_control_points(
     ry: Optional[float] = None,
     angle: float = 0.0
 ) -> Tuple[int, int, int]:
-    """Calculate Bézier control points for quadratic rational arc (§5.3 rule 2)."""
+    """Calculate Bézier control points for quadratic rational arc."""
     dtheta = a1 - a0
     mid_theta = (a0 + a1) / 2.0
     sec_half = 1.0 / np.cos(dtheta / 2.0)
@@ -94,19 +93,20 @@ def unit_cell(
     curve_order: int = 2,
     period_x: float = 1.0
 ) -> ngs.Mesh:
-    """Build a periodic 2D unit cell mesh using native Netgen SplineGeometry (Path I, §5.1).
+    """Build a periodic 2D unit cell mesh using native Netgen SplineGeometry.
 
-    Parameters:
-    - dy: cell height / period_x (normalized cell height)
-    - inclusions: list of inclusion dicts, each with keys like:
-        - {"kind": "circle", "c": (cx, cy), "r": r, "tag": tag, "maxh": h}
-        - {"kind": "ellipse", "c": (cx, cy), "rx": rx, "ry": ry, "tag": tag, "maxh": h}
-        - {"kind": "square", "c": (cx, cy), "s": s, "tag": tag, "maxh": h}
-        - {"kind": "rectangle", "c": (cx, cy), "w": w, "h": h, "tag": tag, "maxh": h}
-        - {"kind": "ring", "c": (cx, cy), "r_out": r1, "r_in": r2, "tag": tag, "maxh": h}
-    - refine: Refine dataclass with refinement sizes
-    - curve_order: Netgen geometric curvature order (>= 2)
-    - period_x: normalized cell width (default 1.0)
+    Parameters
+    ----------
+    dy : float
+        Cell height / period_x (normalized cell height).
+    inclusions : list of dict
+        List of inclusion dictionaries specifying geometries (circle, ellipse, square, rectangle, ring).
+    refine : Refine, optional
+        Refine dataclass with refinement sizes.
+    curve_order : int, default=2
+        Netgen geometric curvature order (>= 2).
+    period_x : float, default=1.0
+        Normalized cell width.
     """
     if refine is None:
         refine = Refine()
@@ -210,7 +210,7 @@ def unit_cell(
     ngm.Curve(curve_order)
     mesh = Mesh(ngm)
 
-    # Mandatory assertions (§5.1, §5.2)
+    # Geometric and periodic boundary sanity assertions
     assert ngm.GetNrIdentifications() == 4, "periodic identifications missing"
     assert ngm.GetCurveOrder() >= 2, "curved geometry not activated"
     assert len(mesh.GetPeriodicNodePairs(NODE_TYPE.VERTEX)) > 0, "no periodic vertex pairs found"
@@ -243,7 +243,7 @@ def import_gmsh_mesh(
     method: str = "IIA",
     curve_order: int = 2
 ) -> ngs.Mesh:
-    """Import a legacy Gmsh MSH 2.2 mesh and configure 2D periodic identifications (Path II, §5.8).
+    """Import a legacy Gmsh MSH 2.2 mesh and configure 2D periodic identifications.
 
     Parameters:
     - msh_path: path to .msh file (must be MSH 2.2, linear elements)
@@ -271,13 +271,13 @@ def import_gmsh_mesh(
 
     # Read with Netgen
     ngm = ReadGmsh(msh_path)
-    # MANDATORY: fix 3D surface mesh trap (§5.8)
+    # Ensure mesh dimension is 2D for planar unit cells
     ngm.dim = 2
     if curve_order >= 2:
         ngm.Curve(curve_order)
 
     if method == "IIA":
-        # Identify periodic boundaries geometrically (§5.8)
+        # Identify periodic boundaries geometrically
         P = np.array([[p[0], p[1], p[2]] for p in ngm.Points()])
         x_min, x_max = P[:, 0].min(), P[:, 0].max()
         y_min, y_max = P[:, 1].min(), P[:, 1].max()
@@ -294,7 +294,7 @@ def import_gmsh_mesh(
         x_pairs = list(zip(sorted(lo, key=lambda i: P[i][1]), sorted(ri, key=lambda i: P[i][1])))
         y_pairs = list(zip(sorted(bo, key=lambda i: P[i][0]), sorted(to, key=lambda i: P[i][0])))
 
-        # 1-BASED identnr: 1 for x-pairs, 2 for y-pairs (§5.8)
+        # 1-based identification numbers: 1 for x-pairs, 2 for y-pairs
         for p1, p2 in x_pairs:
             ngm.AddPointIdentification(p1 + 1, p2 + 1, 1, IdentificationType.PERIODIC)
         for p1, p2 in y_pairs:
@@ -414,23 +414,19 @@ def read_mail_file(mail_path: str, method: str = "IIA") -> Tuple[ngs.Mesh, np.nd
 
 
 def resolve_mesh_file_path(filename: str) -> str:
-    """Resolve a .geo, .py, .msh, or .mail path across standard search locations."""
-    if os.path.isabs(filename) and os.path.exists(filename):
-        return filename
+    """Locate a .geo, .py, .msh, or .mail file in CWD or the dedicated meshes folder."""
     if os.path.exists(filename):
         return os.path.abspath(filename)
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    data_mesh = os.path.join(base_dir, "data", "meshes", filename)
-    if os.path.exists(data_mesh):
-        return data_mesh
-    test_mesh = os.path.join(os.path.dirname(base_dir), "tests", "data", "meshes", filename)
-    if os.path.exists(test_mesh):
-        return test_mesh
+    mesh_dir = os.path.join(base_dir, "data", "meshes")
+    candidate = os.path.join(mesh_dir, os.path.basename(filename))
+    if os.path.exists(candidate):
+        return candidate
     if not filename.endswith("_template.geo") and filename.endswith(".geo"):
-        tmpl = filename[:-4] + "_template.geo"
-        for candidate in [tmpl, os.path.join(base_dir, "data", "meshes", tmpl)]:
-            if os.path.exists(candidate):
-                return candidate
+        tmpl = os.path.basename(filename)[:-4] + "_template.geo"
+        for path in (tmpl, os.path.join(mesh_dir, tmpl)):
+            if os.path.exists(path):
+                return os.path.abspath(path)
     raise FileNotFoundError(f"Geometry / mesh file not found: {filename}")
 
 
@@ -497,7 +493,12 @@ def mesh_from_geo(
     geo_text = geo_text.replace('Physical Surface(1) =', 'Physical Surface("bg") =')
     geo_text = geo_text.replace('Physical Surface(2) =', 'Physical Surface("inc2") =')
 
-    gmsh_bin = shutil.which("gmsh") or "/home/giovi/bin/gmsh"
+    gmsh_bin = (
+        os.environ.get("GMSH_BIN")
+        or shutil.which("gmsh")
+        or os.path.expanduser("~/.local/bin/gmsh")
+        or os.path.expanduser("~/bin/gmsh")
+    )
     if not gmsh_bin or not os.path.exists(gmsh_bin):
         raise EnvironmentError(
             "Gmsh binary not found. Please install Gmsh or use a native Netgen .py geometry template."

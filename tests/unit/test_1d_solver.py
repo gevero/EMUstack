@@ -38,7 +38,7 @@ def test_1d_bloch_phase_invariance():
     eps_list[nel // 4 : 3 * nel // 4] = 1.5**2
 
     # Solver at kx
-    K1, M1, neq = fem_1d.build_sparse_pencil_1d(nel, eps_list, k0, kx, ky, period_x)
+    K1, M1, neq = fem_1d.build_sparse_system_1d(nel, eps_list, k0, kx, ky, period_x)
     sigma = 1.1 * (3.5**2) * (k0**2) - kx**2 - ky**2
     lu1 = splu((K1 - sigma * M1).tocsc())
     OP1 = LinearOperator((neq, neq), matvec=lambda x: lu1.solve(M1 @ x), dtype=complex)
@@ -47,7 +47,7 @@ def test_1d_bloch_phase_invariance():
 
     # Solver at kx + 2*pi/period_x
     kx_shifted = kx + 2.0 * np.pi / period_x
-    K2, M2, _ = fem_1d.build_sparse_pencil_1d(nel, eps_list, k0, kx_shifted, ky, period_x)
+    K2, M2, _ = fem_1d.build_sparse_system_1d(nel, eps_list, k0, kx_shifted, ky, period_x)
     sigma2 = 1.1 * (3.5**2) * (k0**2) - kx_shifted**2 - ky**2
     lu2 = splu((K2 - sigma2 * M2).tocsc())
     OP2 = LinearOperator((neq, neq), matvec=lambda x: lu2.solve(M2 @ x), dtype=complex)
@@ -96,7 +96,7 @@ def test_1d_tetm_decoupling_at_zero_ky():
     ky = 0.0
     eps_list = np.ones(nel, dtype=complex) * 4.0
     
-    K, M, neq = fem_1d.build_sparse_pencil_1d(nel, eps_list, k0, kx, ky)
+    K, M, neq = fem_1d.build_sparse_system_1d(nel, eps_list, k0, kx, ky)
     K_dense = K.toarray()
     M_dense = M.toarray()
     
@@ -202,8 +202,8 @@ def test_1d_kzx_sign_negative_control():
     ky = 0.4
     eps_list = np.ones(nel, dtype=complex) * 4.0
     
-    # Correct pencil
-    K_correct, M, neq = fem_1d.build_sparse_pencil_1d(nel, eps_list, k0, kx, ky, period_x)
+    # Correct system
+    K_correct, M, neq = fem_1d.build_sparse_system_1d(nel, eps_list, k0, kx, ky, period_x)
     sigma = 1.1 * 4.0 * (k0**2) - kx**2 - ky**2
     lu_c = splu((K_correct - sigma * M).tocsc())
     OP_c = LinearOperator((neq, neq), matvec=lambda x: lu_c.solve(M @ x), dtype=complex)

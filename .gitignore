@@ -27,8 +27,9 @@ backend/data/*.msh
 backend/data/meshes/*.log
 backend/data/meshes/*.msh
 
-# Never ignore checked-in test mail and geo files
-!backend/data/meshes/4testing-*.mail
+# Never ignore checked-in test mail, msh, geo, and python template files
+!backend/data/meshes/*.mail
+!backend/data/meshes/*.msh
 !backend/data/meshes/*.geo
 !backend/data/meshes/*.py
 

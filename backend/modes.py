@@ -1,4 +1,4 @@
-"""Mode set container (PORTING_PLAN §4.2).
+"""Mode set container.
 
 Returned by both 1D and 2D solvers, providing a unified container for
 eigenvalues, overlap matrices, self-flux, and diagnostic metadata.

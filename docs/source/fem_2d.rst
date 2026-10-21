@@ -1,26 +1,49 @@
-2D FEM Mode Solver
-====================
+2D Finite Element Mode Solver
+==============================
 
-2D Mesh
+Overview
 --------
 
-2D FEM meshes can be created natively via NGSolve/Netgen or using Gmsh.
-Templates for Gmsh inclusion shapes are stored in ``backend/data/meshes/``. For an up to date list of templates see the 'inc_shape' entry in the NanoStruct docstring. 
+EMUstack computes the electromagnetic Bloch modes of 2D periodic nanostructures using the high-performance finite element library `NGSolve <https://ngsolve.org/>`_. 
 
-An advantage of using the FEM to calculate the modes of layers is that there is absolutely no constraints on the content of the unit cell. If you wish to create a different structure this can be done using Netgen native builders or Gmsh.
+The Maxwell eigenvalue equation:
 
-Note that the area of the unit cell must always be unity! This has been assumed throughout the theoretical derivations.
+.. math::
 
-Note that the Physical Surface numbers set in the .geo file must map onto the following array in EMUstack ::
+    \mathbf{K} \mathbf{u} = \beta^2 \mathbf{M} \mathbf{u}
 
-    self.n_effs = np.array([st.background.n(wl), st.inclusion_a.n(wl),
-                            st.inclusion_b.n(wl), st.inclusion_c.n(wl),
-                            st.inclusion_d.n(wl), st.inclusion_e.n(wl)])
+is discretized on a quasi-periodic product space using mixed vector-scalar finite elements:
 
-So, for example, Physical Surface(1) is st.background and Physical Surface(2) is inclusion_a.
+* **Nédélec edge elements** (:math:`H(\text{curl})`) for the transverse electric field :math:`\mathbf{E}_t`, which naturally enforce continuity of tangential electric fields across material boundaries while allowing normal field jumps.
+* **Lagrange nodal elements** (:math:`H^1`) for the longitudinal electric field :math:`E_z`.
 
+This mixed formulation completely avoids non-physical spurious modes without artificial penalty terms. The eigenvalue problem is solved via shift-invert Arnoldi iteration using NGSolve's built-in sparse solvers. If the requested number of modes cannot be resolved to numerical tolerance, a descriptive ``FEMConvergenceError`` is raised.
 
-FEM Solver
-----------
+Meshing Workflows
+-----------------
 
-The 2D mode solver uses NGSolve to assemble Maxwell curl-curl / grad-div generalized eigenvalue pencils on periodic Nedelec (HCurl) and Lagrange (H1) finite element spaces. Convergence failures raise ``FEMConvergenceError`` rather than aborting.
+EMUstack supports two meshing workflows for 2D nanostructured layers:
+
+1. **Native Built-in Netgen Meshing (Pure Python):**
+   Unit cells are built directly in memory using Netgen's 2D constructive solid geometry (CSG) tools or Python geometry templates (e.g., ``ellipse_msh_template.py``, ``chiral_qbic_template.py``). This workflow requires no external mesh generation binaries and supports curved second-order elements with exact boundary representation.
+
+2. **Gmsh Template Import:**
+   Legacy or complex geometries defined in Gmsh ``.geo`` scripts are meshed and imported via Gmsh MSH 2.2 format. Periodic boundary identifications are automatically applied to matching unit cell boundary edges.
+
+Material Surface Mapping
+------------------------
+
+In 2D unit cells, domain materials are mapped to physical surface tags:
+
+.. code-block:: python
+
+    self.n_effs = np.array([
+        st.background.n(wl),
+        st.inclusion_a.n(wl),
+        st.inclusion_b.n(wl),
+        st.inclusion_c.n(wl),
+        st.inclusion_d.n(wl),
+        st.inclusion_e.n(wl)
+    ])
+
+Domain tag 1 corresponds to ``background``, domain tag 2 corresponds to ``inclusion_a``, and higher tags correspond to subsequent inclusions.

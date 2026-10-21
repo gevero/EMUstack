@@ -19,13 +19,16 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-from __future__ import print_function
-
 import os
 import numpy as np
-import paths
-import materials
-from mode_calcs import Simmo, Anallo
+
+try:
+    from . import paths, materials
+    from .mode_calcs import Simmo, Anallo
+except ImportError:
+    import paths
+    import materials
+    from mode_calcs import Simmo, Anallo
 
 
 msh_location = paths.msh_path
@@ -39,7 +42,7 @@ print('\n##################################################################\n'\
       '##################################################################\n')
 
 
-class NanoStruct(object):
+class NanoStruct:
     """ Represents a structured layer.
 
         Args:
@@ -181,7 +184,7 @@ class NanoStruct(object):
 
             plot_abs  (bool): Choose to plot absolute value of modal fields.
 
-            plt_msh  (bool): Save a plot of the 1D array geometry.
+            plt_msh  (bool): Save a plot of the 1D array geometry. Defaults to False.
     """
     def __init__(self,
                  periodicity,
@@ -247,7 +250,7 @@ class NanoStruct(object):
                  plot_imag=0,
                  plot_abs=0,
                  plot_field_conc=False,
-                 plt_msh=True):
+                 plt_msh=None):
         if geo_params is None:
             geo_params = {}
 
@@ -279,6 +282,8 @@ class NanoStruct(object):
                 self.period_y = float(period)
         else:
             self.period_y = float(period_y)
+        if geo_file is not None and inc_shape == 'circle':
+            inc_shape = 'custom'
         self.inc_shape = inc_shape
         self.is_hex = is_hex
         self.height_nm = height_nm
@@ -367,7 +372,10 @@ class NanoStruct(object):
         self.small_space = small_space
         self.edge_spacing = edge_spacing
         self.split_touching_incs = split_touching_incs
-        self.plt_msh = plt_msh
+        if plt_msh is not None:
+            self.plt_msh = plt_msh
+        else:
+            self.plt_msh = False
         if make_mesh_now is True:
             self.make_mesh()
         else:
@@ -388,7 +396,37 @@ class NanoStruct(object):
 
     def make_mesh(self):
         if self.periodicity == '2D_array':
-            if self.inc_shape in ['circle', 'ellipse', 'square']:
+            if (hasattr(self, 'geo_file') and self.geo_file) or self.inc_shape == 'custom':
+
+                # check that geo_file has been assigned
+                if self.geo_file is None:
+                    raise TypeError(
+                        'Must provide a geo_file if inc_shape="custom".')
+
+                # check geo_file extension
+                if not (self.geo_file.endswith('.geo') or self.geo_file.endswith('.py')):
+                    raise ValueError(
+                        'Must provide a .geo or .py file for custom geometry.')
+
+                # define root mesh name
+                root_msh_name = self.geo_file[:-4]
+                if root_msh_name.endswith('_template'):
+                    root_msh_name = root_msh_name[:-9]
+
+                # add period values to mesh name
+                msh_name = root_msh_name + '%(d)s_%(dy)s_' % {
+                    'd': dec_float_str(self.period),
+                    'dy': dec_float_str(self.period_y)
+                }
+
+                # add custom parameter values to mesh name
+                if hasattr(self, 'geo_params') and self.geo_params:
+                    for key, value in self.geo_params.items():
+                        msh_name = msh_name + '_' + key + '%(value)s' % {
+                            'value': dec_float_str(value)
+                        }
+
+            elif self.inc_shape in ['circle', 'ellipse', 'square']:
                 if self.diameter10 > 0:
                     supercell = 16
                     msh_name = '%(d)s_%(dy)s_%(dia)s_%(dias)s_%(diass)s_%(diasss)s_%(diassss)s' % {
@@ -982,36 +1020,6 @@ class NanoStruct(object):
                     geo = geo.replace('lc2 = lc/1;', "lc2 = lc/%f;" % self.lc2)
                     geo = geo.replace('lc3 = lc/1;', "lc3 = lc/%f;" % self.lc3)
                     geo = geo.replace('square = 0;', "square = 1;")
-
-            elif self.inc_shape == 'custom' or (hasattr(self, 'geo_file') and self.geo_file):
-
-                # check that geo_file has been assigned
-                if self.geo_file is None:
-                    raise TypeError(
-                        'Must provide a geo_file if inc_shape="custom".')
-
-                # check geo_file extension
-                if not (self.geo_file.endswith('.geo') or self.geo_file.endswith('.py')):
-                    raise ValueError(
-                        'Must provide a .geo or .py file for custom geometry.')
-
-                # define root mesh name
-                root_msh_name = self.geo_file[:-4]
-                if root_msh_name.endswith('_template'):
-                    root_msh_name = root_msh_name[:-9]
-
-                # add period values to mesh name
-                msh_name = root_msh_name + '%(d)s_%(dy)s_' % {
-                    'd': dec_float_str(self.period),
-                    'dy': dec_float_str(self.period_y)
-                }
-
-                # add custom parameter values to mesh name
-                if hasattr(self, 'geo_params') and self.geo_params:
-                    for key, value in self.geo_params.items():
-                        msh_name = msh_name + '_' + key + '%(value)s' % {
-                            'value': dec_float_str(value)
-                        }
 
             else:
                 raise NotImplementedError("\n Selected inc_shape = '%s' \n \
@@ -1695,7 +1703,7 @@ class NanoStruct(object):
         return simmo
 
 
-class ThinFilm(object):
+class ThinFilm:
     """ Represents an unstructured homogeneous film.
 
         Args:
@@ -1756,7 +1764,7 @@ class ThinFilm(object):
         return an
 
 
-class Light(object):
+class Light:
     """ Represents the light incident on structure.
 
         Incident angles may either be specified by `k_parallel` or by

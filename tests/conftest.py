@@ -17,3 +17,12 @@ if str(_root_dir) not in sys.path:
 def oracle_id():
     from refdata import ORACLE_IMAGE_ID
     return ORACLE_IMAGE_ID
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_calculation_outputs():
+    """Ensure any temporary test output files (*_stack0001.txt, etc.) are removed after pytest finishes."""
+    yield
+    from EMUstack.backend import plotting
+    plotting.clear_previous()
+

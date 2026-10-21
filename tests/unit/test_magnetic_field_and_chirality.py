@@ -4,18 +4,8 @@ import os
 import numpy as np
 import pytest
 
-backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../backend"))
-mesh_dir = os.path.join(backend_dir, "data", "meshes")
-for d in (backend_dir, mesh_dir):
-    if d not in sys.path:
-        sys.path.insert(0, d)
-
-import objects
-import materials
-import mode_calcs
-import field_eval
-import plotting
-from stack import Stack
+from EMUstack.backend import objects, materials, mode_calcs, field_eval, plotting
+from EMUstack.backend.stack import Stack
 
 
 def compute_optical_chirality(Ex, Ey, Ez, Hx, Hy, Hz, k0=1.0, E0=1.0):
@@ -201,7 +191,9 @@ def test_faraday_curl_with_longitudinal_gradient_and_backward_wave():
 
 
 def test_chiral_qbic_template_generation():
-    """Verify chiral qBIC Netgen geometry template generates a valid mesh."""
+    from EMUstack.backend import paths
+    if paths.msh_path not in sys.path:
+        sys.path.insert(0, paths.msh_path)
     import chiral_qbic_template
     mesh = chiral_qbic_template.build_unit_cell(
         period=700.0,
@@ -340,4 +332,100 @@ def test_circular_dichroism_qbic():
     cd = T_lcp - T_rcp
     # Asymmetric structure must have non-zero circular dichroism
     assert abs(cd) > 1e-4, f"Expected non-zero Circular Dichroism, got {cd}"
+
+
+def test_cross_section_matches_in_plane():
+    """Verify that fields_interpolator_cross_section and fields_interpolator_in_plane agree to machine precision."""
+    period = 700.0
+    wl = 700.0
+    light = objects.Light(wl, max_order_PWs=1, theta=0.0, phi=0.0)
+
+    layer_struct = objects.NanoStruct(
+        '2D_array', period, 200.0,
+        geo_file='chiral_qbic_template.py',
+        geo_params={'alpha': 0.15, 'lc': 0.20, 'lc2': 1.5},
+        background=materials.Material(1.0),
+        inclusion_a=materials.Material(3.5),
+        height_nm=300.0,
+        plotting_fields=1
+    )
+
+    sup = objects.ThinFilm(period=period, height_nm='semi_inf', material=materials.Material(1.0))
+    sub = objects.ThinFilm(period=period, height_nm='semi_inf', material=materials.Material(1.0))
+
+    sim_layer = layer_struct.calc_modes(light, num_BMs=16)
+    sim_sup = sup.calc_modes(light)
+    sim_sub = sub.calc_modes(light)
+
+    stk = Stack([sim_sub, sim_layer, sim_sup])
+    stk.calc_scat(pol='RCP')
+
+    y0 = 0.5
+    z0 = 150.0
+
+    in_plane = plotting.fields_interpolator_in_plane(stk, lay_interest=1, z_value=z0, return_H=True)
+    cross_section = plotting.fields_interpolator_cross_section(stk, plane="xz", slice_coord=y0, lay_interest=1, return_H=True)
+
+    x_test = np.linspace(0.1, 0.9, 41)
+    y_test = np.full_like(x_test, y0)
+    z_test = np.full_like(x_test, z0)
+
+    Ex_ip = in_plane.Ex(x_test, y_test)
+    Ex_cs = cross_section.Ex(x_test, z_test)
+    np.testing.assert_allclose(Ex_cs, Ex_ip, atol=1e-12, rtol=1e-10)
+
+    Ey_ip = in_plane.Ey(x_test, y_test)
+    Ey_cs = cross_section.Ey(x_test, z_test)
+    np.testing.assert_allclose(Ey_cs, Ey_ip, atol=1e-12, rtol=1e-10)
+
+    Ez_ip = in_plane.Ez(x_test, y_test)
+    Ez_cs = cross_section.Ez(x_test, z_test)
+    np.testing.assert_allclose(Ez_cs, Ez_ip, atol=1e-12, rtol=1e-10)
+
+    Hx_ip = in_plane.Hx(x_test, y_test)
+    Hx_cs = cross_section.Hx(x_test, z_test)
+    np.testing.assert_allclose(Hx_cs, Hx_ip, atol=1e-12, rtol=1e-10)
+
+    Hy_ip = in_plane.Hy(x_test, y_test)
+    Hy_cs = cross_section.Hy(x_test, z_test)
+    np.testing.assert_allclose(Hy_cs, Hy_ip, atol=1e-12, rtol=1e-10)
+
+    Hz_ip = in_plane.Hz(x_test, y_test)
+    Hz_cs = cross_section.Hz(x_test, z_test)
+    np.testing.assert_allclose(Hz_cs, Hz_ip, atol=1e-12, rtol=1e-10)
+
+    # Test full-stack cross section stitching
+    cs_all = plotting.fields_interpolator_cross_section(stk, plane="xz", slice_coord=y0, lay_interest=None, return_H=True)
+    assert cs_all.interface_z_nm is not None
+    assert len(cs_all.interface_z_nm) == 2  # 3 layers -> 2 internal interfaces
+    # Check that field in the middle of layer 1 matches
+    z_mid = cs_all.interface_z_nm[0] + 150.0
+    Ex_mid = cs_all.Ex(x_test, np.full_like(x_test, z_mid))
+    np.testing.assert_allclose(Ex_mid, Ex_ip, atol=1e-6, rtol=1e-5)
+
+    # Test dataset conversion via to_xarray
+    ds = cross_section.to_xarray(x_test, np.array([z0]), dims=("z", "x"))
+    assert "Ex" in ds
+    assert "Hx" in ds
+    assert "chirality_enhancement" in ds
+
+
+def test_spectra_to_xarray():
+    """Verify spectra_to_xarray packs transmission, reflection, and absorption into xarray.Dataset."""
+    period = 700.0
+    wl = 700.0
+    light = objects.Light(wl, max_order_PWs=1, theta=0.0, phi=0.0)
+
+    sup = objects.ThinFilm(period=period, height_nm='semi_inf', material=materials.Material(1.0))
+    sub = objects.ThinFilm(period=period, height_nm='semi_inf', material=materials.Material(1.5))
+    stk = Stack([sub.calc_modes(light), sup.calc_modes(light)])
+    stk.calc_scat(pol='TE')
+
+    ds = plotting.spectra_to_xarray([stk])
+    assert "T_total" in ds
+    assert "R_total" in ds
+    assert "A_total" in ds
+    assert ds["T_total"].shape == (1,)
+    assert np.isclose(float(ds["T_total"][0]) + float(ds["R_total"][0]), 1.0, atol=1e-6)
+
 
