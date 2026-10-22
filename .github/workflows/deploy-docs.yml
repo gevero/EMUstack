@@ -1,0 +1,66 @@
+name: Deploy Documentation to GitHub Pages
+
+on:
+  push:
+    branches: [master, main, port/fem-backend-install]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install documentation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f "EMUstack/docs/requirements.txt" ]; then
+            pip install -r EMUstack/docs/requirements.txt
+          elif [ -f "docs/requirements.txt" ]; then
+            pip install -r docs/requirements.txt
+          fi
+
+      - name: Build Sphinx HTML documentation
+        run: |
+          if [ -d "EMUstack/docs" ]; then
+            make -C EMUstack/docs html
+          elif [ -d "docs" ]; then
+            make -C docs html
+          fi
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ (hashFiles('EMUstack/docs/build/html/index.html') != '' && 'EMUstack/docs/build/html') || 'docs/build/html' }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

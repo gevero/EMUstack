@@ -21,36 +21,79 @@ To install EMUstack in editable development mode from the repository root:
 
     pip install -e .
 
+Setting Up a Dedicated Environment
+-----------------------------------
+
+We strongly recommend installing EMUstack inside an isolated environment. Below are instructions for three standard workflows:
+
+Option A: Dedicated Conda Environment + Pip
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Create and activate a clean Conda environment, then install EMUstack and its dependencies via pip:
+
+.. code-block:: bash
+
+    # 1. Create a dedicated environment (Python 3.11 or 3.12 recommended)
+    conda create -n emustack python=3.12 -y
+
+    # 2. Activate the environment
+    conda activate emustack
+
+    # 3. Upgrade pip and install EMUstack in editable mode
+    pip install --upgrade pip
+    pip install -e .
+
+Option B: Dedicated Python Virtual Environment (venv) + Pip
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Create a lightweight virtual environment using Python's built-in ``venv`` module:
+
+.. code-block:: bash
+
+    # 1. Create a virtual environment in the repository folder
+    python3 -m venv .venv
+
+    # 2. Activate the environment
+    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+    # 3. Upgrade pip and install EMUstack in editable mode
+    pip install --upgrade pip
+    pip install -e .
+
+Option C: Dedicated Virtual Environment with uv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you use `uv <https://docs.astral.sh/uv/>`_ for extremely fast environment management:
+
+.. code-block:: bash
+
+    # 1. Create a virtual environment with uv
+    uv venv .venv --python 3.12
+
+    # 2. Activate the environment
+    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+    # 3. Install EMUstack with uv pip
+    uv pip install -e .
+
 Installing Optional Dependencies
 --------------------------------
 
-You can install optional extras depending on your workflow:
+You can install optional dependency groups using pip or uv:
 
 .. code-block:: bash
 
-    # For running tutorial Jupyter notebooks
-    pip install -e ".[notebooks]"
+    # For running tutorial Jupyter notebooks (Jupyter, adaptive, etc.)
+    pip install -e ".[notebooks]"       # or: uv pip install -e ".[notebooks]"
 
-    # For running the test suite
-    pip install -e ".[dev]"
+    # For developer tools and test suites (pytest, ruff)
+    pip install -e ".[dev]"             # or: uv pip install -e ".[dev]"
 
-    # For building documentation
-    pip install -e ".[docs]"
+    # For building documentation (Sphinx, sphinx-rtd-theme, nbsphinx)
+    pip install -e ".[docs]"            # or: uv pip install -e ".[docs]"
 
-    # For everything
+    # For all extras simultaneously
     pip install -e ".[dev,notebooks,docs]"
-
-Using Conda / Mamba
--------------------
-
-If you prefer managing environments with Conda or Mamba:
-
-.. code-block:: bash
-
-    conda create -n fem-scattering python=3.11
-    conda activate fem-scattering
-    conda install -c conda-forge ngsolve netgen numpy scipy matplotlib xarray
-    pip install -e .
 
 Verifying Installation
 ----------------------

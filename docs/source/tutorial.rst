@@ -205,6 +205,65 @@ Available Tutorial Notebooks
      - Yes
      - Flagship: Chiral quasi-BIC and 3-plane optical chirality maps.
 
+Native Netgen CSG Tutorials (In-Memory Meshing)
+-----------------------------------------------
+
+.. toctree::
+   :maxdepth: 1
+
+   examples_netgen/Chiral_qBIC_Optical_Chirality.ipynb
+   examples_netgen/Au Nanodisk Array with Interpolators.ipynb
+   examples_netgen/Elliptical Nanohole Array (custom target interface).ipynb
+   examples_netgen/simo_010-single_interface.ipynb
+   examples_netgen/simo_011-single_interface-dispersive.ipynb
+   examples_netgen/simo_020-thin_film_multilayered_stack.ipynb
+   examples_netgen/simo_021-thin_film_mirror.ipynb
+   examples_netgen/simo_030-1D_grating.ipynb
+   examples_netgen/simo_031-1D_grating-2_inclusions.ipynb
+   examples_netgen/simo_032-1D_grating-3_inclusions.ipynb
+   examples_netgen/simo_040-2D_array.ipynb
+   examples_netgen/simo_041-combining_1D_and_2D_array.ipynb
+   examples_netgen/simo_042-eliptical_holes-CD.ipynb
+   examples_netgen/simo_050-plotting_fields_1d.ipynb
+   examples_netgen/simo_051-plotting_fields_2d.ipynb
+   examples_netgen/simo_052-plotting_amplitudes.ipynb
+   examples_netgen/simo_053-plotting_k_space_amps.ipynb
+   examples_netgen/simo_060-shear_transformations.ipynb
+   examples_netgen/simo_070-ultrathin_limit.ipynb
+   examples_netgen/simo_071-many_substrates.ipynb
+   examples_netgen/simo_080-convergence-stacked_gratings.ipynb
+   examples_netgen/simo_090-EOT.ipynb
+   examples_netgen/simo_091-slab_mode_finding.ipynb
+
+Classic Gmsh & Pre-Generated Mesh Tutorials
+-------------------------------------------
+
+.. toctree::
+   :maxdepth: 1
+
+   examples/Au Nanodisk Array with Interpolators.ipynb
+   examples/Elliptical Nanohole Array (custom target interface).ipynb
+   examples/simo_010-single_interface.ipynb
+   examples/simo_011-single_interface-dispersive.ipynb
+   examples/simo_020-thin_film_multilayered_stack.ipynb
+   examples/simo_021-thin_film_mirror.ipynb
+   examples/simo_030-1D_grating.ipynb
+   examples/simo_031-1D_grating-2_inclusions.ipynb
+   examples/simo_032-1D_grating-3_inclusions.ipynb
+   examples/simo_040-2D_array.ipynb
+   examples/simo_041-combining_1D_and_2D_array.ipynb
+   examples/simo_042-eliptical_holes-CD.ipynb
+   examples/simo_050-plotting_fields_1d.ipynb
+   examples/simo_051-plotting_fields_2d.ipynb
+   examples/simo_052-plotting_amplitudes.ipynb
+   examples/simo_053-plotting_k_space_amps.ipynb
+   examples/simo_060-shear_transformations.ipynb
+   examples/simo_070-ultrathin_limit.ipynb
+   examples/simo_071-many_substrates.ipynb
+   examples/simo_080-convergence-stacked_gratings.ipynb
+   examples/simo_090-EOT.ipynb
+   examples/simo_091-slab_mode_finding.ipynb
+
 .. toctree::
    :hidden:
 

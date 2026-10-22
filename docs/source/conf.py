@@ -37,8 +37,12 @@ extensions = [
     'sphinx.ext.coverage',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
-    'sphinx.ext.napoleon'
+    'sphinx.ext.napoleon',
+    'nbsphinx',
 ]
+
+# Do not re-execute notebooks during documentation build; render embedded outputs
+nbsphinx_execute = 'never'
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -108,7 +112,7 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'default'
+html_theme = 'sphinx_rtd_theme'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -266,3 +270,40 @@ texinfo_documents = [
 
 # If true, do not generate a @detailmenu in the "Top" node's menu.
 #texinfo_no_detailmenu = False
+
+# -----------------------------------------------------------------------------
+# nbsphinx staging hook: Stage notebooks into docs/source during build
+# -----------------------------------------------------------------------------
+import shutil
+import glob
+
+
+def stage_notebooks(app):
+    """Stage notebook directories into docs/source for nbsphinx build."""
+    src_dir = app.srcdir
+    repo_root = os.path.abspath(os.path.join(src_dir, '..', '..'))
+
+    for folder in ['examples', 'examples_netgen']:
+        src_folder = os.path.join(repo_root, folder)
+        dest_folder = os.path.join(src_dir, folder)
+        if os.path.exists(src_folder):
+            if os.path.exists(dest_folder):
+                shutil.rmtree(dest_folder)
+            os.makedirs(dest_folder, exist_ok=True)
+            for nb_file in glob.glob(os.path.join(src_folder, '*.ipynb')):
+                shutil.copy2(nb_file, dest_folder)
+
+
+def clean_notebooks(app, exception):
+    """Remove staged notebook directories after docs build."""
+    src_dir = app.srcdir
+    for folder in ['examples', 'examples_netgen']:
+        dest_folder = os.path.join(src_dir, folder)
+        if os.path.exists(dest_folder):
+            shutil.rmtree(dest_folder, ignore_errors=True)
+
+
+def setup(app):
+    app.connect('builder-inited', stage_notebooks)
+    app.connect('build-finished', clean_notebooks)
+

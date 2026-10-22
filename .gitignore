@@ -69,6 +69,8 @@ docs/*.gz
 docs/*.out
 docs/*.toc
 docs/build/
+docs/source/examples/
+docs/source/examples_netgen/
 
 # Jupyter & Editor
 .ipynb_checkpoints/

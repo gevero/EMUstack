@@ -1,3 +1,8 @@
-MarkupSafe==0.15
-Sphinx==1.2.2
-sphinxcontrib-napoleon==0.2.8
+sphinx>=7.0
+sphinx-rtd-theme>=2.0
+nbsphinx>=0.9
+ipython>=8.0
+numpy>=1.22
+scipy>=1.9
+matplotlib>=3.6
+xarray>=2023.1

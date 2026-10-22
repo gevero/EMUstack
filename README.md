@@ -46,19 +46,45 @@ EMUstack v2.0 is a pure Python package. It requires **no Fortran compilers**, **
 * **Python:** 3.10, 3.11, 3.12, 3.13, or 3.14.
 * **Core Dependencies:** `numpy>=1.22`, `scipy>=1.9`, `matplotlib>=3.6`, `ngsolve>=6.2.2401`, `netgen-mesher>=6.2.2401`, `xarray>=2023.1`.
 
-### Install from Repository
+### Environment Setup & Installation
+
+We recommend installing EMUstack into an isolated environment using Conda, standard `venv`, or `uv`:
+
+#### Option 1: Dedicated Conda Environment + Pip
 ```bash
-# Clone the repository
-git clone https://github.com/EMUstack/EMUstack.git
-cd EMUstack
-
-# Editable installation
+conda create -n emustack python=3.12 -y
+conda activate emustack
+pip install --upgrade pip
 pip install -e .
+```
 
-# Optional extras
+#### Option 2: Dedicated Virtual Environment (`venv`) + Pip
+```bash
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install --upgrade pip
+pip install -e .
+```
+
+#### Option 3: Dedicated Virtual Environment with `uv`
+```bash
+uv venv .venv --python 3.12
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv pip install -e .
+```
+
+### Optional Extras
+```bash
+# With pip:
 pip install -e ".[notebooks]"   # Jupyter, nbconvert, adaptive
 pip install -e ".[dev]"         # Pytest, ruff
-pip install -e ".[docs]"        # Sphinx, sphinx-rtd-theme
+pip install -e ".[docs]"        # Sphinx, sphinx-rtd-theme, nbsphinx
+pip install -e ".[dev,notebooks,docs]"
+
+# Or with uv:
+uv pip install -e ".[notebooks]"
+uv pip install -e ".[dev]"
+uv pip install -e ".[docs]"
 ```
 
 ---
