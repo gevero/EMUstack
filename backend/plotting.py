@@ -248,7 +248,7 @@ def t_r_a_plots(stacks_list, xvalues=None, xlabel='', params_layer=1,
     for i in range(len(xvalues)):
         a_tot.append(float(np.asarray(a_list[layers_steps-1+(i*layers_steps)]).flat[0]))
         t_tot.append(float(np.asarray(t_list[layers_steps-1+(i*layers_steps)]).flat[0]))
-        r_tot.append(float(np.asarray(r_list[layers_steps-1+(i*layers_steps)] if len(r_list) > layers_steps-1+(i*layers_steps) else r_list[-1]).flat[0]))
+        r_tot.append(float(np.asarray(r_list[i]).flat[0]))  # one total R per stack
 
     if ult_eta is True or J_sc is True:
         active_abs = []
@@ -263,8 +263,7 @@ def t_r_a_plots(stacks_list, xvalues=None, xlabel='', params_layer=1,
     if ult_eta is True:
         Efficiency = ult_efficiency(active_abs, xvalues,
                                     params_2_print=params_2_print,
-                                    stack_label=stack_label, add_name=add_name,
-                                    save_txt=save_txt)
+                                    stack_label=stack_label, add_name=add_name)
         params_2_print += r'$\eta$ = %(Efficiency)6.2f' % {'Efficiency':
                                                            Efficiency*100, }
         params_2_print += ' %'
@@ -273,8 +272,7 @@ def t_r_a_plots(stacks_list, xvalues=None, xlabel='', params_layer=1,
     if J_sc is True:
         J = J_short_circuit(active_abs, xvalues,
                             params_2_print=params_2_print,
-                            stack_label=stack_label, add_name=add_name,
-                            save_txt=save_txt)
+                            stack_label=stack_label, add_name=add_name)
         params_2_print += r'$J_{sc}$ = %(J)6.2f'% {'J' : J, }
         params_2_print += r' mA/cm$^2$'
         out.append(J)
@@ -556,7 +554,7 @@ def t_r_a_plots_subs(stacks_list, wavelengths, period, sub_n,
     for i in range(len(wavelengths)):
         a_tot.append(float(a_list[layers_steps-1+(i*layers_steps)]))
         t_tot.append(float(t_list[layers_steps-1+(i*layers_steps)]))
-        r_tot.append(float(r_list[layers_steps-1+(i*layers_steps)] if len(r_list) > layers_steps-1+(i*layers_steps) else r_list[-1]))
+        r_tot.append(float(r_list[i]))  # one total R per stack (legacy)
 
     out = []
     if ult_eta == True or J_sc == True:
@@ -571,8 +569,7 @@ def t_r_a_plots_subs(stacks_list, wavelengths, period, sub_n,
     if ult_eta == True:
         Efficiency = ult_efficiency(active_abs, wavelengths,
                                     params_2_print=params_2_print,
-                                    stack_label=stack_label, add_name=add_name,
-                                    save_txt=save_txt)
+                                    stack_label=stack_label, add_name=add_name)
         params_2_print += r'$\eta$ = %(Efficiency)6.2f'% {'Efficiency' : Efficiency*100, }
         params_2_print += ' %'
         out.append(Efficiency)
@@ -580,8 +577,7 @@ def t_r_a_plots_subs(stacks_list, wavelengths, period, sub_n,
     if J_sc == True:
         J = J_short_circuit(active_abs, wavelengths,
                             params_2_print=params_2_print,
-                            stack_label=stack_label, add_name=add_name,
-                            save_txt=save_txt)
+                            stack_label=stack_label, add_name=add_name)
         params_2_print += r'$J_{sc}$ = %(J)6.2f'% {'J' : J, }
         params_2_print += r' mA/cm$^2$'
         out.append(J)
@@ -1011,7 +1007,7 @@ def omega_plot(stacks_list, wavelengths=None, params_layer=1, stack_label=1, sav
             stack_label  (int): Label to differentiate plots of different \
                 :Stack:s.
 
-            save_pdf  (bool): If True, save plots to PDF files. Defaults to False.
+            save_pdf  (bool): If True, save plots to PDF files. False by default.
     """
     if wavelengths is None:
         wavelengths = [s.layers[0].light.wl_nm for s in stacks_list]
@@ -1099,7 +1095,7 @@ def E_conc_plot(stacks_list, which_layer, which_modes, wavelengths,
             stack_label  (int): Label to differentiate plots of different \
                 :Stack:s.
 
-            save_pdf  (bool): If True, save plot to PDF file. Defaults to False.
+            save_pdf  (bool): If True, save plot to PDF file. False by default.
     """
 
     params_2_print = gen_params_string(stacks_list, params_layer)
@@ -1148,7 +1144,7 @@ def vis_scat_mats(scat_mat, nu_prop_PWs=0, wl=None, add_name='',
 
             max_scale  (float): Limit maximum amplitude shown.
 
-            save_pdf  (bool): If True, save plot to PDF file. Defaults to False.
+            save_pdf  (bool): If True, save plot to PDF file. False by default.
     """
 
     fig = plt.figure(num=None, figsize=(14, 6), dpi=80, facecolor='w', edgecolor='k')
@@ -1203,7 +1199,7 @@ def vis_matrix(scat_mat, add_name='', max_scale=None, only_real=False, save_pdf=
 
             only_real  (bool): Only plot the real part of matrix.
 
-            save_pdf  (bool): If True, save plot to PDF file. Defaults to False.
+            save_pdf  (bool): If True, save plot to PDF file. False by default.
     """
 
     fig = plt.figure(num=None, figsize=(10, 8), dpi=80, facecolor='w', edgecolor='k')
@@ -1246,7 +1242,7 @@ def t_func_k_plot_1D(stacks_list, lay_interest=0, pol='TE', save_pdf=False):
 
             pol  (str): Include transmission in Which polarisation.
 
-            save_pdf  (bool): If True, save plot to PDF file. Defaults to False.
+            save_pdf  (bool): If True, save plot to PDF file. False by default.
     """
     fig = plt.figure(num=None, dpi=80, facecolor='w', edgecolor='k')
     ax1 = fig.add_subplot(1,1,1)
@@ -1710,8 +1706,8 @@ def fields_in_plane(stacks_list, lay_interest=1, z_values=[0.1, 3.6],
             nu_calc_pts  (int): fields are calculated over a mesh of \
                 nu_calc_pts * nu_calc_pts points.
 
-            save_pdf  (bool): If True, save plots to PDF. Defaults to False.
-            save_pos  (bool): If True, save Gmsh .pos files. Defaults to False.
+            save_pdf  (bool): If True, save plots to PDF. False by default.
+            save_pos  (bool): If True, save Gmsh .pos files. False by default.
     """
     import field_eval
 
@@ -2448,6 +2444,7 @@ def fields_interpolator_cross_section(
         FieldBundle (if return_H=True) or 7-tuple (if return_H=False).
     """
     return_H = bool(return_H or return_h)
+    import field_eval
     from scipy.interpolate import RegularGridInterpolator
 
     num_lays = len(pstack.layers)
@@ -2635,7 +2632,7 @@ def fields_interpolator_cross_section(
 
                 Ex_lay = M_line[0] @ P_plus
                 Ey_lay = M_line[1] @ P_plus
-                Ez_lay = M_line[2] @ ((-1j * kz_col) * P_minus)
+                Ez_lay = M_line[2] @ field_eval.ez_coefficient(P_minus, kz_col, physical=True if return_H else None)
                 Hx_lay = M_line[3] @ (((kz_col / k0)) * P_minus)
                 Hy_lay = M_line[4] @ (((kz_col / k0)) * P_minus)
                 Hz_lay = M_line[5] @ ((1.0 / (1j * k0)) * P_plus)
@@ -2670,7 +2667,7 @@ def fields_interpolator_cross_section(
 
                 Ex_lay = M_line[0] @ P_plus
                 Ey_lay = M_line[1] @ P_plus
-                Ez_lay = M_line[2] @ ((-1j * kz_col) * P_minus)
+                Ez_lay = M_line[2] @ field_eval.ez_coefficient(P_minus, kz_col, physical=True if return_H else None)
                 Hx_lay = M_line[3] @ (((kz_col / k0)) * P_minus)
                 Hy_lay = M_line[4] @ (((kz_col / k0)) * P_minus)
                 Hz_lay = M_line[5] @ ((1.0 / (1j * k0)) * P_plus)
@@ -2936,7 +2933,7 @@ def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,
         h_ratio = [h/min_h for h in ind_h_list[::-1]]
 
         layer = pstack.layers[0]
-        if isinstance(layer,mode_calcs.Anallo):
+        if _is_anallo(layer):
             if layer.structure.world_1d == True:
                 slice_types = ['xz']
             else:
@@ -2973,7 +2970,7 @@ def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,
                     for lay in range(num_lays):
                         layer = pstack.layers[lay]
                         ax1 = plt.subplot(gs[num_lays-lay-1])
-                        if isinstance(layer, mode_calcs.Simmo):
+                        if _is_simmo(layer):
                             eps = layer.n_effs**2
                         else:
                             eps = layer.n()**2
@@ -2987,7 +2984,7 @@ def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,
                         vec_index = num_lays - lay - 1
 
                         # If NanoStruct layer
-                        if isinstance(layer, mode_calcs.Simmo):
+                        if _is_simmo(layer):
                             name_lay = "%i_NanoStruct"% lay
                             gmsh_file_pos = 'stack_%(stack_num)s_lay_%(name)s_'% \
                                             {'name': name_lay, 'stack_num': stack_num}
@@ -3069,7 +3066,7 @@ def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,
                                             coef_down = vec_coef_fem[BM] * P_down
                                             coef_up = vec_coef_fem[BM+layer.num_BMs] * P_up
                                             if E[5] == 'z':
-                                                coef_tot = (coef_up - coef_down)/beta # Taking into account the change of variable for Ez
+                                                coef_tot = field_eval.ez_coefficient(coef_down - coef_up, beta)  # Ez from the axial mode variable
                                             else:
                                                 coef_tot = coef_up + coef_down
                                             coef_tot = coef_tot[0,0]
@@ -3687,7 +3684,7 @@ def field_values(stacks_list, lay_interest=0, xyz_values=[(0.1,0.1,0.1)], save_f
     super_points = []
     for pstack in stacks_list:
         try:
-            if not isinstance(pstack.layers[lay_interest],mode_calcs.Anallo):
+            if not _is_anallo(pstack.layers[lay_interest]):
                 raise ValueError
 
             num_lays = len(pstack.layers)
@@ -3831,7 +3828,7 @@ def fields_3d(stacks_list, lay_interest=1):
     stack_num = 0
     for pstack in stacks_list:
         try:
-            if not isinstance(pstack.layers[lay_interest],mode_calcs.Simmo):
+            if not _is_simmo(pstack.layers[lay_interest]):
                 raise ValueError
 
             meat = pstack.layers[lay_interest]
@@ -3889,7 +3886,7 @@ def Bloch_fields_1d(stacks_list, lay_interest=None, save_pdf=False):
         if lay_interest is None:
             lay_interest = []
             for l in range(len(pstack.layers)):
-                if isinstance(pstack.layers[l],mode_calcs.Simmo):
+                if _is_simmo(pstack.layers[l]):
                     if pstack.layers[l].structure.periodicity == '1D_array':
                         lay_interest.append(l)
         else: lay_interest = [lay_interest]
@@ -3898,7 +3895,7 @@ def Bloch_fields_1d(stacks_list, lay_interest=None, save_pdf=False):
         for lay in lay_interest:
             try:
                 meat = pstack.layers[lay]
-                if not isinstance(meat,mode_calcs.Simmo):
+                if not _is_simmo(meat):
                     raise ValueError
                 if not meat.structure.periodicity == '1D_array':
                     raise ValueError

@@ -398,9 +398,10 @@ class Stack:
                     self.t_list.append(t_layer)
 
                 else:
-                    self.a_list = np.zeros(len(self.layers) - 1)
-                    self.r_list = np.zeros(len(self.layers) - 1)
-                    self.t_list = np.zeros(len(self.layers) - 1)
+                    # legacy length (one shorter than the normal path's lists)
+                    self.a_list = np.zeros(len(self.layers) - 2)
+                    self.r_list = np.zeros(len(self.layers) - 2)
+                    self.t_list = np.zeros(len(self.layers) - 2)
                     print("Warning: there are no propagating modes in the semi-inf \n superstrate therefore CANNOT CALCULATE ENERGY FLUXES ANYWHERE.")
 
             else:

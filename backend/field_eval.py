@@ -10,6 +10,27 @@ import os
 from typing import Optional, Tuple, Dict, Any
 import numpy as np
 
+# How Ez is rebuilt from the stored axial mode variable ez (same variable in both codes):
+# 'physical' - Ez = sum (c_down - c_up) * (-i k_z) * ez, what the eigenproblem implies: it
+#              satisfies div E = 0 in a homogeneous layer (checked in 1D and 2D). Default.
+# 'legacy'   - legacy EMUstack (field_value_plane.f, gmsh_plot_*.f, plotting.py):
+#              Ez = sum (c_up - c_down) * ez / k_z, off from the physical Ez by a factor
+#              i k_z^2. Only to reproduce legacy field maps (benchmarks/parity).
+# Environment variable EMUSTACK_EZ_CONVENTION sets the default. Whenever H is computed as
+# well (E.H, chirality: no legacy counterpart), Ez is physical regardless.
+ez_convention = os.environ.get('EMUSTACK_EZ_CONVENTION', 'physical')
+if ez_convention not in ('physical', 'legacy'):
+    raise ValueError("EMUSTACK_EZ_CONVENTION must be 'physical' or 'legacy', got %r" % ez_convention)
+
+
+def ez_coefficient(prop_minus, k_z, physical=None):
+    """Per-mode factor multiplying ez; prop_minus = c_down P_down - c_up P_up."""
+    if physical is None:
+        physical = ez_convention == 'physical'
+    if physical:
+        return prop_minus * (-1j * k_z)
+    return -prop_minus / k_z
+
 
 def field_value_plane(
     num_BMs: int,
@@ -65,6 +86,7 @@ def field_value_plane(
             k0 = 2.0 * np.pi
 
     has_H = (sol1.shape[0] >= 6)
+    ez_coef = ez_coefficient(prop_minus, k_z_arr, physical=True if return_H else None)
 
     for iel in range(n_msh_el):
         for inod in range(min(6, sol1.shape[1])):
@@ -74,7 +96,7 @@ def field_value_plane(
 
             m_E[iel, inod, 0] = np.sum(prop_plus * ex_modes)
             m_E[iel, inod, 1] = np.sum(prop_plus * ey_modes)
-            m_E[iel, inod, 2] = np.sum(prop_minus * (-1j * k_z_arr * ez_modes))
+            m_E[iel, inod, 2] = np.sum(ez_coef * ez_modes)
 
             if has_H:
                 hx_modes = np.asarray(sol1[3, inod, :num_modes, iel]).flatten()

@@ -15,7 +15,7 @@ from netgen.meshing import IdentificationType
 
 from EMUstack.backend import paths
 
-_MSH_PATH = Path(paths.msh_path) / "gmsh_import_cell.order1.msh"
+_MSH_PATH = Path(paths.template_path) / "gmsh_import_cell.order1.msh"
 
 
 def to_scipy(bform):

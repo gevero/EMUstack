@@ -36,6 +36,7 @@ data_path = str(_backend_dir / 'data') + '/'
 # Dedicated directory where all .geo, *_template.py, .msh, and .mail files are stored
 _msh_dir = _backend_dir / "data" / "meshes"
 template_path = str(_msh_dir) + "/"
-msh_path = str(_msh_dir) + "/"
+# .geo/.msh/.mail files that NanoStruct generates (legacy wrote them next to the templates)
+msh_path = str(_msh_dir / "generated") + "/"
 
 

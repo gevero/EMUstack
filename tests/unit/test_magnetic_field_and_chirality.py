@@ -192,8 +192,8 @@ def test_faraday_curl_with_longitudinal_gradient_and_backward_wave():
 
 def test_chiral_qbic_template_generation():
     from EMUstack.backend import paths
-    if paths.msh_path not in sys.path:
-        sys.path.insert(0, paths.msh_path)
+    if paths.template_path not in sys.path:
+        sys.path.insert(0, paths.template_path)
     import chiral_qbic_template
     mesh = chiral_qbic_template.build_unit_cell(
         period=700.0,

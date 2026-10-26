@@ -9,6 +9,7 @@ import numpy as np
 from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import splu, LinearOperator, eigs
 from modes import BlochModes, FEMConvergenceError
+from legacy_sort import z_indexx
 
 
 def elem_matrices(h):
@@ -154,8 +155,8 @@ def pw_ordering_1d(neq_PW, period_x, kx, ky, k0, max_order_PWs):
     alpha_arr = np.array(alpha_list)
     beta_z_arr = np.array(beta_z_list)
     
-    # Stable sort descending by Re(beta_z**2)
-    order = np.argsort(-np.real(beta_z_arr**2), kind='stable')
+    # legacy pw_ordering_1d.f: z_indexx, descending Re(beta_z**2), same order for ties
+    order = z_indexx(beta_z_arr)
     inv_order = np.zeros_like(order)
     inv_order[order] = np.arange(len(order))
     return order, inv_order, alpha_arr
@@ -261,7 +262,7 @@ def embed_1d_to_2d(J_1d, J_dag_1d, neq_PW_1d, neq_PW_2d, nbm, period_x, kx, ky, 
                 s += 1
                 
     beta_z_2d = np.array(beta_z_2d)
-    order_2d = np.argsort(-np.real(beta_z_2d**2), kind='stable')
+    order_2d = z_indexx(beta_z_2d)  # legacy pw_matrix_1d_to_2d.f
     inv_order_2d = np.zeros_like(order_2d)
     inv_order_2d[order_2d] = np.arange(len(order_2d))
     
@@ -319,7 +320,14 @@ def solve_bloch_modes_1d(
         
     # 2. Primal assembly & solve
     K_pri, M_pri, neq = build_sparse_system_1d(nel, eps_list, k0, bloch_vec_x, bloch_vec_y, period_x)
-    ncv = min(2 * num_BMs + num_BMs // 2 + 3, neq - 1)
+    # Krylov size of legacy EMUstack (py_calc_modes_1d.f). Legacy ARPACK stops with
+    # info=-3 when it exceeds the number of unknowns: the mesh is too coarse for num_BMs.
+    ncv = 2 * num_BMs + num_BMs // 2 + 3
+    if ncv > neq:
+        raise FEMConvergenceError(
+            f"1D mesh too coarse for num_BMs={num_BMs}: the eigensolver needs "
+            f"{ncv} Krylov vectors but the mesh has only {neq} unknowns "
+            f"(legacy EMUstack: ARPACK info=-3). Use a smaller lc_bkg or fewer modes.")
     
     if v0 is None:
         rng = np.random.default_rng(42)
@@ -334,13 +342,13 @@ def solve_bloch_modes_1d(
     zeta_pri = np.sqrt(1.0 / vals_pri + sigma)
     # Branch selection: |Im beta| < tol => Re > 0; else Im > 0
     for i in range(num_BMs):
-        if abs(zeta_pri[i].imag) < 1e-12:
+        if abs(zeta_pri[i].imag) < 1e-8:  # legacy threshold
             if zeta_pri[i].real < 0:
                 zeta_pri[i] = -zeta_pri[i]
         elif zeta_pri[i].imag < 0:
             zeta_pri[i] = -zeta_pri[i]
             
-    order_pri = np.argsort(-np.real(zeta_pri**2), kind='stable')
+    order_pri = z_indexx(zeta_pri)  # legacy mode order
     zeta_pri = zeta_pri[order_pri]
     vecs_pri = vecs_pri[:, order_pri]
     
@@ -352,13 +360,13 @@ def solve_bloch_modes_1d(
     
     zeta_adj = np.sqrt(1.0 / vals_adj + sigma)
     for i in range(num_BMs):
-        if abs(zeta_adj[i].imag) < 1e-12:
+        if abs(zeta_adj[i].imag) < 1e-8:  # legacy threshold
             if zeta_adj[i].real < 0:
                 zeta_adj[i] = -zeta_adj[i]
         elif zeta_adj[i].imag < 0:
             zeta_adj[i] = -zeta_adj[i]
             
-    order_adj = np.argsort(-np.real(zeta_adj**2), kind='stable')
+    order_adj = z_indexx(zeta_adj)  # legacy mode order
     zeta_adj = zeta_adj[order_adj]
     vecs_adj = vecs_adj[:, order_adj]
     

@@ -177,7 +177,7 @@ ds_field = bundle.to_xarray(x, y)
 ## Interactive Tutorial Notebooks
 
 EMUstack v2.0 provides **45 didactic Jupyter Notebooks** organized into two dedicated suites:
-- **`EMUstack/examples/` (22 Notebooks):** Demonstrates the classic Gmsh `.geo` and pre-generated `.mail` mesh workflow.
+- **`EMUstack/examples/` (22 Notebooks):** The original EMUstack examples with their legacy inputs (a `LEGACY_PARAMS` switch selects lighter sampling where the legacy inputs take hours), meshed with the legacy gmsh templates.
 - **`EMUstack/examples_netgen/` (23 Notebooks):** Demonstrates the native in-memory Netgen CSG workflow with pure Python geometry templates.
 
 | Notebook | Topic & Physical System | `examples/` (Gmsh) | `examples_netgen/` (Netgen) |
@@ -207,6 +207,32 @@ EMUstack v2.0 provides **45 didactic Jupyter Notebooks** organized into two dedi
 | `Chiral_qBIC_Optical_Chirality.ipynb` | Chiral quasi-BIC metasurface & 3-plane optical chirality $\hat{C}$ | — | [View](examples_netgen/Chiral_qBIC_Optical_Chirality.ipynb) |
 
 ---
+
+## Legacy Parity
+
+By default the ported solver reproduces the original Fortran EMUstack. Every legacy
+example is run on both codes and compared in `benchmarks/parity/PARITY_RESULTS.md`:
+thin films agree to rounding, 1D gratings to 1e-8, 2D structures and field maps to 1e-5
+or better (the report lists the few documented exceptions with their evidence).
+What the defaults copy from legacy, and the module setting that selects the alternative:
+
+| Behaviour | Default (legacy) | Alternative |
+|---|---|---|
+| 2D unit-cell mesh | gmsh with the legacy `.geo` templates (`objects.default_mesher = 'gmsh'`) | `'netgen'`: native netgen geometry (used by `examples_netgen/`) |
+| 2D eigensolver | ARPACK shift-invert, the `num_BMs` modes nearest the shift (`fem_2d.eigensolver = 'arpack'`) | `'ngsolve'`: NGSolve `ArnoldiSolver` |
+| Mode/plane-wave overlap quadrature | legacy 16-point rule (`fem_2d.overlap_quadrature = 'legacy'`) | `'ngsolve'` |
+
+One deliberate exception: E_z in field maps. Legacy EMUstack's formula
+(`field_value_plane.f` and its other field routines) is off from the field the
+eigenproblem implies by a factor $i k_z^2$; the physical E_z satisfies
+$\nabla\cdot\mathbf{E}=0$ in a homogeneous layer (checked in 1D and 2D), the legacy one
+does not. The port uses the physical E_z (`field_eval.ez_convention = 'physical'`).
+`'legacy'`, or `EMUSTACK_EZ_CONVENTION=legacy` in the environment, reproduces legacy's
+E_z maps; the parity harness uses it. H fields, Poynting vectors and chirality always use
+the physical E_z.
+
+Plots of a single Bloch mode show that mode's arbitrary complex phase, which the two
+codes' eigensolvers choose differently; spectra and total fields do not depend on it.
 
 ## What Changed in v2.0 (Summary of Modernization)
 

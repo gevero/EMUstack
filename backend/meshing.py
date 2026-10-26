@@ -413,6 +413,71 @@ def read_mail_file(mail_path: str, method: str = "IIA") -> Tuple[ngs.Mesh, np.nd
     return mesh, table_nod, type_el, pts, npt, nel
 
 
+def _gmsh_binary() -> str:
+    for cand in (os.environ.get("GMSH_BIN"), shutil.which("gmsh"),
+                 os.path.expanduser("~/.local/bin/gmsh"), os.path.expanduser("~/bin/gmsh")):
+        if cand and os.path.exists(cand):
+            return cand
+    raise EnvironmentError(
+        "Gmsh binary not found. Install Gmsh, set GMSH_BIN, or use mesher='netgen'."
+    )
+
+
+def conv_gmsh(root: str) -> Tuple[int, int]:
+    """Mesh `root`.geo with gmsh and write `root`.mail, as legacy EMUstack's conv_gmsh.f does.
+
+    Same gmsh command line as legacy (6-node triangles, MSH 2.2 set by the templates).
+    The .mail holds every node with the physical tag of the boundary line it lies on
+    (0 inside), and every triangle with its physical surface tag. Unlike legacy, nodes
+    keep gmsh's order instead of being renumbered for bandwidth; the mesh is the same.
+    Returns (number of nodes, number of triangles).
+    """
+    geo, msh, mail = root + ".geo", root + ".msh", root + ".mail"
+    tmp_msh = msh + ".%d.tmp" % os.getpid()
+    cmd = [_gmsh_binary(), "-0", "-2", "-order", "2", "-v", "0", "-format", "msh2",
+           "-o", tmp_msh, geo]
+    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if res.returncode != 0 or not os.path.exists(tmp_msh):
+        raise RuntimeError("gmsh failed on %s (exit %d):\n%s" % (geo, res.returncode, res.stderr))
+
+    with open(tmp_msh) as f:
+        lines = f.read().split("\n")
+    i = lines.index("$Nodes")
+    npt = int(lines[i + 1])
+    index = {}  # gmsh node id -> 1-based .mail index
+    xy = np.zeros((npt, 2))
+    for k in range(npt):
+        parts = lines[i + 2 + k].split()
+        index[int(parts[0])] = k + 1
+        xy[k] = float(parts[1]), float(parts[2])
+    i = lines.index("$Elements")
+    idfn = np.zeros(npt, dtype=int)
+    tris, tri_tags = [], []
+    for k in range(int(lines[i + 1])):
+        parts = [int(p) for p in lines[i + 2 + k].split()]
+        typ, ntags = parts[1], parts[2]
+        tag, nodes = parts[3], [index[n] for n in parts[3 + ntags:]]
+        if typ == 8:  # 3-node line: its nodes get the line's physical tag
+            for n in nodes:
+                idfn[n - 1] = tag
+        elif typ == 9:  # 6-node triangle
+            tris.append(nodes)
+            tri_tags.append(tag)
+        elif typ != 15:  # points are ignored, anything else is unexpected
+            raise ValueError("conv_gmsh: unexpected gmsh element type %d in %s" % (typ, msh))
+
+    out = ["%9d %9d" % (npt, len(tris))]
+    out += ["  %7d %24.15E %24.15E %5d" % (k + 1, xy[k, 0], xy[k, 1], idfn[k]) for k in range(npt)]
+    out += ["%d %s %d" % (e + 1, " ".join(str(n) for n in tris[e]), tri_tags[e])
+            for e in range(len(tris))]
+    tmp_mail = mail + ".%d.tmp" % os.getpid()
+    with open(tmp_mail, "w") as f:
+        f.write("\n".join(out) + "\n")
+    os.replace(tmp_msh, msh)  # atomic: parallel runs may build the same mesh
+    os.replace(tmp_mail, mail)
+    return npt, len(tris)
+
+
 def resolve_mesh_file_path(filename: str) -> str:
     """Locate a .geo, .py, .msh, or .mail file in CWD or the dedicated meshes folder."""
     if os.path.exists(filename):

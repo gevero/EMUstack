@@ -34,7 +34,7 @@ def test_dod2_fem2d_allowed_imports():
     allowed_modules = {
         "os", "time", "typing", "sys", "math",
         "numpy", "scipy", "netgen", "ngsolve",
-        "modes", "meshing", "paths", "linalg"
+        "modes", "meshing", "paths", "linalg", "legacy_sort"
     }
 
     for node in ast.walk(tree):

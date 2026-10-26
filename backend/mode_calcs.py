@@ -24,6 +24,7 @@ import sys
 import os
 from EMUstack.backend import paths
 from EMUstack.backend.linalg import mat
+from EMUstack.backend.legacy_sort import legacy_argsort
 
 
 
@@ -169,7 +170,8 @@ class Anallo(Modes):
             # Sort the modes from propagating to fastest decaying
             # k_z is real for propagating waves
             # This must be done consistently
-            s = np.argsort(-1*k_z_unsrt.real + k_z_unsrt.imag)
+            # legacy order, including ties (NumPy 1.24 argsort)
+            s = legacy_argsort(-1*k_z_unsrt.real + k_z_unsrt.imag)
             self.sort_order = s
         else:
             s = self.air_ref().sort_order

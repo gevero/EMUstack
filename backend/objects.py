@@ -34,6 +34,11 @@ except ImportError:
 msh_location = paths.msh_path
 template_location = paths.template_path
 
+# How NanoStruct meshes a 2D unit cell when mesher is not given:
+# 'gmsh'   - legacy EMUstack: fill a .geo template, mesh it with gmsh (default).
+# 'netgen' - native netgen geometry (circle, ellipse, square, ring, dimer, .py templates).
+default_mesher = os.environ.get('EMUSTACK_MESHER', 'gmsh')
+
 # Acknowledgements
 print('\n##################################################################\n'\
     + 'EMUstack is brought to you by Bjorn Sturmberg, Kokou Dossou, \n' \
@@ -184,7 +189,7 @@ class NanoStruct:
 
             plot_abs  (bool): Choose to plot absolute value of modal fields.
 
-            plt_msh  (bool): Save a plot of the 1D array geometry. Defaults to False.
+            plt_msh  (bool): Save a plot of the 1D array geometry (legacy default True).
     """
     def __init__(self,
                  periodicity,
@@ -250,7 +255,8 @@ class NanoStruct:
                  plot_imag=0,
                  plot_abs=0,
                  plot_field_conc=False,
-                 plt_msh=None):
+                 plt_msh=False,
+                 mesher=None):
         if geo_params is None:
             geo_params = {}
 
@@ -369,6 +375,7 @@ class NanoStruct:
         self.lc5 = lc5
         self.lc6 = lc6
         self.force_mesh = force_mesh
+        self.mesher = mesher
         self.small_space = small_space
         self.edge_spacing = edge_spacing
         self.split_touching_incs = split_touching_incs
@@ -393,6 +400,36 @@ class NanoStruct:
         self.plot_imag = plot_imag
         self.plot_abs = plot_abs
         self.plot_field_conc = plot_field_conc
+
+    def _legacy_custom_geo(self):
+        """Text of a custom .geo template with geo_params filled in, as legacy EMUstack writes it."""
+        import meshing
+        params = dict(self.geo_params or {})
+        for key in ('period', 'period_y', 'd_in_nm', 'dy_in_nm', 'diameter1'):
+            params.pop(key, None)  # already used by the constructor
+        # lc* in geo_params override the lc_bkg/lc2.. arguments (legacy ignored them there)
+        lcs = {'lc': self.lc, 'lc2': self.lc2, 'lc3': self.lc3,
+               'lc4': self.lc4, 'lc5': self.lc5, 'lc6': self.lc6}
+        for key in lcs:
+            if key in params:
+                lcs[key] = params.pop(key)
+        geo_tmp = open(meshing.resolve_mesh_file_path(self.geo_file), "r").read()
+        geo = geo_tmp.replace('d_in_nm = 0;', "d_in_nm  = %f;" % self.period)
+        geo = geo.replace('dy_in_nm = 0;', "dy_in_nm = %f;" % self.period_y)
+        geo = geo.replace('lc = 0;', "lc = %f;" % lcs['lc'])
+        for key in ('lc2', 'lc3', 'lc4', 'lc5', 'lc6'):
+            geo = geo.replace('%s = lc/1;' % key, "%s = lc/%f;" % (key, lcs[key]))
+        for key, value in params.items():
+            if key[0:2] == 'lc':
+                str_in = key + ' = lc/1;'
+                str_out = key + ' = lc/%f;' % value
+            else:
+                str_in = key + ' = 0;'
+                str_out = key + ' = %f;' % value
+            if str_in not in geo:
+                raise KeyError('Could not find "%s" in geometry file %s.' % (str_in, self.geo_file))
+            geo = geo.replace(str_in, str_out)
+        return geo
 
     def make_mesh(self):
         if self.periodicity == '2D_array':
@@ -1030,8 +1067,27 @@ class NanoStruct:
             self.mesh_file = msh_name + '.mail'
             import meshing
             merged_geo_params = self.harvest_geo_params()
+            mesher = self.mesher or default_mesher
+            if mesher not in ('gmsh', 'netgen'):
+                raise ValueError("mesher must be 'gmsh' or 'netgen', got %r" % mesher)
+            py_geometry = bool(self.geo_file) and self.geo_file.endswith('.py')
 
-            if hasattr(self, 'geo_file') and self.geo_file:
+            if mesher == 'gmsh' and not py_geometry:
+                # Legacy EMUstack: write the .geo, mesh it with gmsh, convert to .mail,
+                # and reuse an existing .mail unless force_mesh is set.
+                root = msh_location + msh_name
+                if not os.path.exists(root + '.mail') or self.force_mesh is True:
+                    if self.geo_file:
+                        geo = self._legacy_custom_geo()
+                    os.makedirs(msh_location, exist_ok=True)
+                    tmp_geo = root + '.geo.%d.tmp' % os.getpid()
+                    with open(tmp_geo, 'w') as f:
+                        f.write(geo)
+                    os.replace(tmp_geo, root + '.geo')
+                    meshing.conv_gmsh(root)
+                (self.mesh, self.table_nod, self.type_el, self.x_arr,
+                 self.n_msh_pts, self.n_msh_el) = meshing.read_mail_file(root + '.mail')
+            elif hasattr(self, 'geo_file') and self.geo_file:
                 if self.geo_file.endswith('.geo'):
                     self.mesh = meshing.mesh_from_geo(
                         self.geo_file,
@@ -1080,11 +1136,14 @@ class NanoStruct:
                     gap = getattr(self, 'gap', 0.0) / self.period
                     inclusions.append({"kind": "dimer", "c": center, "r": d1 / 2.0, "gap": gap, "tag": 2})
 
-                inc_h = self.lc / self.lc2 if getattr(self, 'lc2', 1.0) > 1.0 else self.lc
-                refine = meshing.Refine(bg=self.lc, inc=inc_h)
+                # geo_params lc/lc2 override lc_bkg/lc2, as on the gmsh path
+                lc = float(merged_geo_params.get('lc', self.lc))
+                lc2 = float(merged_geo_params.get('lc2', getattr(self, 'lc2', 1.0)))
+                inc_h = lc / lc2 if lc2 > 1.0 else lc
+                refine = meshing.Refine(bg=lc, inc=inc_h)
                 self.mesh = meshing.unit_cell(dy, inclusions, refine=refine, curve_order=2, period_x=1.0)
 
-            if self.mesh is not None:
+            if self.mesh is not None and (mesher == 'netgen' or py_geometry):
                 self.n_msh_pts = self.mesh.nv
                 self.n_msh_el = self.mesh.ne
                 self.x_arr = np.array([v.point[:2] for v in self.mesh.vertices]).T
@@ -1531,11 +1590,15 @@ class NanoStruct:
                         x_1 = ls_x[2 * i_el - 1]
                         x_2 = ls_x[2 * i_el + 1]
                         dx = x_2 - x_1
-                        if x_1 >= 0.5 - rad_1 - 1e-6 and x_2 <= 0.5 + rad_1 + 1e-6:
+                        # Legacy EMUstack rule, kept verbatim for parity: an
+                        # element straddling the left edge of inclusion a by
+                        # less than dx counts as inclusion.
+                        if x_1 <= 0.5 + rad_1 and 0.5 - rad_1 - dx <= x_1 \
+                        and x_2 <= 0.5 + rad_1 and 0.5 - rad_1 - dx <= x_2:
                             type_el[i_el] = 2
-                        elif x_2 <= 0.5 - rad_1 - small_space + 1e-6:
+                        elif x_1 <= 0.5 - rad_1 - small_space and x_2 <= 0.5 - rad_1 - small_space:
                             type_el[i_el] = 3
-                        elif x_1 >= 0.5 + large_d + rad_1 - 1e-6:
+                        elif x_1 >= 0.5 + large_d + rad_1 and x_2 >= 0.5 + large_d + rad_1:
                             type_el[i_el] = 3
                         else:
                             type_el[i_el] = 1
@@ -1550,7 +1613,9 @@ class NanoStruct:
                     x_1 = ls_x[2 * i_el - 1]
                     x_2 = ls_x[2 * i_el + 1]
                     dx = x_2 - x_1
-                    if x_1 >= 0.5 - rad_1 - 1e-6 and x_2 <= 0.5 + rad_1 + 1e-6:
+                    # Legacy EMUstack rule, kept verbatim for parity (see above).
+                    if x_1 <= 0.5 + rad_1 and 0.5 - rad_1 - dx <= x_1 \
+                    and x_2 <= 0.5 + rad_1 and 0.5 - rad_1 - dx <= x_2:
                         type_el[i_el] = 2
                     else:
                         type_el[i_el] = 1
