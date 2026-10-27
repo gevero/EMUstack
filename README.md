@@ -261,7 +261,7 @@ Legacy file dumps can be re-enabled at any time by explicitly passing `save_pdf=
 ## What Changed in v2.0 (Summary of Modernization)
 
 1. **Zero Fortran & Pure-Python Setup:**
-   - Complete elimination of compiled Fortran 90 binaries (`f90wrap`, `gfortran`, `ARPACK`, custom C wrappers). Installs effortlessly across Python 3.10–3.14 on Linux, macOS (Intel & Apple Silicon), and Windows (WSL/Docker).
+   - Complete elimination of compiled Fortran 90 binaries (`f90wrap`, `gfortran`, `ARPACK`, custom C wrappers). Installs effortlessly across Python 3.10–3.14 on Linux, macOS (Intel & Apple Silicon), and Windows (native / WSL).
 2. **Modern Finite-Element Solvers:**
    - Pure-Python 1D FEM using high-order polynomial elements with coupled TE/TM states for conical incidence.
    - NGSolve 2D FEM utilizing mixed vector-scalar spaces ($H(\text{curl}) \times H^1$) with exact tangential continuity and zero spurious eigenmodes.

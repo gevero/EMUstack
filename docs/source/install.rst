@@ -76,27 +76,6 @@ If you use `uv <https://docs.astral.sh/uv/>`_ for extremely fast environment man
     # 3. Install EMUstack with uv pip
     uv pip install -e .
 
-Option D: Pre-Configured Docker Container
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-For an isolated, containerized setup with all system libraries and Netgen/NGSolve dependencies pre-configured, use the provided ``Dockerfile``:
-
-.. code-block:: bash
-
-    # 1. Build the Docker container from the repository root
-    docker build -t emustack .
-
-    # On Apple Silicon (M1/M2/M3/M4):
-    docker buildx build --platform linux/amd64 -t emustack .
-
-    # 2. Launch an interactive shell with port 8888 exposed for Jupyter
-    docker run -it --name EMUstack -p 8888:8888 emustack:latest
-
-    # Or mount a local workspace into /home/host:
-    docker run -it --name EMUstack -p 8888:8888 \
-      --mount type=bind,source="$(pwd)",target=/home/host \
-      emustack:latest
-
 Installing Optional Dependencies
 --------------------------------
 
