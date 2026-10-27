@@ -203,7 +203,7 @@ Available Tutorial Notebooks
    * - ``Chiral_qBIC_Optical_Chirality.ipynb``
      - No
      - Yes
-     - Flagship: Chiral quasi-BIC and 3-plane optical chirality maps.
+     - Flagship: Chiral quasi-BIC, parallel adaptive spectrum (300-700 nm), and in-plane optical chirality maps.
 
 Native Netgen CSG Tutorials (In-Memory Meshing)
 -----------------------------------------------

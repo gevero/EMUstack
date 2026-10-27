@@ -29,6 +29,8 @@ RUN pip install --break-system-packages --no-cache-dir \
     matplotlib>=3.8 \
     ngsolve>=6.2.2600 \
     netgen-mesher>=6.2.2600 \
+    xarray>=2023.1 \
+    pyyaml>=6.0 \
     pytest>=8 \
     pytest-xdist \
     jupyterlab

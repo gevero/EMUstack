@@ -53,19 +53,28 @@ charge_e       = 1.602176565*1e-19  # Charge of an electron
 
 #### Short utility functions ##################################################
 def clear_previous():
-    """ Delete all files of specified type as well as field directories. """
+    """ Delete all generated simulation files of specified type as well as field directories. """
+    import glob
+    import shutil
 
-    devnull = open(os.devnull, 'wb')
+    file_patterns = ['*.npz', '*.pdf', '*.txt', '*.gif', '*.png', '*.log', '*.svg']
+    preserved_files = {'LICENSE.txt', 'LICENSE', 'requirements.txt'}
 
-    type_list = ['*.npz', '*.pdf', '*.txt', '*.gif', '*.png', '*.log', '*.svg',
-    'fields_vertically -r', 'in_plane_fields -r', 'Bloch_fields -r',
-    'field_values -r', '3d_fields -r']
-    for typ in type_list:
-        try:
-            files_rm = 'rm %s'% typ
-            subprocess.call(files_rm, shell = True, stderr=devnull)
-        except:
-            pass
+    for pattern in file_patterns:
+        for f in glob.glob(pattern):
+            if os.path.basename(f) not in preserved_files and os.path.isfile(f):
+                try:
+                    os.remove(f)
+                except OSError:
+                    pass
+
+    dir_names = ['fields_vertically', 'in_plane_fields', 'Bloch_fields', 'field_values', '3d_fields']
+    for d in dir_names:
+        if os.path.isdir(d):
+            try:
+                shutil.rmtree(d)
+            except OSError:
+                pass
 
 
 def zeros_int_str(zero_int):
