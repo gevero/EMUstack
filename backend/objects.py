@@ -389,11 +389,6 @@ class NanoStruct:
             self.mesh_file = mesh_file
         if bool(plotting_fields):
             self.plotting_fields = 1
-            if periodicity == '2D_array':
-                if not os.path.exists("Bloch_fields"):
-                    os.mkdir("Bloch_fields")
-                if not os.path.exists("Bloch_fields/PDF"):
-                    os.mkdir("Bloch_fields/PDF")
         else:
             self.plotting_fields = 0
         self.plot_real = plot_real
