@@ -2,7 +2,7 @@ name: Deploy Documentation to GitHub Pages
 
 on:
   push:
-    branches: [master, main, port/fem-backend-install]
+    branches: [master, main]
   workflow_dispatch:
 
 permissions:

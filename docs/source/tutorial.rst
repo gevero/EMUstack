@@ -263,8 +263,3 @@ Classic Gmsh & Pre-Generated Mesh Tutorials
    examples/simo_080-convergence-stacked_gratings.ipynb
    examples/simo_090-EOT.ipynb
    examples/simo_091-slab_mode_finding.ipynb
-
-.. toctree::
-   :hidden:
-
-   screen_sesh
