@@ -22,13 +22,15 @@ This mixed formulation completely avoids non-physical spurious modes without art
 Meshing Workflows
 -----------------
 
-EMUstack supports two meshing workflows for 2D nanostructured layers:
+EMUstack supports two complete meshing pipelines for 2D nanostructured layers, both of which follow the same 6 stages (parameter injection, coordinate normalization to a dimensionless unit cell of width :math:`1` and height :math:`d_y = \text{period\_y} / \text{period}`, periodic outer boundary identification, second-order curved inclusion boundaries, subdomain material tagging, and mesh refinement verification):
 
 1. **Native Built-in Netgen Meshing (Pure Python):**
-   Unit cells are built directly in memory using Netgen's 2D constructive solid geometry (CSG) tools or Python geometry templates (e.g., ``ellipse_msh_template.py``, ``chiral_qbic_template.py``). This workflow requires no external mesh generation binaries and supports curved second-order elements with exact boundary representation.
+   Unit cells are built directly in memory using Netgen's 2D constructive solid geometry (``netgen.geom2d.SplineGeometry``) via built-in shapes or parameterized Python templates (e.g., ``ellipse_msh_template.py``, ``chiral_qbic_gorkunov.py``, ``chiral_qbic_template.py``). Curved boundaries are represented by 12 exact quadratic rational Bézier spline arcs (``spline3``) and curved to second order via ``ngm.Curve(2)``, requiring zero external binaries or temporary disk files.
 
 2. **Gmsh Template Import:**
-   Legacy or complex geometries defined in Gmsh ``.geo`` scripts are meshed and imported via Gmsh MSH 2.2 format. Periodic boundary identifications are automatically applied to matching unit cell boundary edges.
+   Legacy or custom geometries defined in Gmsh ``.geo`` scripts (e.g., ``ellipse_msh_template.geo``) have their ``key = 0;`` placeholders substituted from ``geo_params``, are meshed in MSH 2.2 format, and have opposite outer boundary vertices paired via 1-based ``AddPointIdentification`` for Bloch periodicity.
+
+For a complete, step-by-step walkthrough of both pipelines—including side-by-side line-by-line explanations of ``ellipse_msh_template.geo``, ``ellipse_msh_template.py``, and ``chiral_qbic_gorkunov.py``—see the :doc:`meshing`.
 
 Material Surface Mapping
 ------------------------

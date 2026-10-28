@@ -132,9 +132,11 @@ print(f"Total Transmission: {float(ds_spectra['T_total'].values[0]):.4f}")
 print(f"Total Reflection:   {float(ds_spectra['R_total'].values[0]):.4f}")
 ```
 
-### 2. Custom 2D Geometries with Python Templates
+### 2. Custom 2D Geometries with Python & Gmsh Templates
 
-EMUstack supports parameterized Python geometry templates located in `backend/data/meshes/` (e.g. `ellipse_msh_template.py`, `chiral_qbic_template.py`):
+EMUstack supports both pure-Python Netgen geometry templates (`*.py`) and classic Gmsh scripts (`*.geo`) located in the working directory or `backend/data/meshes/` (e.g. `ellipse_msh_template.py`, `ellipse_msh_template.geo`, `chiral_qbic_gorkunov.py`).
+
+In a Python template, `build_unit_cell(...)` receives the parameters from `geo_params`, normalizes physical dimensions by `period` onto the dimensionless unit cell $[0, 1] \times [0, d_y]$, defines a list of `inclusions` (with `"tag": 2` mapped to `inclusion_a`, `"tag": 3` to `inclusion_b`, etc., and `"tag": 1` reserved for `background`), and calls `meshing.unit_cell()` to build a curved second-order periodic `ngsolve.Mesh` in memory:
 
 ```python
 from EMUstack.backend import objects, materials
@@ -150,6 +152,8 @@ ellipse_layer = objects.NanoStruct(
     geo_params={'period': 400.0, 'a1': 100.0, 'ellipticity': 0.5, 'angle': 0.0, 'lc': 0.15, 'lc2': 2.0}
 )
 ```
+
+For a complete, step-by-step guide comparing the Gmsh (`.geo`) and Netgen (`.py`) pipelines—with line-by-line walkthroughs of `ellipse_msh_template.geo`, `ellipse_msh_template.py`, and `chiral_qbic_gorkunov.py`—see the **[2D Geometry & Meshing Guide](https://bjornsturmberg.github.io/EMUstack/meshing.html)** in the documentation.
 
 ### 3. Evaluating Electric & Magnetic Near-Fields, Poynting Vector, and Optical Chirality
 
