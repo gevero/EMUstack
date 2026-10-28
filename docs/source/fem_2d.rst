@@ -25,7 +25,10 @@ Meshing Workflows
 EMUstack supports two complete meshing pipelines for 2D nanostructured layers, both of which follow the same 6 stages (parameter injection, coordinate normalization to a dimensionless unit cell of width :math:`1` and height :math:`d_y = \text{period\_y} / \text{period}`, periodic outer boundary identification, second-order curved inclusion boundaries, subdomain material tagging, and mesh refinement verification):
 
 1. **Native Built-in Netgen Meshing (Pure Python):**
-   Unit cells are built directly in memory using Netgen's 2D constructive solid geometry (``netgen.geom2d.SplineGeometry``) via built-in shapes or parameterized Python templates (e.g., ``ellipse_msh_template.py``, ``chiral_qbic_gorkunov.py``, ``chiral_qbic_template.py``). Curved boundaries are represented by 12 exact quadratic rational Bézier spline arcs (``spline3``) and curved to second order via ``ngm.Curve(2)``, requiring zero external binaries or temporary disk files.
+   Unit cells are built directly in memory using Netgen's 2D constructive solid geometry (``netgen.geom2d.SplineGeometry``) with zero external binaries or temporary disk files. Within a ``.py`` template, you can either:
+
+   * **Use the high-level helper** :func:`meshing.unit_cell` **(Route B1)** for unit cells composed of standard inclusion primitives (``circle``, ``ellipse``, ``square``, ``rectangle``, ``ring``, ``dimer``), such as ``ellipse_msh_template.py`` or ``chiral_qbic_gorkunov.py``, where :func:`meshing.unit_cell` automatically constructs the periodic box, 12-segment quadratic rational Bézier spline arcs (``spline3``), domain tags, and second-order curving (``ngm.Curve(2)``); or
+   * **Construct a** ``netgen.geom2d.SplineGeometry`` **directly (Route B2)** when you need a fancier custom resonator shape (such as an L-antenna, split ring, crescent, or arbitrary polygon/spline).
 
 2. **Gmsh Template Import:**
    Legacy or custom geometries defined in Gmsh ``.geo`` scripts (e.g., ``ellipse_msh_template.geo``) have their ``key = 0;`` placeholders substituted from ``geo_params``, are meshed in MSH 2.2 format, and have opposite outer boundary vertices paired via 1-based ``AddPointIdentification`` for Bloch periodicity.

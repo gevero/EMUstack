@@ -5,50 +5,64 @@ EMUstack solves for the electromagnetic Bloch modes of 2D periodically structure
 
 To support both legacy simulation scripts and pure-Python workflows, EMUstack provides **two complete 2D meshing pipelines** that converge into the same ``ngsolve.Mesh`` representation:
 
-1. **The Gmsh Pipeline (Classic Workflow):**
-   Reads a parameterized Gmsh ``.geo`` script (or a pre-generated ``.mail`` / ``.msh`` file), substitutes geometry parameters, invokes the external ``gmsh`` binary to triangulate the unit cell, and imports the resulting mesh into Netgen/NGSolve with periodic vertex identifications.
-2. **The Netgen Pipeline (Native Pure-Python Workflow):**
-   Executes a pure-Python geometry builder (either built-in parametric shapes or a custom ``*_template.py`` module such as ``ellipse_msh_template.py`` or ``chiral_qbic_gorkunov.py``) to construct a ``netgen.geom2d.SplineGeometry`` directly in memory with exact quadratic rational Bézier curves and periodic boundary identifications—requiring **zero external binaries and zero temporary disk files**.
+1. **The Gmsh Pipeline (Classic Workflow — ``.geo``):**
+   Reads a parameterized Gmsh ``.geo`` script (or a pre-generated ``.mail`` / ``.msh`` file), substitutes geometry parameters from ``geo_params``, invokes the external ``gmsh`` binary to triangulate the unit cell, and imports the resulting mesh into Netgen/NGSolve with periodic vertex identifications.
+2. **The Netgen Pipeline (Native Pure-Python Workflow — ``.py``):**
+   Executes a pure-Python geometry builder (``build_unit_cell(...)`` in a ``*.py`` template) to construct a curved second-order periodic ``ngsolve.Mesh`` directly in memory—requiring **zero external binaries and zero temporary disk files**.
+
+   Within a Netgen ``.py`` template, you can choose between **two routes** depending on the complexity of your resonator geometry:
+
+   * **Netgen Route B1 — High-Level Helper** :func:`meshing.unit_cell` **(Standard Inclusions):**
+     If your unit cell is composed of one or more **standard geometric primitives**—circles, rotated ellipses, squares, rectangles, concentric rings, or dimers (such as in ``ellipse_msh_template.py`` or the two tilted elliptical bars in ``chiral_qbic_gorkunov.py``)—you do not need to write low-level Netgen CSG code. You simply normalize your dimensions, describe each inclusion as a Python dictionary (``{"kind": "ellipse", ...}``), and pass the list to :func:`meshing.unit_cell`, which builds the periodic box, curved splines, domain tags, and mesh automatically.
+   * **Netgen Route B2 — Direct** ``netgen.geom2d.SplineGeometry`` **(Fancier / Arbitrary Custom Shapes):**
+     If you need a **fancier or arbitrary custom shape** that is not one of the standard primitives supported by :func:`meshing.unit_cell` (for example: an L-shaped nanoantenna, a split-ring resonator with a cut gap, a crescent, a polygon, or freeform Bézier curves), you bypass :func:`meshing.unit_cell` and construct a ``netgen.geom2d.SplineGeometry`` directly inside ``build_unit_cell(...)``.
 
 .. note::
    **How EMUstack Selects the Pipeline:**
 
    * Passing a Python template ``geo_file='... .py'`` **always** runs the native Netgen pipeline.
-   * For standard built-in shapes (``inc_shape='circle'``, ``'ellipse'``, ``'square'``, ``'rectangle'``, ``'ring'``, ``'dimer'``), the pipeline is controlled either globally via ``objects.default_mesher = 'gmsh'`` (default) or ``'netgen'``, or per layer via ``NanoStruct(..., mesher='netgen')``.
-   * Passing a Gmsh script ``geo_file='... .geo'`` runs the Gmsh pipeline.
+   * Passing a Gmsh script ``geo_file='... .geo'`` runs the Gmsh pipeline (unless overridden).
+   * For built-in ``NanoStruct`` shapes without a ``geo_file`` (``inc_shape='circle'``, ``'ellipse'``, ``'square'``, ``'rectangle'``, ``'ring'``, ``'dimer'``), the pipeline is controlled either globally via ``objects.default_mesher = 'gmsh'`` (default) or ``'netgen'``, or per layer via ``NanoStruct(..., mesher='netgen')``.
 
 ---
 
 Part I: General Presentation & the 6 Core Concepts
 --------------------------------------------------
 
-Regardless of whether you use the **Gmsh pipeline** or the **Netgen pipeline**, building a valid 2D periodic unit-cell mesh in EMUstack follows the exact same **six conceptual stages**. Understanding these six concepts makes it straightforward to read, modify, or author geometry templates in either pipeline.
+Regardless of whether you use the **Gmsh pipeline (``.geo``)** or the **Netgen pipeline (``.py``, via Route B1 or Route B2)**, building a valid 2D periodic unit-cell mesh in EMUstack always requires the exact same **six conceptual stages**.
 
-.. list-table:: Summary of the 6 Core Meshing Stages Across Both Pipelines
+.. list-table:: Summary of the 6 Core Meshing Stages Across Gmsh and Both Netgen Routes
    :header-rows: 1
-   :widths: 22 39 39
+   :widths: 19 27 27 27
 
    * - Stage / Concept
      - Gmsh Pipeline (``.geo``)
-     - Netgen Pipeline (``.py``)
+     - Netgen Route B1: ``meshing.unit_cell()`` (Standard Shapes)
+     - Netgen Route B2: Direct ``SplineGeometry`` (Custom Shapes)
    * - **1. Parameter Injection**
-     - Textual substitution of placeholders (``key = 0;`` :math:`\to` ``key = val;``) in the ``.geo`` script via :func:`meshing.mesh_from_geo`.
-     - Python function signature inspection of ``build_unit_cell(...)`` and keyword-argument passing via :func:`meshing.mesh_from_py`.
+     - Textual substitution of ``key = 0;`` placeholders in the ``.geo`` script from ``geo_params``.
+     - Python signature inspection of ``build_unit_cell(...)`` and keyword passing from ``geo_params``.
+     - Python signature inspection of ``build_unit_cell(...)`` and keyword passing from ``geo_params``.
    * - **2. Coordinate Normalization**
-     - Physical lengths in nm are divided by ``d_in_nm`` (:math:`a`) to span :math:`[0, 1] \times [-d_y, 0]`, centered at :math:`(0.5, -0.5\,d_y)`.
-     - Physical lengths in nm are divided by ``period`` (:math:`a`) to span :math:`[0, 1] \times [0, d_y]`, centered at :math:`(0.5, 0.5\,d_y)`.
+     - Physical lengths in nm are divided by ``d_in_nm`` (:math:`a`) onto :math:`[0, 1] \times [-d_y, 0]`.
+     - Physical lengths in nm are divided by ``period`` (:math:`a`) onto :math:`[0, 1] \times [0, d_y]`.
+     - Physical lengths in nm are divided by ``period`` (:math:`a`) onto :math:`[0, 1] \times [0, d_y]`.
    * - **3. Periodic Outer Boundaries**
-     - Outer edges tagged as ``Physical Line(1..4)``; opposite boundary vertices are paired geometrically upon import via ``AddPointIdentification``.
-     - Left and bottom edges are defined first; right and top edges are appended with ``copy=i_l`` and ``copy=i_b`` to clone 1D boundary nodes.
-   * - **4. Curved Inclusions**
-     - ``Circle`` / ``Ellipsis`` arcs and ``Rotate`` commands in ``.geo``, meshed as 6-node quadratic triangles or curved on import.
-     - Declarative ``inclusions`` dicts converted into 12 exact rational Bézier ``spline3`` arcs with off-curve tangent control points, curved via ``ngm.Curve(2)``.
+     - Outer edges tagged as ``Physical Line(1..4)``; opposite vertices paired on import via ``AddPointIdentification``.
+     - **Automated by** ``unit_cell()`` (creates corners and pairs left/right and bottom/top edges with ``copy=``).
+     - Append primary ``left`` and ``bottom`` lines, then append ``right`` (``copy=i_l``) and ``top`` (``copy=i_b``).
+   * - **4. Interior Inclusions**
+     - ``Circle`` / ``Ellipsis`` arcs and ``Rotate`` commands inside ``Line Loop`` definitions.
+     - **Automated by** ``unit_cell()`` from declarative ``inclusions`` dicts (``circle``, ``ellipse``, ``square``, ``rectangle``, ``ring``, ``dimer``).
+     - Append custom ``["line", p0, p1]`` segments and/or 3-point quadratic Bézier ``["spline3", p0, pc, p1]`` arcs.
    * - **5. Subdomain Material Tags**
      - ``Plane Surface`` + ``Physical Surface(1)`` (background) and ``Physical Surface(2..6)`` (inclusions).
-     - Counter-clockwise curve orientation (``leftdomain=tag, rightdomain=1``) + ``geo.SetMaterial(1, "bg")`` and ``geo.SetMaterial(tag, "inc{tag}")``.
-   * - **6. Refinement & Verification**
-     - Point characteristic lengths ``lc`` (background), ``lc2 = lc/factor`` (inclusion boundary), and ``lc3`` (inclusion center).
-     - ``meshing.Refine(bg=lc, inc=lc/lc2)`` + ``SetDomainMaxH``, followed by automatic checks on periodic pairs, curve order, and cell area.
+     - **Automated by** ``unit_cell()`` using the ``"tag": 2..6`` key on each dictionary in ``inclusions``.
+     - Set ``leftdomain=tag, rightdomain=1`` on counter-clockwise inclusion curves + ``geo.SetMaterial(...)``.
+   * - **6. Refinement & Meshing**
+     - Point sizes ``lc`` (background), ``lc2 = lc/factor`` (boundary), ``lc3`` (center) + ``gmsh`` binary call.
+     - **Automated by** ``unit_cell()`` from ``meshing.Refine(bg=lc, inc=lc/lc2)`` + ``Curve(2)`` + sanity checks.
+     - Call ``SetDomainMaxH(...)``, ``geo.GenerateMesh(maxh=lc)``, and ``ngm.Curve(2)``.
 
 Concept 1: Parameter Injection (``geo_file`` & ``geo_params``)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -56,7 +70,7 @@ Concept 1: Parameter Injection (``geo_file`` & ``geo_params``)
 When you instantiate ``objects.NanoStruct('2D_array', geo_file=..., geo_params={...})``, **all** geometric and mesh refinement parameters (``period`` or ``d_in_nm``, ``period_y`` or ``dy_in_nm``, ``a1``, ``ellipticity``, ``angle``, ``lc``, ``lc2``, ``lc3``) can be passed directly inside the ``geo_params`` dictionary—without repeating legacy positional arguments like ``period``, ``diameter1``, ``ellipticity``, or ``inc_shape='custom'``. EMUstack locates ``geo_file`` (searching first in your current working directory and then in ``EMUstack/backend/data/meshes/``) and dispatches ``geo_params`` to the selected template:
 
 * **In the Gmsh pipeline**, ``NanoStruct`` / :func:`meshing.mesh_from_geo` reads the ``.geo`` file as text and replaces placeholder assignments such as ``d_in_nm = 0;``, ``dy_in_nm = 0;``, ``a1 = 0;``, ``ellipticity = 0;``, ``angle = 0;``, ``lc = 0;``, and ``lc2 = lc/1;`` with the numerical values from ``geo_params``. If a key in ``geo_params`` does not have a matching placeholder in the ``.geo`` file, a ``KeyError`` is raised immediately.
-* **In the Netgen pipeline**, :func:`meshing.mesh_from_py` dynamically imports the ``.py`` module, inspects the Python signature of ``build_unit_cell(...)`` using ``inspect.signature``, verifies that every key in ``geo_params`` is a valid parameter of ``build_unit_cell`` (raising a ``TypeError`` on typos), and calls ``build_unit_cell(**call_params)``.
+* **In the Netgen pipeline (both Routes B1 and B2)**, :func:`meshing.mesh_from_py` dynamically imports the ``.py`` module, inspects the Python signature of ``build_unit_cell(...)`` using ``inspect.signature``, verifies that every key in ``geo_params`` is a valid parameter of ``build_unit_cell`` (raising a ``TypeError`` on typos), and calls ``build_unit_cell(**call_params)``.
 
 Concept 2: Coordinate Normalization to a Dimensionless Unit Cell
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -86,7 +100,7 @@ To enforce Bloch quasi-periodicity across the unit cell,
 NGSolve's ``Periodic(HCurl * H1, phase=...)`` space requires that opposite outer boundaries (**Left** :math:`\leftrightarrow` **Right** and **Bottom** :math:`\leftrightarrow` **Top**) have **identical 1D mesh discretizations** and explicit **periodic vertex identifications**:
 
 * **In the Gmsh pipeline**, the four outer boundary edges are tagged as ``Physical Line(1..4)``. When :func:`meshing.import_gmsh_mesh` ingests the ``.msh`` file, it locates all vertices on :math:`x = x_{\min}` and :math:`x = x_{\max}` (and :math:`y = y_{\min}`, :math:`y = y_{\max}`), verifies that opposite faces have the exact same node count, sorts them by coordinate, and pairs them via 1-based ``ngm.AddPointIdentification(p1, p2, id_nr, IdentificationType.PERIODIC)``.
-* **In the Netgen pipeline**, :func:`meshing.unit_cell` appends the **left** edge (:math:`\tilde{x}=0`) as primary segment ``i_l`` and then appends the **right** edge (:math:`\tilde{x}=1`) in the **same bottom-to-top direction** with ``copy=i_l``. Likewise, it appends the **bottom** edge (:math:`\tilde{y}=0`) as primary segment ``i_b`` and the **top** edge (:math:`\tilde{y}=d_y`) in the **same left-to-right direction** with ``copy=i_b``. The ``copy=`` argument instructs Netgen to clone the 1D mesh nodes from the primary edge onto its partner edge and automatically register the periodic vertex identifications.
+* **In the Netgen pipeline**, the **left** edge (:math:`\tilde{x}=0`) is appended as primary segment ``i_l`` and the **right** edge (:math:`\tilde{x}=1`) is appended in the **same bottom-to-top direction** with ``copy=i_l``. Likewise, the **bottom** edge (:math:`\tilde{y}=0`) is appended as primary segment ``i_b`` and the **top** edge (:math:`\tilde{y}=d_y`) in the **same left-to-right direction** with ``copy=i_b``. The ``copy=`` argument instructs Netgen to clone the 1D mesh nodes from the primary edge onto its partner edge and automatically register the periodic vertex identifications. *(When using Route B1, :func:`meshing.unit_cell` sets up this outer periodic box for you automatically; when using Route B2, you write these 5 lines at the top of your ``SplineGeometry``.)*
 
 Concept 4: Interior Inclusions & High-Order Curved Boundaries
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -94,16 +108,18 @@ Concept 4: Interior Inclusions & High-Order Curved Boundaries
 Approximating curved dielectric or metallic resonators (such as circular nanopillars or tilted elliptical bars in a high-:math:`Q` quasi-BIC metasurface) with straight-edged polygons introduces artificial corner singularities and staircase errors. Both pipelines represent curved boundaries using **second-order isoparametric curved elements**:
 
 * **In the Gmsh pipeline**, curved boundaries are defined using Gmsh's built-in ``Circle`` or ``Ellipsis`` arc primitives (optionally rotated via ``Rotate``) and meshed either as 6-node quadratic triangles (``gmsh -2 -order 2``) or curved to second order upon Netgen import (``ngm.Curve(2)``).
-* **In the Netgen pipeline**, :func:`meshing.unit_cell` divides each circle or rotated ellipse into :math:`N_{\text{seg}} = 12` angular sectors :math:`[a_0, a_1]` (:math:`\Delta\theta = 30^\circ`). For each sector, :func:`meshing.arc_control_points` computes the start point :math:`\mathbf{P}_0`, the end point :math:`\mathbf{P}_1`, and the exact **off-curve tangent intersection control point** :math:`\mathbf{P}_{\text{ctrl}}` of a quadratic rational Bézier arc:
+* **In the Netgen pipeline**, curved boundaries are represented in ``netgen.geom2d.SplineGeometry`` using 3-point quadratic rational Bézier spline segments (``["spline3", pt0, pt_ctrl, pt1]``) together with ``ngm.Curve(2)``:
 
-  .. math::
+  * **In Route B1 (** :func:`meshing.unit_cell` **):** You simply specify a dictionary such as ``{"kind": "ellipse", "c": (xc, yc), "rx": rx, "ry": ry, "angle": alpha, "tag": 2}``. Internally, :func:`meshing.unit_cell` divides the circle or ellipse into :math:`N_{\text{seg}} = 12` angular sectors :math:`[a_0, a_1]` (:math:`\Delta\theta = 30^\circ`) and calls :func:`meshing.arc_control_points` to compute the start point :math:`\mathbf{P}_0`, the end point :math:`\mathbf{P}_1`, and the exact **off-curve tangent intersection control point** :math:`\mathbf{P}_{\text{ctrl}}`:
 
-     \mathbf{P}_{\text{ctrl}} = \mathbf{c} +
-     \begin{pmatrix} \cos\alpha & -\sin\alpha \\ \sin\alpha & \cos\alpha \end{pmatrix}
-     \begin{pmatrix} r_x \sec(\Delta\theta / 2) \cos\theta_{\text{mid}} \\ r_y \sec(\Delta\theta / 2) \sin\theta_{\text{mid}} \end{pmatrix},
-     \qquad \theta_{\text{mid}} = \frac{a_0 + a_1}{2},
+    .. math::
 
-  and appends ``["spline3", pt0, pt_ctrl, pt1]`` to the ``SplineGeometry``. Calling ``ngm.Curve(2)`` after mesh generation curves all triangle edges on the resonator boundary onto the exact analytical ellipse.
+       \mathbf{P}_{\text{ctrl}} = \mathbf{c} +
+       \begin{pmatrix} \cos\alpha & -\sin\alpha \\ \sin\alpha & \cos\alpha \end{pmatrix}
+       \begin{pmatrix} r_x \sec(\Delta\theta / 2) \cos\theta_{\text{mid}} \\ r_y \sec(\Delta\theta / 2) \sin\theta_{\text{mid}} \end{pmatrix},
+       \qquad \theta_{\text{mid}} = \frac{a_0 + a_1}{2}.
+
+  * **In Route B2 (Direct** ``SplineGeometry`` **):** For arbitrary polygons or custom resonators, you append straight segments via ``geo.Append(["line", p0, p1], ...)`` and curved segments via ``geo.Append(["spline3", pt0, pt_ctrl, pt1], ...)`` (you can even call the helper :func:`meshing.arc_control_points` for circular/elliptical fillets or arcs inside your custom shape).
 
 Concept 5: Subdomain Material Tagging (``bg``, ``inc2``, ``inc3``, ...)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -144,7 +160,7 @@ During the finite-element assembly (:mod:`fem_2d`), EMUstack maps each mesh subd
      - ``inclusion_e``
 
 * **In the Gmsh pipeline**, you explicitly group closed ``Line Loop`` definitions into ``Plane Surface`` entities (subtracting interior inclusion loops from the outer unit-cell loop) and assign ``Physical Surface(1)`` to the background and ``Physical Surface(2)`` to the inclusion.
-* **In the Netgen pipeline**, 2D regions are defined topologically by **directed boundary curves** via ``leftdomain`` and ``rightdomain``: as you walk along a segment from its start point to its end point, ``leftdomain`` is the region ID to your left and ``rightdomain`` is the region ID to your right (where ``0`` denotes the exterior of the computational domain). Because inclusion splines are traversed **counter-clockwise**, the interior of the inclusion lies on the left (``leftdomain=tag``) and the surrounding background lies on the right (``rightdomain=1``).
+* **In the Netgen pipeline**, 2D regions are defined topologically by **directed boundary curves** via ``leftdomain`` and ``rightdomain``: as you walk along a segment from its start point to its end point, ``leftdomain`` is the region ID to your left and ``rightdomain`` is the region ID to your right (where ``0`` denotes the exterior of the computational domain). When an inclusion boundary is traversed **counter-clockwise**, its interior lies on the left (``leftdomain=tag``) and the surrounding background lies on the right (``rightdomain=1``). In **Route B1**, you simply set ``"tag": 2`` (or ``3..6``) in each inclusion dictionary and :func:`meshing.unit_cell` sets ``leftdomain``, ``rightdomain``, and ``geo.SetMaterial(...)`` automatically. In **Route B2**, you pass ``leftdomain=tag, rightdomain=1`` directly to ``geo.Append(...)`` and call ``geo.SetMaterial(...)``.
 
 Concept 6: Mesh Refinement Controls (``lc``, ``lc2``, ``lc3``) & Verification
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -161,7 +177,7 @@ Mesh resolution is controlled in dimensionless unit-cell units (fractions of ``p
   Higher-index dielectric or plasmonic inclusions have shorter internal wavelengths and sharper local fields, so setting ``lc2 = 2.0`` to ``5.0`` refines the resonator interior and boundary without over-refining the background.
 * ``lc3`` (**center refinement factor**, Gmsh pipeline): Controls element size at a control point placed at the center of an inclusion (``lc / lc3``).
 
-Once the mesh is generated in the Netgen pipeline, :func:`meshing.unit_cell` automatically runs **four sanity assertions**:
+Once the mesh is generated in :func:`meshing.unit_cell`, it automatically runs **four sanity assertions**:
 
 1. ``ngm.GetNrIdentifications() == 4`` (periodic boundary tables exist).
 2. ``ngm.GetCurveOrder() >= 2`` (second-order curved elements are active).
@@ -173,12 +189,11 @@ Once the mesh is generated in the Netgen pipeline, :func:`meshing.unit_cell` aut
 Part II: Step-by-Step Practical Examples
 ----------------------------------------
 
-To see how the **6 Core Concepts** from Part I translate directly into code, we now walk step by step through two real templates included in ``EMUstack/backend/data/meshes/``:
+To reinforce the **6 Core Concepts** from Part I, we now examine three concrete examples where **each practical step (`Step 1` through `Step 6`) maps directly to `Concept 1` through `Concept 6` above**:
 
-* **Example A (Gmsh Pipeline):** ``ellipse_msh_template.geo`` — a rotated elliptical nanohole/nanopillar unit cell in Gmsh.
-* **Example B (Netgen Pipeline):** ``ellipse_msh_template.py`` and ``chiral_qbic_gorkunov.py`` — the native pure-Python Netgen equivalents for a single rotated ellipse and for the 3-layer tilted elliptical-bar dimer used in the flagship **Chiral quasi-BIC (qBIC)** tutorial, followed by the internal steps of :func:`meshing.unit_cell`.
-
-In both walkthroughs below, **Steps 1 through 6 correspond 1-to-1 to Concepts 1 through 6 from Part I**.
+* **Example A (Gmsh Pipeline):** ``ellipse_msh_template.geo`` — a rotated elliptical nanohole/nanopillar unit cell in Gmsh, passing all parameters via ``geo_params``.
+* **Example B1 (Netgen Route B1 — Standard Inclusions via** :func:`meshing.unit_cell` **):** ``ellipse_msh_template.py`` and ``chiral_qbic_gorkunov.py`` — showing how standard inclusions (such as single or multiple rotated ellipses) are built effortlessly by passing an ``inclusions`` dictionary list to :func:`meshing.unit_cell`.
+* **Example B2 (Netgen Route B2 — Fancier Custom Shapes via Direct** ``SplineGeometry`` **):** Walking through all 6 steps using ``netgen.geom2d.SplineGeometry`` directly when you need a geometry beyond the standard primitives of :func:`meshing.unit_cell`.
 
 ---
 
@@ -190,7 +205,7 @@ Below is the step-by-step breakdown of ``EMUstack/backend/data/meshes/ellipse_ms
 Step 1 (Concept 1 — Parameter Placeholders)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-At the top of ``ellipse_msh_template.geo``, every parameter that can be overridden by ``NanoStruct`` or ``geo_params`` is initialized with a ``0`` (or ``lc/1``) placeholder:
+At the top of ``ellipse_msh_template.geo``, every parameter that can be overridden by ``geo_params`` is initialized with a ``0`` (or ``lc/1``) placeholder:
 
 .. code-block:: c
 
@@ -208,7 +223,7 @@ At the top of ``ellipse_msh_template.geo``, every parameter that can be overridd
    lc2 = lc/1;       // Replaced by lc / lc2 (on ellipse boundary)
    lc3 = lc/1;       // Replaced by lc / lc3 (at ellipse center)
 
-When you pass ``geo_params={'a1': 300, 'ellipticity': 0.5, 'angle': np.pi/3, 'lc': 0.08, 'lc2': 4.0}``, EMUstack replaces ``a1 = 0;`` with ``a1 = 300.0;``, ``lc2 = lc/1;`` with ``lc2 = lc/4.0;``, and so on.
+When you pass ``geo_params={'period': 400.0, 'a1': 300.0, 'ellipticity': 0.5, 'angle': np.pi/3, 'lc': 0.08, 'lc2': 4.0, 'lc3': 2.0}``, EMUstack replaces ``d_in_nm = 0;`` with ``d_in_nm = 400.0;``, ``a1 = 0;`` with ``a1 = 300.0;``, ``lc2 = lc/1;`` with ``lc2 = lc/4.0;``, and so on.
 
 Step 2 (Concept 2 — Coordinate Normalization)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -217,7 +232,7 @@ Next, the script converts the physical dimensions ``d_in_nm``, ``dy_in_nm``, and
 
 .. code-block:: c
 
-   dy = dy_in_nm / d_in_nm;        // Normalized unit-cell height along y
+   dy = dy_in_nm / d_in_nm;             // Normalized unit-cell height along y
    radius1 = (a1 / (2 * d_in_nm)) * d;  // Normalized semi-major axis rx
    hy = dy;
    hx = 0.0;
@@ -305,101 +320,100 @@ To use this Gmsh template in a simulation script, pass **all** geometric and mes
    from EMUstack.backend import objects, materials
 
    nh_layer = objects.NanoStruct(
-       '2D_array',
-       geo_file='ellipse_msh_template.geo',
-       geo_params={
-           'period': 400.0,
-           'a1': 300.0,
-           'ellipticity': 0.5,
-           'angle': np.pi / 3,
-           'lc': 0.08,
-           'lc2': 4.0,
-           'lc3': 2.0,
-       },
-       background=materials.Au,
-       inclusion_a=materials.Air,
-       height_nm=50.0,
+      '2D_array',
+      geo_file='ellipse_msh_template.geo',
+      geo_params={
+          'period': 400.0,
+          'a1': 300.0,
+          'ellipticity': 0.5,
+          'angle': np.pi / 3,
+          'lc': 0.08,
+          'lc2': 4.0,
+          'lc3': 2.0,
+      },
+      background=materials.Au,
+      inclusion_a=materials.Air,
+      height_nm=50.0,
    )
 
 ---
 
-Example B: Step-by-Step Netgen Templates (``ellipse_msh_template.py`` & ``chiral_qbic_gorkunov.py``)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Example B1: Netgen Route B1 — Standard Inclusions via ``meshing.unit_cell()`` (``ellipse_msh_template.py`` & ``chiral_qbic_gorkunov.py``)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Now let us walk through the **native Netgen pipeline**, using both the single rotated ellipse template (``ellipse_msh_template.py``) and the two-ellipse chiral quasi-BIC dimer template (``chiral_qbic_gorkunov.py``) from the flagship tutorial ``Chiral_qBIC_Optical_Chirality.ipynb``.
+When your unit cell consists of one or more **standard geometric primitives** (circles, rotated ellipses, squares, rectangles, concentric rings, or dimers), you do **not** need to construct a ``SplineGeometry`` by hand. Instead, you use :func:`meshing.unit_cell`, which automates **Steps 3, 4, 5, and 6** from a list of inclusion dictionaries.
 
-Notice how **Steps 1 through 6** below directly mirror the Gmsh steps above, while eliminating manual point/line IDs and external binary calls.
+Let us see how both ``ellipse_msh_template.py`` (single rotated ellipse) and ``chiral_qbic_gorkunov.py`` (the two-ellipse chiral quasi-BIC dimer from ``Chiral_qBIC_Optical_Chirality.ipynb``) are implemented using this route.
 
 Step 1 (Concept 1 — Python Function Signature & Parameter Validation)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-A Netgen geometry template is a standard Python file defining ``build_unit_cell(...)``. Here is the signature from ``chiral_qbic_gorkunov.py`` (which models two elliptical dielectric bars of length ``l``, width ``w``, separated by ``gap``, and rotated by :math:`\pm \theta/2`):
+The template defines ``build_unit_cell(...)`` with explicit keyword arguments and defaults:
 
-.. code-block:: python
+* **In** ``ellipse_msh_template.py`` **(single rotated ellipse):**
 
-   from typing import Optional
-   import numpy as np
-   import ngsolve as ngs
-   from EMUstack.backend import meshing
+  .. code-block:: python
 
-   def build_unit_cell(
-       period: float = 480.0,
-       period_y: Optional[float] = None,
-       theta: float = 3.5,          # Tilt angle in degrees
-       d: float = 10.0,             # Vertical offset in nm
-       l: float = 220.0,            # Bar length in nm (major axis 2*ry)
-       w: float = 70.0,             # Bar width in nm  (minor axis 2*rx)
-       gap: float = 15.0,           # Edge-to-edge gap between bars in nm
-       include_bar1: bool = True,   # Toggle left bar (for 3-layer z-slicing)
-       include_bar2: bool = True,   # Toggle right bar (for 3-layer z-slicing)
-       rot1: Optional[float] = None,
-       rot2: Optional[float] = None,
-       lc: float = 0.08,            # Background mesh size (fraction of period)
-       lc2: float = 2.0,            # Inclusion refinement factor (inc = lc / lc2)
-       lc3: float = 1.0,
-       curve_order: int = 2,        # Second-order curved elements
-       **kwargs
-   ) -> ngs.Mesh:
+     from typing import Optional
+     import numpy as np
+     import ngsolve as ngs
+     from EMUstack.backend import meshing
 
-Similarly, in ``ellipse_msh_template.py``, the signature accepts ``period``, ``period_y``, ``a1`` (major diameter in nm), ``ellipticity``, and ``angle`` (in radians):
+     def build_unit_cell(
+         period: float = 400.0,
+         period_y: Optional[float] = None,
+         a1: Optional[float] = None,
+         ellipticity: Optional[float] = None,
+         angle: Optional[float] = None,
+         r1: Optional[float] = None,
+         r2: Optional[float] = None,
+         rot: Optional[float] = None,
+         lc: float = 0.12,
+         lc2: float = 5.0,
+         lc3: float = 1.0,
+     ) -> ngs.Mesh:
 
-.. code-block:: python
+* **In** ``chiral_qbic_gorkunov.py`` **(two tilted elliptical bars separated by a gap):**
 
-   def build_unit_cell(
-       period: float = 400.0,
-       period_y: Optional[float] = None,
-       a1: Optional[float] = None,
-       ellipticity: Optional[float] = None,
-       angle: Optional[float] = None,
-       r1: Optional[float] = None,
-       r2: Optional[float] = None,
-       rot: Optional[float] = None,
-       lc: float = 0.12,
-       lc2: float = 5.0,
-       lc3: float = 1.0,
-   ) -> ngs.Mesh:
+  .. code-block:: python
 
-When ``NanoStruct`` calls :func:`meshing.mesh_from_py`, it inspects these parameters, translates legacy aliases automatically (``d_in_nm`` :math:`\to` ``period``, ``dy_in_nm`` :math:`\to` ``period_y``, ``diameter1`` :math:`\to` ``a1``), and passes your ``geo_params`` dictionary directly as keyword arguments.
+     def build_unit_cell(
+         period: float = 480.0,
+         period_y: Optional[float] = None,
+         theta: float = 3.5,          # Tilt angle in degrees
+         d: float = 10.0,             # Vertical offset in nm
+         l: float = 220.0,            # Bar length in nm (major axis 2*ry)
+         w: float = 70.0,             # Bar width in nm  (minor axis 2*rx)
+         gap: float = 15.0,           # Edge-to-edge gap between bars in nm
+         include_bar1: bool = True,   # Toggle left bar (for 3-layer z-slicing)
+         include_bar2: bool = True,   # Toggle right bar (for 3-layer z-slicing)
+         rot1: Optional[float] = None,
+         rot2: Optional[float] = None,
+         lc: float = 0.08,            # Background mesh size (fraction of period)
+         lc2: float = 2.0,            # Inclusion refinement factor (inc = lc / lc2)
+         lc3: float = 1.0,
+         curve_order: int = 2,
+         **kwargs
+     ) -> ngs.Mesh:
 
 Step 2 (Concept 2 — Coordinate Normalization to :math:`[0, 1] \times [0, d_y]`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Inside ``build_unit_cell``, all physical dimensions in nanometers are divided by ``period`` (:math:`a`) so the unit cell spans :math:`[0, 1] \times [0, d_y]` with its center at :math:`(0.5, 0.5\,d_y)`:
+Next, physical lengths in nanometers are divided by ``period`` (:math:`a`) so the unit cell spans :math:`[0, 1] \times [0, d_y]` with its center at :math:`(0.5, 0.5\,d_y)`:
 
-* **In** ``ellipse_msh_template.py`` **(single rotated ellipse at unit-cell center):**
+* **In** ``ellipse_msh_template.py``:
 
   .. code-block:: python
 
      py = period if period_y is None else period_y
      dy = float(py) / float(period)
 
-     # Normalize semi-major axis rx and semi-minor axis ry by period
      rx = float(a1) / (2.0 * float(period))
      ry = rx * (1.0 - float(ellipticity))
      ang_rad = float(angle)
      center = (0.5, dy / 2.0)
 
-* **In** ``chiral_qbic_gorkunov.py`` **(two tilted elliptical bars separated along x):**
+* **In** ``chiral_qbic_gorkunov.py``:
 
   .. code-block:: python
 
@@ -407,114 +421,68 @@ Inside ``build_unit_cell``, all physical dimensions in nanometers are divided by
      dy = float(py) / float(period)
      a = float(period)
 
-     # Convert tilt angle from degrees to radians (+/- theta / 2)
      theta_rad = np.deg2rad(float(theta))
      rot1 = +0.5 * theta_rad if rot1 is None else rot1
      rot2 = -0.5 * theta_rad if rot2 is None else rot2
 
-     # Normalize ellipse semi-axes rx, ry and center-to-center separation by period
      rx = 0.5 * float(w) / a
      ry = 0.5 * float(l) / a
      sep = (float(w) + float(gap)) / a
-
-     # Normalized centers of left bar (c1) and right bar (c2)
      c1 = (0.5 - 0.5 * sep, 0.5 * dy)
      c2 = (0.5 + 0.5 * sep, 0.5 * dy)
 
-Step 3 (Concept 3 — Outer Unit-Cell Box & Periodic ``copy=`` Boundaries)
+Steps 3, 4, 5, & 6 (Concepts 3–6 — Automated by ``meshing.unit_cell()``)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-When ``build_unit_cell`` calls ``meshing.unit_cell(dy, inclusions, refine=refine, curve_order=2)``, :func:`meshing.unit_cell` first constructs the outer unit-cell rectangle :math:`[0, 1] \times [0, d_y]` in ``netgen.geom2d.SplineGeometry`` and pairs opposite periodic faces using ``copy=``:
+Because both templates use standard elliptical inclusions, **Steps 3 through 6 require only a few lines of Python**:
 
-.. code-block:: python
+1. Build the ``inclusions`` list of dictionaries—where each dictionary specifies the shape ``"kind"`` (**Step 4**) and the material ``"tag"`` (**Step 5**):
 
-   geo = g2.SplineGeometry()
-   L = period_x   # 1.0
-   H = dy         # period_y / period
+   * **In** ``ellipse_msh_template.py``:
 
-   # 1. Add the 4 corner points of the normalized unit cell
-   P = [geo.AddPoint(*q) for q in [(0, 0), (L, 0), (L, H), (0, H)]]
+     .. code-block:: python
 
-   # 2. Periodic x-boundaries: Left (P0 -> P3) is primary; Right (P1 -> P2) is its copy
-   i_l = geo.Append(["line", P[0], P[3]], leftdomain=0, rightdomain=1, bc="left", maxh=refine.bg)
-   geo.Append(["line", P[1], P[2]], leftdomain=1, rightdomain=0, bc="right", maxh=refine.bg, copy=i_l)
+        inclusions = [{
+            "kind": "ellipse",
+            "c": center,
+            "rx": rx,
+            "ry": ry,
+            "angle": ang_rad,
+            "tag": 2,          # Maps to inclusion_a
+        }]
 
-   # 3. Periodic y-boundaries: Bottom (P0 -> P1) is primary; Top (P3 -> P2) is its copy
-   i_b = geo.Append(["line", P[0], P[1]], leftdomain=1, rightdomain=0, bc="bottom", maxh=refine.bg)
-   geo.Append(["line", P[3], P[2]], leftdomain=0, rightdomain=1, bc="top", maxh=refine.bg, copy=i_b)
+   * **In** ``chiral_qbic_gorkunov.py``:
 
-.. important::
-   Notice the point ordering on periodic pairs:
+     .. code-block:: python
 
-   * ``left`` goes from ``P[0] (0,0)`` to ``P[3] (0,H)``, and ``right`` goes in the **same direction** from ``P[1] (L,0)`` to ``P[2] (L,H)`` with ``copy=i_l``.
-   * Because ``left`` walks up the left border, the unit-cell interior (domain ``1``) is on the **right** (``leftdomain=0, rightdomain=1``). Because ``right`` walks up the right border, the unit-cell interior is on the **left** (``leftdomain=1, rightdomain=0``).
+        inclusions = []
+        if include_bar1:
+            inclusions.append({
+                "kind": "ellipse", "c": c1, "rx": rx, "ry": ry,
+                "angle": float(rot1), "tag": 2,
+            })
+        if include_bar2:
+            inclusions.append({
+                "kind": "ellipse", "c": c2, "rx": rx, "ry": ry,
+                "angle": float(rot2), "tag": 2,
+            })
 
-Step 4 (Concept 4 — Declarative Inclusions & Exact Rational Bézier Splines)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2. Package the mesh refinement sizes ``lc`` and ``lc / lc2`` into :class:`meshing.Refine` and call :func:`meshing.unit_cell` (**Steps 3 & 6**):
 
-In the template, each resonator is described as a clean Python dictionary inside the ``inclusions`` list:
+   .. code-block:: python
 
-* **Single rotated ellipse (``ellipse_msh_template.py``):**
+      inc_h = lc / lc2 if lc2 > 1.0 else lc
+      refine = meshing.Refine(bg=lc, inc=inc_h)
+      return meshing.unit_cell(dy, inclusions, refine=refine, curve_order=2, period_x=1.0)
 
-  .. code-block:: python
+What ``meshing.unit_cell()`` Supports vs. When to Take Route B2
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-     inclusions = [{
-         "kind": "ellipse",
-         "c": (0.5, dy / 2.0),
-         "rx": rx,
-         "ry": ry,
-         "angle": ang_rad,
-         "tag": 2,
-     }]
+All standard inclusion shapes supported out of the box by :func:`meshing.unit_cell` are listed below:
 
-* **Two-bar chiral qBIC dimer (``chiral_qbic_gorkunov.py``):**
-
-  .. code-block:: python
-
-     inclusions = []
-     if include_bar1:
-         inclusions.append({
-             "kind": "ellipse",
-             "c": c1,
-             "rx": rx,
-             "ry": ry,
-             "angle": float(rot1),
-             "tag": 2,
-         })
-     if include_bar2:
-         inclusions.append({
-             "kind": "ellipse",
-             "c": c2,
-             "rx": rx,
-             "ry": ry,
-             "angle": float(rot2),
-             "tag": 2,
-         })
-
-  *(In the 3-layer qBIC metasurface, Layer 1 sets* ``include_bar1=True, include_bar2=False`` *for the bottom 10 nm offset slice, Layer 2 sets both* ``True`` *for the middle 90 nm overlap region, and Layer 3 sets* ``include_bar1=False, include_bar2=True`` *for the top 10 nm slice—all using this single template!)*
-
-**What** :func:`meshing.unit_cell` **does with each ellipse dictionary:**
-For each ellipse, :func:`meshing.unit_cell` loops over 12 angular intervals :math:`[a_0, a_1]` (:math:`30^\circ` each), calls :func:`meshing.arc_control_points` to compute the rotated endpoints ``pt0``, ``pt1`` and the off-curve tangent intersection control point ``pt_ctrl``, and appends a 3-point quadratic rational Bézier spline (``"spline3"``):
-
-.. code-block:: python
-
-   for a0, a1 in arc_segments(r=r, c=c, nseg=12):
-       pt0, pt_ctrl, pt1 = arc_control_points(
-           geo, kind="ellipse", c=c, a0=a0, a1=a1, rx=rx, ry=ry, angle=ang
-       )
-       geo.Append(
-           ["spline3", pt0, pt_ctrl, pt1],
-           leftdomain=tag,
-           rightdomain=1,
-           bc=f"inc{tag}",
-           maxh=maxh_inc,
-       )
-
-All built-in shapes supported in the ``inclusions`` list of :func:`meshing.unit_cell` are summarized below:
-
-.. list-table:: Built-in Inclusion Shapes Supported by ``meshing.unit_cell()``
+.. list-table:: Standard Inclusion Shapes Supported by ``meshing.unit_cell()``
    :header-rows: 1
-   :widths: 16 44 40
+   :widths: 18 42 40
 
    * - ``"kind"``
      - Required / Optional Keys
@@ -535,44 +503,16 @@ All built-in shapes supported in the ``inclusions`` list of :func:`meshing.unit_
      - ``"c": (xc, yc)``, ``"sub_kind": "circle"|"square"``, ``"r": float``, ``"gap": float``, ``"tag": int``
      - Symmetric pair of inclusions separated along :math:`x` by edge-to-edge ``gap``.
 
-Step 5 (Concept 5 — Oriented Domain Tagging ``leftdomain`` / ``rightdomain`` & Materials)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. important::
+   **The Exact Role and Boundary of** :func:`meshing.unit_cell`:
 
-Because ``arc_segments`` steps counter-clockwise from :math:`0` to :math:`2\pi`, walking from ``pt0`` to ``pt1`` along each ``spline3`` arc keeps the **interior of the ellipse on the left** (``leftdomain=tag``, i.e. ``2``) and the **background medium on the right** (``rightdomain=1``).
+   * **Use Route B1 (** :func:`meshing.unit_cell` **)** whenever your unit cell consists of one or more non-overlapping inclusions drawn from the 6 standard shapes in the table above (in any combination of positions ``c``, sizes, rotation angles, and material tags ``2..6``).
+   * **Use Route B2 (Direct** ``SplineGeometry`` **, shown next)** whenever you need a **fancier custom inclusion** that is *not* in the table above—for example, an L-shaped resonator, a split-ring with an angular cut, a crescent, a triangle/hexagonal prism, a rotated rectangle, or freeform splines.
 
-After all inclusions are appended, :func:`meshing.unit_cell` assigns the domain names and maximum element sizes:
+Calling ``ellipse_msh_template.py`` and ``chiral_qbic_gorkunov.py`` from ``NanoStruct``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. code-block:: python
-
-   geo.SetMaterial(1, "bg")
-   geo.SetDomainMaxH(1, refine.bg)
-   for tag in tags:
-       if tag != 1:
-           geo.SetMaterial(tag, f"inc{tag}")
-           geo.SetDomainMaxH(tag, refine.inc)
-
-When ``NanoStruct`` builds the layer, ``"bg"`` (tag ``1``) is assigned the permittivity of ``background``, and ``"inc2"`` (tag ``2``) is assigned the permittivity of ``inclusion_a``. If your unit cell contains two *different* resonator materials, simply set ``"tag": 2`` on the first dictionary (mapped to ``inclusion_a``) and ``"tag": 3`` on the second dictionary (mapped to ``inclusion_b``).
-
-Step 6 (Concept 6 — Mesh Refinement, Curving ``ngm.Curve(2)``, & Calling from ``NanoStruct``)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-At the end of ``build_unit_cell``, the template computes the inclusion element size ``inc_h = lc / lc2``, packages it into :class:`meshing.Refine`, and delegates mesh generation and curving to :func:`meshing.unit_cell`:
-
-.. code-block:: python
-
-   inc_h = lc / lc2 if lc2 > 1.0 else lc
-   refine = meshing.Refine(bg=lc, inc=inc_h)
-   return meshing.unit_cell(dy, inclusions, refine=refine, curve_order=curve_order, period_x=1.0)
-
-Inside :func:`meshing.unit_cell`, Netgen generates the 2D mesh, curves all boundary splines to polynomial order ``curve_order=2``, wraps it into ``ngsolve.Mesh``, and verifies the 4 topological invariants:
-
-.. code-block:: python
-
-   ngm = geo.GenerateMesh(maxh=refine.bg)
-   ngm.Curve(curve_order)
-   mesh = Mesh(ngm)
-
-To use ``ellipse_msh_template.py`` in a simulation script, notice that you pass the **exact same** ``geo_params`` dictionary as in the Gmsh example above—simply changing ``.geo`` to ``.py``:
+To run ``ellipse_msh_template.py``, you pass the **exact same** ``geo_params`` dictionary as in the Gmsh example—simply changing ``.geo`` to ``.py``:
 
 .. code-block:: python
 
@@ -596,7 +536,7 @@ To use ``ellipse_msh_template.py`` in a simulation script, notice that you pass 
        height_nm=50.0,
    )
 
-Similarly, to use ``chiral_qbic_gorkunov.py`` ( passing all parameters via ``geo_params``) and visually inspect the generated mesh:
+Similarly, to build the chiral qBIC dimer layer with ``chiral_qbic_gorkunov.py`` and plot the triangulated mesh:
 
 .. code-block:: python
 
@@ -605,10 +545,6 @@ Similarly, to use ``chiral_qbic_gorkunov.py`` ( passing all parameters via ``geo
    from EMUstack.backend import objects, materials
 
    period = 480.0
-   mat_bars = materials.Material(4.0 + 0.01j)
-   mat_air = materials.Material(1.0)
-
-   # Build the middle overlap layer containing both tilted elliptical bars
    lay2 = objects.NanoStruct(
        '2D_array',
        geo_file='chiral_qbic_gorkunov.py',
@@ -620,15 +556,15 @@ Similarly, to use ``chiral_qbic_gorkunov.py`` ( passing all parameters via ``geo
            'lc': 0.15,
            'lc2': 1.5,
        },
-       background=mat_air,
-       inclusion_a=mat_bars,
+       background=materials.Material(1.0),
+       inclusion_a=materials.Material(4.0 + 0.01j),
        height_nm=90.0,
    )
 
    # Visually inspect the generated mesh and material tags (1 = bg, 2 = inc2)
    x_nm = lay2.x_arr[0] * period
    y_nm = lay2.x_arr[1] * period
-   triangles = lay2.table_nod[:3].T - 1  # 0-based vertex indices
+   triangles = lay2.table_nod[:3].T - 1
    triang = mtri.Triangulation(x_nm, y_nm, triangles)
 
    fig, ax = plt.subplots(figsize=(5, 5))
@@ -640,15 +576,23 @@ Similarly, to use ``chiral_qbic_gorkunov.py`` ( passing all parameters via ``geo
 
 ---
 
-Advanced Recipe: Writing a Low-Level Custom ``SplineGeometry`` Template
------------------------------------------------------------------------
+Example B2: Netgen Route B2 — Fancier Custom Shapes via Direct ``SplineGeometry``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you want to model an arbitrary 2D polygon or custom curve (such as an L-shaped antenna, split-ring resonator, or crescent) that is not one of the built-in shapes in :func:`meshing.unit_cell`, your ``build_unit_cell(...)`` function in ``my_custom_template.py`` can construct a ``netgen.geom2d.SplineGeometry`` directly and return either the ``SplineGeometry`` or an ``ngsolve.Mesh``:
+When you need a **fancier resonator geometry** that is not one of the standard primitives in :func:`meshing.unit_cell` (or if you want to understand what :func:`meshing.unit_cell` does under the hood), your ``build_unit_cell(...)`` function constructs a ``netgen.geom2d.SplineGeometry`` directly, performing **all 6 steps** explicitly in Python.
+
+Below is the step-by-step walkthrough of how to build a custom ``SplineGeometry`` template (illustrated for an **L-shaped nanoantenna**, along with how curved ``"spline3"`` arcs are added).
+
+Step 1 (Concept 1 — Python Function Signature)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Define ``build_unit_cell(...)`` in your custom ``.py`` file (e.g., ``l_antenna_template.py``) with your custom geometric parameters and mesh controls:
 
 .. code-block:: python
 
    import netgen.geom2d as g2
    import ngsolve as ngs
+   from ngsolve.fem import NODE_TYPE
 
    def build_unit_cell(
        period: float = 500.0,
@@ -659,31 +603,63 @@ If you want to model an arbitrary 2D polygon or custom curve (such as an L-shape
        lc2: float = 2.5,
        curve_order: int = 2,
    ) -> ngs.Mesh:
+
+Step 2 (Concept 2 — Coordinate Normalization to :math:`[0, 1] \times [0, d_y]`)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Divide all physical dimensions in nanometers by ``period`` so the geometry lives inside :math:`[0, 1] \times [0, d_y]`:
+
+.. code-block:: python
+
        dy = float(period_y) / float(period)
-       L_arm = arm_len / period
-       W_arm = arm_width / period
+       L_arm = float(arm_len) / float(period)
+       W_arm = float(arm_width) / float(period)
        inc_h = lc / lc2 if lc2 > 1.0 else lc
+
+Step 3 (Concept 3 — Outer Unit-Cell Box & Periodic ``copy=`` Boundaries)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Instantiate ``geo = g2.SplineGeometry()``, add the 4 corners of the normalized unit cell, and append the primary ``left`` and ``bottom`` edges followed by their periodic copies ``right`` (``copy=i_l``) and ``top`` (``copy=i_b``):
+
+.. code-block:: python
 
        geo = g2.SplineGeometry()
 
-       # Step 3: Outer periodic box [0, 1] x [0, dy]
-       P = [geo.AddPoint(*q) for q in [(0, 0), (1, 0), (1, dy), (0, dy)]]
+       # 1. Add the 4 corner points of [0, 1] x [0, dy]
+       P = [geo.AddPoint(*q) for q in [(0, 0), (1.0, 0), (1.0, dy), (0, dy)]]
+
+       # 2. Periodic x-boundaries: Left (P0 -> P3) is primary; Right (P1 -> P2) is its copy
        i_l = geo.Append(["line", P[0], P[3]], leftdomain=0, rightdomain=1, bc="left", maxh=lc)
        geo.Append(["line", P[1], P[2]], leftdomain=1, rightdomain=0, bc="right", maxh=lc, copy=i_l)
+
+       # 3. Periodic y-boundaries: Bottom (P0 -> P1) is primary; Top (P3 -> P2) is its copy
        i_b = geo.Append(["line", P[0], P[1]], leftdomain=1, rightdomain=0, bc="bottom", maxh=lc)
        geo.Append(["line", P[3], P[2]], leftdomain=0, rightdomain=1, bc="top", maxh=lc, copy=i_b)
 
-       # Step 4 & 5: Counter-clockwise polygon for an L-shaped resonator (leftdomain=2, rightdomain=1)
-       x0, y0 = 0.5 - L_arm / 2, 0.5 * dy - L_arm / 2
+.. note::
+   Always ensure that ``left`` and ``right`` are traversed in the **same direction** (both bottom-to-top: ``P[0]->P[3]`` and ``P[1]->P[2]``), and that ``bottom`` and ``top`` are traversed in the **same direction** (both left-to-right: ``P[0]->P[1]`` and ``P[3]->P[2]``).
+
+Step 4 (Concept 4 — Drawing the Custom Inclusion with ``"line"`` and ``"spline3"``)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Add the vertices (and any spline control points) of your custom resonator in **counter-clockwise order**, and connect them with ``geo.Append(...)``:
+
+* **For straight polygon edges (such as the 6 vertices of our L-shaped antenna):**
+  Use ``["line", start_pt, end_pt]``:
+
+  .. code-block:: python
+
+       x0, y0 = 0.5 - L_arm / 2.0, 0.5 * dy - L_arm / 2.0
        pts_L = [
-           (x0, y0),
+           (x0,         y0),
            (x0 + L_arm, y0),
            (x0 + L_arm, y0 + W_arm),
            (x0 + W_arm, y0 + W_arm),
            (x0 + W_arm, y0 + L_arm),
-           (x0, y0 + L_arm),
+           (x0,         y0 + L_arm),
        ]
        Q = [geo.AddPoint(*p) for p in pts_L]
+
        for i in range(len(Q)):
            geo.Append(
                ["line", Q[i], Q[(i + 1) % len(Q)]],
@@ -693,15 +669,67 @@ If you want to model an arbitrary 2D polygon or custom curve (such as an L-shape
                maxh=inc_h,
            )
 
-       # Step 6: Assign material names, domain maxh, generate mesh, and curve
+* **For curved boundary arcs (e.g., rounded corners, crescents, or split rings):**
+  Use ``["spline3", pt0, pt_ctrl, pt1]``, where ``pt0`` and ``pt1`` are the arc endpoints and ``pt_ctrl`` is the off-curve tangent intersection control point. For circular or elliptical arcs spanning angle :math:`[a_0, a_1]`, you can call the built-in helper :func:`meshing.arc_control_points` directly:
+
+  .. code-block:: python
+
+       # Example: appending a curved circular/elliptical arc from angle a0 to a1
+       pt0, pt_ctrl, pt1 = meshing.arc_control_points(
+           geo, kind="circle", c=(0.5, 0.5 * dy), a0=a0, a1=a1, r=radius
+       )
+       geo.Append(["spline3", pt0, pt_ctrl, pt1], leftdomain=2, rightdomain=1, bc="inc2", maxh=inc_h)
+
+Step 5 (Concept 5 — Oriented Domain Tagging ``leftdomain`` / ``rightdomain`` & Materials)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Because the vertices ``Q[0] -> Q[1] -> ... -> Q[5] -> Q[0]`` wind **counter-clockwise** around the L-antenna, the interior of the antenna is always to the left of each segment (``leftdomain=2``) and the background is to the right (``rightdomain=1``).
+
+Next, assign the domain material names and maximum element sizes (`"bg"` for domain ``1`` and `"inc2"` for domain ``2``, or `"inc3".."inc6"` if you have multiple distinct inclusion materials):
+
+.. code-block:: python
+
        geo.SetMaterial(1, "bg")
        geo.SetDomainMaxH(1, lc)
        geo.SetMaterial(2, "inc2")
        geo.SetDomainMaxH(2, inc_h)
 
+Step 6 (Concept 6 — Mesh Generation, Curving ``ngm.Curve(2)``, & Calling from ``NanoStruct``)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Finally, generate the mesh, curve any spline boundaries to polynomial order ``curve_order=2``, and return the ``ngsolve.Mesh``:
+
+.. code-block:: python
+
        ngm = geo.GenerateMesh(maxh=lc)
        ngm.Curve(curve_order)
-       return ngs.Mesh(ngm)
+       mesh = ngs.Mesh(ngm)
+
+       # Optional sanity checks
+       assert ngm.GetNrIdentifications() == 4, "periodic identifications missing"
+       assert len(mesh.GetPeriodicNodePairs(NODE_TYPE.VERTEX)) > 0
+       return mesh
+
+You can then invoke ``l_antenna_template.py`` from ``objects.NanoStruct`` using ``geo_params`` in the exact same way as any other template:
+
+.. code-block:: python
+
+   from EMUstack.backend import objects, materials
+
+   l_layer = objects.NanoStruct(
+       '2D_array',
+       geo_file='l_antenna_template.py',
+       geo_params={
+           'period': 500.0,
+           'arm_len': 320.0,
+           'arm_width': 90.0,
+           'lc': 0.08,
+           'lc2': 3.0,
+       },
+       background=materials.Air,
+       inclusion_a=materials.Au,
+       height_nm=60.0,
+   )
 
 ---
 
