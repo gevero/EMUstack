@@ -143,12 +143,10 @@ from EMUstack.backend import objects, materials
 
 ellipse_layer = objects.NanoStruct(
     '2D_array',
-    period=400.0,
-    diameter1=200.0,
     background=materials.Material(1.0),
     inclusion_a=materials.Material(2.0),
     height_nm=150.0,
-    geo_file='ellipse_msh_template.py',
+    geo_file='ellipse_msh_template.py',  # or 'ellipse_msh_template.geo'
     geo_params={'period': 400.0, 'a1': 100.0, 'ellipticity': 0.5, 'angle': 0.0, 'lc': 0.15, 'lc2': 2.0}
 )
 ```

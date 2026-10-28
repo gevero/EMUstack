@@ -53,9 +53,9 @@ Regardless of whether you use the **Gmsh pipeline** or the **Netgen pipeline**, 
 Concept 1: Parameter Injection (``geo_file`` & ``geo_params``)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When you instantiate ``objects.NanoStruct('2D_array', period, ..., geo_file=..., geo_params={...})``, EMUstack locates ``geo_file`` (searching first in your current working directory and then in ``EMUstack/backend/data/meshes/``) and merges the layer's basic parameters (``period``, ``period_y``, ``diameter1``, ``lc``, ``lc2``, ``lc3``) with your custom ``geo_params`` dictionary:
+When you instantiate ``objects.NanoStruct('2D_array', geo_file=..., geo_params={...})``, **all** geometric and mesh refinement parameters (``period`` or ``d_in_nm``, ``period_y`` or ``dy_in_nm``, ``a1``, ``ellipticity``, ``angle``, ``lc``, ``lc2``, ``lc3``) can be passed directly inside the ``geo_params`` dictionary—without repeating legacy positional arguments like ``period``, ``diameter1``, ``ellipticity``, or ``inc_shape='custom'``. EMUstack locates ``geo_file`` (searching first in your current working directory and then in ``EMUstack/backend/data/meshes/``) and dispatches ``geo_params`` to the selected template:
 
-* **In the Gmsh pipeline**, :func:`meshing.mesh_from_geo` reads the ``.geo`` file as text and replaces placeholder assignments such as ``d_in_nm = 0;``, ``a1 = 0;``, ``angle = 0;``, ``lc = 0;``, and ``lc2 = lc/1;`` with the numerical values from ``geo_params``. If a key in ``geo_params`` does not have a matching placeholder in the ``.geo`` file, a ``KeyError`` is raised immediately.
+* **In the Gmsh pipeline**, ``NanoStruct`` / :func:`meshing.mesh_from_geo` reads the ``.geo`` file as text and replaces placeholder assignments such as ``d_in_nm = 0;``, ``dy_in_nm = 0;``, ``a1 = 0;``, ``ellipticity = 0;``, ``angle = 0;``, ``lc = 0;``, and ``lc2 = lc/1;`` with the numerical values from ``geo_params``. If a key in ``geo_params`` does not have a matching placeholder in the ``.geo`` file, a ``KeyError`` is raised immediately.
 * **In the Netgen pipeline**, :func:`meshing.mesh_from_py` dynamically imports the ``.py`` module, inspects the Python signature of ``build_unit_cell(...)`` using ``inspect.signature``, verifies that every key in ``geo_params`` is a valid parameter of ``build_unit_cell`` (raising a ``TypeError`` on typos), and calls ``build_unit_cell(**call_params)``.
 
 Concept 2: Coordinate Normalization to a Dimensionless Unit Cell
@@ -297,7 +297,7 @@ Finally, ``Point{5} In Surface{12};`` embeds the center point inside the ellipse
 
    Point{5} In Surface{12};
 
-To use this Gmsh template in a simulation script:
+To use this Gmsh template in a simulation script, pass **all** geometric and meshing parameters directly inside the ``geo_params`` dictionary:
 
 .. code-block:: python
 
@@ -306,12 +306,11 @@ To use this Gmsh template in a simulation script:
 
    nh_layer = objects.NanoStruct(
        '2D_array',
-       period=400.0,
-       diameter1=300.0,
-       ellipticity=0.5,
-       inc_shape='custom',
        geo_file='ellipse_msh_template.geo',
        geo_params={
+           'period': 400.0,
+           'a1': 300.0,
+           'ellipticity': 0.5,
            'angle': np.pi / 3,
            'lc': 0.08,
            'lc2': 4.0,
@@ -320,7 +319,6 @@ To use this Gmsh template in a simulation script:
        background=materials.Au,
        inclusion_a=materials.Air,
        height_nm=50.0,
-       mesher='gmsh',
    )
 
 ---
@@ -574,7 +572,31 @@ Inside :func:`meshing.unit_cell`, Netgen generates the 2D mesh, curves all bound
    ngm.Curve(curve_order)
    mesh = Mesh(ngm)
 
-To use ``chiral_qbic_gorkunov.py`` in a simulation and visually inspect the generated mesh:
+To use ``ellipse_msh_template.py`` in a simulation script, notice that you pass the **exact same** ``geo_params`` dictionary as in the Gmsh example above—simply changing ``.geo`` to ``.py``:
+
+.. code-block:: python
+
+   import numpy as np
+   from EMUstack.backend import objects, materials
+
+   nh_layer = objects.NanoStruct(
+       '2D_array',
+       geo_file='ellipse_msh_template.py',
+       geo_params={
+           'period': 400.0,
+           'a1': 300.0,
+           'ellipticity': 0.5,
+           'angle': np.pi / 3,
+           'lc': 0.08,
+           'lc2': 4.0,
+           'lc3': 2.0,
+       },
+       background=materials.Au,
+       inclusion_a=materials.Air,
+       height_nm=50.0,
+   )
+
+Similarly, to use ``chiral_qbic_gorkunov.py`` ( passing all parameters via ``geo_params``) and visually inspect the generated mesh:
 
 .. code-block:: python
 
@@ -589,8 +611,6 @@ To use ``chiral_qbic_gorkunov.py`` in a simulation and visually inspect the gene
    # Build the middle overlap layer containing both tilted elliptical bars
    lay2 = objects.NanoStruct(
        '2D_array',
-       period=period,
-       diameter1=200.0,
        geo_file='chiral_qbic_gorkunov.py',
        geo_params={
            'period': period,

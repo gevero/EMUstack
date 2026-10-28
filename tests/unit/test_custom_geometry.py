@@ -99,27 +99,28 @@ def test_py_unexpected_param_raises_type_error():
 
 
 def test_nanostruct_pure_dict_configuration():
-    """Test creating a NanoStruct layer purely via geo_params with zero legacy arguments."""
-    ns = objects.NanoStruct(
-        '2D_array',
-        height_nm=60.0,
-        inclusion_a=materials.Air,
-        background=materials.Material(3.5),
-        geo_file='ellipse_msh_template.py',
-        geo_params={
-            'period': 500.0,
-            'period_y': 500.0,
-            'a1': 200.0,
-            'ellipticity': 0.3,
-            'angle': 0.2,
-            'lc': 0.12,
-            'lc2': 3.0,
-        }
-    )
-    assert ns.period == 500.0
-    assert ns.period_y == 500.0
-    assert ns.mesh is not None
-    assert ns.mesh.ne > 0
+    """Test creating a NanoStruct layer purely via geo_params with zero legacy arguments (.py and .geo)."""
+    for template in ('ellipse_msh_template.py', 'ellipse_msh_template.geo'):
+        ns = objects.NanoStruct(
+            '2D_array',
+            height_nm=60.0,
+            inclusion_a=materials.Air,
+            background=materials.Material(3.5),
+            geo_file=template,
+            geo_params={
+                'period': 500.0,
+                'period_y': 500.0,
+                'a1': 200.0,
+                'ellipticity': 0.3,
+                'angle': 0.2,
+                'lc': 0.12,
+                'lc2': 3.0,
+            }
+        )
+        assert ns.period == 500.0
+        assert ns.period_y == 500.0
+        assert ns.mesh is not None
+        assert ns.mesh.ne > 0
 
 
 def test_nanostruct_dict_overrides_legacy():
