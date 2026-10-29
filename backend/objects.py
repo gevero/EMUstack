@@ -1103,6 +1103,9 @@ class NanoStruct:
                         lc=self.lc,
                         lc2=self.lc2,
                         lc3=self.lc3,
+                        lc4=getattr(self, 'lc4', 1.0),
+                        lc5=getattr(self, 'lc5', 1.0),
+                        lc6=getattr(self, 'lc6', 1.0),
                         curve_order=2
                     )
                 else:
@@ -1131,12 +1134,18 @@ class NanoStruct:
                     gap = getattr(self, 'gap', 0.0) / self.period
                     inclusions.append({"kind": "dimer", "c": center, "r": d1 / 2.0, "gap": gap, "tag": 2})
 
-                # geo_params lc/lc2 override lc_bkg/lc2, as on the gmsh path
+                # geo_params lc/lc2..lc6 override lc_bkg/lc2..lc6, as on the gmsh path
                 lc = float(merged_geo_params.get('lc', self.lc))
                 lc2 = float(merged_geo_params.get('lc2', getattr(self, 'lc2', 1.0)))
-                inc_h = lc / lc2 if lc2 > 1.0 else lc
-                refine = meshing.Refine(bg=lc, inc=inc_h)
-                self.mesh = meshing.unit_cell(dy, inclusions, refine=refine, curve_order=2, period_x=1.0)
+                lc3 = float(merged_geo_params.get('lc3', getattr(self, 'lc3', 1.0)))
+                lc4 = float(merged_geo_params.get('lc4', getattr(self, 'lc4', 1.0)))
+                lc5 = float(merged_geo_params.get('lc5', getattr(self, 'lc5', 1.0)))
+                lc6 = float(merged_geo_params.get('lc6', getattr(self, 'lc6', 1.0)))
+                self.mesh = meshing.unit_cell(
+                    dy, inclusions,
+                    lc=lc, lc2=lc2, lc3=lc3, lc4=lc4, lc5=lc5, lc6=lc6,
+                    curve_order=2, period_x=1.0
+                )
 
             if self.mesh is not None and (mesher == 'netgen' or py_geometry):
                 self.n_msh_pts = self.mesh.nv
@@ -1728,6 +1737,12 @@ class NanoStruct:
             params['lc2'] = self.lc2
         if hasattr(self, 'lc3') and self.lc3 != 1.0:
             params['lc3'] = self.lc3
+        if hasattr(self, 'lc4') and self.lc4 != 1.0:
+            params['lc4'] = self.lc4
+        if hasattr(self, 'lc5') and self.lc5 != 1.0:
+            params['lc5'] = self.lc5
+        if hasattr(self, 'lc6') and self.lc6 != 1.0:
+            params['lc6'] = self.lc6
 
         if hasattr(self, 'geo_params') and self.geo_params:
             params.update(self.geo_params)

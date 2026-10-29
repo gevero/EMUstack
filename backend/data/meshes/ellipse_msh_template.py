@@ -69,7 +69,7 @@ def build_unit_cell(
         "angle": ang_rad,
         "tag": 2
     }]
-    
-    inc_h = lc / lc2 if lc2 > 1.0 else lc
-    refine = meshing.Refine(bg=lc, inc=inc_h)
-    return meshing.unit_cell(dy, inclusions, refine=refine, curve_order=2, period_x=1.0)
+
+    return meshing.unit_cell(
+        dy, inclusions, lc=lc, lc2=lc2, lc3=lc3, curve_order=2, period_x=1.0
+    )

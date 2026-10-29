@@ -508,11 +508,18 @@ def solve_bloch_modes_2d(
                 gap = getattr(structure, "gap", 0.0) / float(structure.period)
                 inclusions.append({"kind": "dimer", "c": center, "r": d1 / 2.0, "gap": gap, "tag": 2})
 
-            refine = meshing.Refine(
-                bg=getattr(structure, "lc", 0.1),
-                inc=getattr(structure, "lc", 0.1) * getattr(structure, "lc2", 1.0)
+            mesh = meshing.unit_cell(
+                dy,
+                inclusions,
+                lc=getattr(structure, "lc", 0.1),
+                lc2=getattr(structure, "lc2", 1.0),
+                lc3=getattr(structure, "lc3", 1.0),
+                lc4=getattr(structure, "lc4", 1.0),
+                lc5=getattr(structure, "lc5", 1.0),
+                lc6=getattr(structure, "lc6", 1.0),
+                curve_order=order,
+                period_x=period_x,
             )
-            mesh = meshing.unit_cell(dy, inclusions, refine=refine, curve_order=order, period_x=period_x)
             structure.mesh = mesh
             structure.n_msh_pts = mesh.nv
             structure.n_msh_el = mesh.ne

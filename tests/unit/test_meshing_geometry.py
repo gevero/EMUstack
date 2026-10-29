@@ -20,7 +20,7 @@ if str(backend_path) not in sys.path:
     sys.path.insert(0, str(backend_path))
 
 import meshing
-from meshing import Refine, unit_cell, bloch_spaces, import_gmsh_mesh, read_mail_file
+from meshing import unit_cell, bloch_spaces, import_gmsh_mesh, read_mail_file
 
 
 def test_native_circle_area_and_perimeter():
@@ -29,8 +29,7 @@ def test_native_circle_area_and_perimeter():
     dy = 1.0
     c = (0.5, 0.5)
     inclusions = [{"kind": "circle", "c": c, "r": r, "tag": 2, "nseg": 24}]
-    refine = Refine(bg=0.08, inc=0.04, arc=24)
-    mesh = unit_cell(dy=dy, inclusions=inclusions, refine=refine, curve_order=2)
+    mesh = unit_cell(dy=dy, inclusions=inclusions, lc=0.08, lc2=2.0, nseg=24, curve_order=2)
 
     # 1. Total cell area
     cell_area = ngs.Integrate(1.0, mesh)
@@ -59,8 +58,7 @@ def test_native_ellipse_area_and_perimeter():
     dy = 0.8
     c = (0.5, 0.4)
     inclusions = [{"kind": "ellipse", "c": c, "rx": rx, "ry": ry, "tag": 2, "nseg": 24}]
-    refine = Refine(bg=0.08, inc=0.04, arc=24)
-    mesh = unit_cell(dy=dy, inclusions=inclusions, refine=refine, curve_order=2)
+    mesh = unit_cell(dy=dy, inclusions=inclusions, lc=0.08, lc2=2.0, nseg=24, curve_order=2)
 
     # Inclusion area
     area_inc = ngs.Integrate(mesh.MaterialCF({"inc2": 1.0, "bg": 0.0}), mesh)
@@ -82,8 +80,7 @@ def test_native_rotated_ellipse_area_and_perimeter():
     c = (0.5, 0.5)
     angle = np.pi / 3.0
     inclusions = [{"kind": "ellipse", "c": c, "rx": rx, "ry": ry, "angle": angle, "tag": 2, "nseg": 24}]
-    refine = Refine(bg=0.08, inc=0.04, arc=24)
-    mesh = unit_cell(dy=dy, inclusions=inclusions, refine=refine, curve_order=2)
+    mesh = unit_cell(dy=dy, inclusions=inclusions, lc=0.08, lc2=2.0, nseg=24, curve_order=2)
 
     # Inclusion area (invariant under rotation)
     area_inc = ngs.Integrate(mesh.MaterialCF({"inc2": 1.0, "bg": 0.0}), mesh)
@@ -104,8 +101,7 @@ def test_native_square_and_rectangle():
     dy = 1.0
     c = (0.5, 0.5)
     inclusions = [{"kind": "rectangle", "c": c, "w": w, "h": h, "tag": 2}]
-    refine = Refine(bg=0.08, inc=0.04)
-    mesh = unit_cell(dy=dy, inclusions=inclusions, refine=refine, curve_order=2)
+    mesh = unit_cell(dy=dy, inclusions=inclusions, lc=0.08, lc2=2.0, curve_order=2)
 
     area_inc = ngs.Integrate(mesh.MaterialCF({"inc2": 1.0, "bg": 0.0}), mesh)
     exact_area = w * h
@@ -122,8 +118,7 @@ def test_native_ring_area_and_perimeter():
     dy = 1.0
     c = (0.5, 0.5)
     inclusions = [{"kind": "ring", "c": c, "r_out": r_out, "r_in": r_in, "tag": 2, "nseg": 24}]
-    refine = Refine(bg=0.08, inc=0.04, arc=24)
-    mesh = unit_cell(dy=dy, inclusions=inclusions, refine=refine, curve_order=2)
+    mesh = unit_cell(dy=dy, inclusions=inclusions, lc=0.08, lc2=2.0, nseg=24, curve_order=2)
 
     area_inc = ngs.Integrate(mesh.MaterialCF({"inc2": 1.0, "bg": 0.0}), mesh)
     exact_area = np.pi * (r_out**2 - r_in**2)
@@ -138,13 +133,41 @@ def test_native_dimer_inclusion():
     dy = 1.0
     c = (0.5, 0.5)
     inclusions = [{"kind": "dimer", "sub_kind": "circle", "c": c, "r": r, "gap": gap, "tag": 2, "nseg": 24}]
-    refine = Refine(bg=0.08, inc=0.04, arc=24)
-    mesh = unit_cell(dy=dy, inclusions=inclusions, refine=refine, curve_order=2)
+    mesh = unit_cell(dy=dy, inclusions=inclusions, lc=0.08, lc2=2.0, nseg=24, curve_order=2)
 
     area_inc = ngs.Integrate(mesh.MaterialCF({"inc2": 1.0, "bg": 0.0}), mesh)
     exact_area = 2.0 * np.pi * r**2
     rel_err_area = abs(area_inc - exact_area) / exact_area
     assert rel_err_area < 5e-4, f"Dimer area error: {rel_err_area}"
+
+
+def test_unit_cell_multi_lc_and_per_inclusion_maxh():
+    """Verify direct lc, lc2, lc3, lc4 per-tag mapping and per-inclusion maxh override."""
+    dy = 1.0
+    # Two inclusions with different tags (2 and 3): tag 3 has finer lc3=5.0 vs lc2=1.5
+    inclusions_multi_tag = [
+        {"kind": "circle", "c": (0.3, 0.5), "r": 0.12, "tag": 2},
+        {"kind": "circle", "c": (0.7, 0.5), "r": 0.12, "tag": 3},
+    ]
+    mesh_multi = unit_cell(dy=dy, inclusions=inclusions_multi_tag, lc=0.12, lc2=1.5, lc3=5.0)
+    n_inc2 = sum(1 for el in mesh_multi.Elements(ngs.VOL) if el.mat == "inc2")
+    n_inc3 = sum(1 for el in mesh_multi.Elements(ngs.VOL) if el.mat == "inc3")
+    assert n_inc3 > n_inc2, f"Expected finer mesh in inc3 (lc3=5.0) than inc2 (lc2=1.5), got {n_inc3} vs {n_inc2}"
+
+    # Per-inclusion maxh override on same tag
+    mesh_coarse = unit_cell(
+        dy=dy,
+        inclusions=[{"kind": "circle", "c": (0.5, 0.5), "r": 0.15, "tag": 2}],
+        lc=0.12,
+        lc2=1.5,
+    )
+    mesh_override = unit_cell(
+        dy=dy,
+        inclusions=[{"kind": "circle", "c": (0.5, 0.5), "r": 0.15, "tag": 2, "maxh": 0.12 / 5.0}],
+        lc=0.12,
+        lc2=1.5,
+    )
+    assert mesh_override.ne > mesh_coarse.ne
 
 
 def test_msh4_rejection():

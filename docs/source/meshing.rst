@@ -61,7 +61,7 @@ Regardless of whether you use the **Gmsh pipeline (``.geo``)** or the **Netgen p
      - Set ``leftdomain=tag, rightdomain=1`` on counter-clockwise inclusion curves + ``geo.SetMaterial(...)``.
    * - **6. Refinement & Meshing**
      - Point sizes ``lc`` (background), ``lc2 = lc/factor`` (boundary), ``lc3`` (center) + ``gmsh`` binary call.
-     - **Automated by** ``unit_cell()`` from ``meshing.Refine(bg=lc, inc=lc/lc2)`` + ``Curve(2)`` + sanity checks.
+     - **Automated by** ``unit_cell()`` from ``lc, lc2, lc3, ...`` (or per-inclusion ``"maxh"``) + ``Curve(2)`` + sanity checks.
      - Call ``SetDomainMaxH(...)``, ``geo.GenerateMesh(maxh=lc)``, and ``ngm.Curve(2)``.
 
 Concept 1: Parameter Injection (``geo_file`` & ``geo_params``)
@@ -162,20 +162,28 @@ During the finite-element assembly (:mod:`fem_2d`), EMUstack maps each mesh subd
 * **In the Gmsh pipeline**, you explicitly group closed ``Line Loop`` definitions into ``Plane Surface`` entities (subtracting interior inclusion loops from the outer unit-cell loop) and assign ``Physical Surface(1)`` to the background and ``Physical Surface(2)`` to the inclusion.
 * **In the Netgen pipeline**, 2D regions are defined topologically by **directed boundary curves** via ``leftdomain`` and ``rightdomain``: as you walk along a segment from its start point to its end point, ``leftdomain`` is the region ID to your left and ``rightdomain`` is the region ID to your right (where ``0`` denotes the exterior of the computational domain). When an inclusion boundary is traversed **counter-clockwise**, its interior lies on the left (``leftdomain=tag``) and the surrounding background lies on the right (``rightdomain=1``). In **Route B1**, you simply set ``"tag": 2`` (or ``3..6``) in each inclusion dictionary and :func:`meshing.unit_cell` sets ``leftdomain``, ``rightdomain``, and ``geo.SetMaterial(...)`` automatically. In **Route B2**, you pass ``leftdomain=tag, rightdomain=1`` directly to ``geo.Append(...)`` and call ``geo.SetMaterial(...)``.
 
-Concept 6: Mesh Refinement Controls (``lc``, ``lc2``, ``lc3``) & Verification
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Concept 6: Mesh Refinement Controls (``lc``, ``lc2``, ``lc3``, ...) & Verification
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Mesh resolution is controlled in dimensionless unit-cell units (fractions of ``period``):
 
-* ``lc`` (**background mesh size**): Maximum triangle edge length in the background medium (domain ``1``). For example, ``lc = 0.08`` produces roughly :math:`1 / 0.08 \approx 12\text{--}13` elements across the unit cell.
-* ``lc2`` (**inclusion refinement factor**): Divides ``lc`` to set the maximum element size inside and along the boundary of inclusions:
+* ``lc`` (**background mesh size**): Maximum triangle edge length in the background medium (domain ``tag = 1``, ``"bg"``). For example, ``lc = 0.08`` produces roughly :math:`1 / 0.08 \approx 12\text{--}13` elements across the unit cell.
+* ``lc2, lc3, lc4, lc5, lc6`` (**inclusion refinement factors**): Divide ``lc`` to set the maximum element size inside and along the boundary of inclusions:
 
   .. math::
 
-     h_{\text{inc}} = \frac{\text{lc}}{\text{lc2}} \qquad (\text{when } \text{lc2} > 1).
+     h_{\text{inc}, k} = \frac{\text{lc}}{\text{lc}_k} \qquad (\text{when } \text{lc}_k > 1).
 
-  Higher-index dielectric or plasmonic inclusions have shorter internal wavelengths and sharper local fields, so setting ``lc2 = 2.0`` to ``5.0`` refines the resonator interior and boundary without over-refining the background.
-* ``lc3`` (**center refinement factor**, Gmsh pipeline): Controls element size at a control point placed at the center of an inclusion (``lc / lc3``).
+  Higher-index dielectric or plasmonic inclusions have shorter internal wavelengths and sharper local fields, so setting ``lc2 = 2.0`` to ``5.0`` refines the resonator interior and boundary without over-refining the background:
+
+  * **In the Gmsh pipeline**, ``lc2`` typically refines the inclusion perimeter (``lc / lc2``) while ``lc3`` refines an interior control point at the inclusion center (``lc / lc3``), or refines a second inclusion in multi-inclusion templates.
+  * **In the Netgen pipeline (Route B1 —** :func:`meshing.unit_cell` **)**, ``lc, lc2, lc3, lc4, lc5, lc6`` map automatically to each subdomain material tag:
+
+    * ``tag = 1`` (``background``) :math:`\rightarrow` max element size ``lc``
+    * ``tag = 2`` (``inclusion_a``) :math:`\rightarrow` max element size ``lc / lc2``
+    * ``tag = 3`` (``inclusion_b``) :math:`\rightarrow` max element size ``lc / lc3`` *(defaults to* ``lc / lc2`` *if* ``lc3`` *is omitted or* :math:`\le 1` *)*
+    * ``tag = 4..6`` (``inclusion_c..e``) :math:`\rightarrow` max element size ``lc / lc4 .. lc / lc6`` *(defaulting to* ``lc / lc2`` *)*
+    * **Per-inclusion override (** ``"maxh"`` **):** If two inclusions share the **same** material (e.g., both have ``"tag": 2``) but one is much smaller or has a sharper tip and needs a finer mesh, you can pass ``"maxh": lc / lc3`` directly inside that inclusion's dictionary.
 
 Once the mesh is generated in :func:`meshing.unit_cell`, it automatically runs **four sanity assertions**:
 
@@ -467,13 +475,26 @@ Because both templates use standard elliptical inclusions, **Steps 3 through 6 r
                 "angle": float(rot2), "tag": 2,
             })
 
-2. Package the mesh refinement sizes ``lc`` and ``lc / lc2`` into :class:`meshing.Refine` and call :func:`meshing.unit_cell` (**Steps 3 & 6**):
+2. Pass ``dy``, ``inclusions``, and the mesh refinement parameters ``lc, lc2, lc3, ...`` directly to :func:`meshing.unit_cell` (**Steps 3 & 6**):
 
    .. code-block:: python
 
-      inc_h = lc / lc2 if lc2 > 1.0 else lc
-      refine = meshing.Refine(bg=lc, inc=inc_h)
-      return meshing.unit_cell(dy, inclusions, refine=refine, curve_order=2, period_x=1.0)
+      return meshing.unit_cell(
+          dy, inclusions, lc=lc, lc2=lc2, lc3=lc3, curve_order=2, period_x=1.0
+      )
+
+   .. tip::
+      **Multi-inclusion refinement with** ``lc2..lc6`` **and** ``"maxh"``:
+
+      * If your unit cell has multiple inclusions with **different materials** (``"tag": 2``, ``"tag": 3``, ``"tag": 4``, ...), simply pass ``lc=lc, lc2=lc2, lc3=lc3, lc4=lc4`` to :func:`meshing.unit_cell`—each subdomain ``tag = k`` automatically receives mesh size ``lc / lc_k``.
+      * If two inclusions share the **same material** (both ``"tag": 2``) but need different mesh densities, add ``"maxh": lc / lc3`` directly to the dictionary of the finer inclusion:
+
+        .. code-block:: python
+
+           inclusions = [
+               {"kind": "ellipse", "c": c1, "rx": rx1, "ry": ry1, "tag": 2, "maxh": lc / lc2},
+               {"kind": "circle",  "c": c2, "r": r_small,         "tag": 2, "maxh": lc / lc3},
+           ]
 
 What ``meshing.unit_cell()`` Supports vs. When to Take Route B2
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

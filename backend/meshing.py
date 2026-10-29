@@ -13,7 +13,6 @@ import shutil
 import subprocess
 import inspect
 import importlib.util
-from dataclasses import dataclass
 from typing import List, Tuple, Dict, Any, Optional
 
 import numpy as np
@@ -23,14 +22,6 @@ from netgen.read_gmsh import ReadGmsh
 import ngsolve as ngs
 from ngsolve import Mesh, HCurl, H1
 from ngsolve.fem import NODE_TYPE
-
-
-@dataclass
-class Refine:
-    """Mesh refinement control parameters."""
-    bg: float = 0.1
-    inc: float = 0.05
-    arc: int = 12
 
 
 def arc_segments(r: float, c: Tuple[float, float], nseg: int = 12):
@@ -89,9 +80,15 @@ def arc_control_points(
 def unit_cell(
     dy: float,
     inclusions: List[Dict[str, Any]],
-    refine: Optional[Refine] = None,
+    lc: float = 0.1,
+    lc2: float = 2.0,
+    lc3: Optional[float] = None,
+    lc4: Optional[float] = None,
+    lc5: Optional[float] = None,
+    lc6: Optional[float] = None,
+    nseg: int = 12,
     curve_order: int = 2,
-    period_x: float = 1.0
+    period_x: float = 1.0,
 ) -> ngs.Mesh:
     """Build a periodic 2D unit cell mesh using native Netgen SplineGeometry.
 
@@ -100,16 +97,39 @@ def unit_cell(
     dy : float
         Cell height / period_x (normalized cell height).
     inclusions : list of dict
-        List of inclusion dictionaries specifying geometries (circle, ellipse, square, rectangle, ring).
-    refine : Refine, optional
-        Refine dataclass with refinement sizes.
+        List of inclusion dictionaries specifying geometries (circle, ellipse,
+        square, rectangle, ring, dimer). Each dictionary may also specify
+        ``"tag": 2..6`` (subdomain material tag) and/or ``"maxh": float`` to
+        override the mesh size for that specific inclusion.
+    lc : float, default=0.1
+        Background mesh element size (domain tag 1, ``"bg"``) in normalized
+        unit-cell coordinates.
+    lc2 : float, default=2.0
+        Refinement factor for ``tag=2`` (``"inc2"`` / ``inclusion_a``), setting
+        maximum element size to ``lc / lc2`` (when ``lc2 > 1.0`` else ``lc``).
+        Also used as the default refinement factor for higher inclusion tags
+        when ``lc3..lc6`` are not specified.
+    lc3, lc4, lc5, lc6 : float, optional
+        Refinement factors for ``tag=3..6`` (``"inc3".."inc6"`` /
+        ``inclusion_b..e``), setting maximum element size to ``lc / lc_k``
+        (falling back to ``lc2`` if ``None`` or ``<= 1.0``).
+    nseg : int, default=12
+        Default number of quadratic rational Bézier spline segments per closed
+        curved perimeter (circle/ellipse/ring).
     curve_order : int, default=2
         Netgen geometric curvature order (>= 2).
     period_x : float, default=1.0
         Normalized cell width.
     """
-    if refine is None:
-        refine = Refine()
+    bg_h = float(lc)
+    lc_factors = {2: lc2, 3: lc3, 4: lc4, 5: lc5, 6: lc6}
+
+    def _default_inc_h(tag: int) -> float:
+        factor = lc_factors.get(tag)
+        if factor is None or float(factor) <= 1.0:
+            factor = lc2
+        factor = float(factor)
+        return bg_h / factor if factor > 1.0 else bg_h
 
     geo = g2.SplineGeometry()
     L = period_x
@@ -120,29 +140,31 @@ def unit_cell(
 
     # Periodic boundary edges
     # left is primary, right is copy (Ident 1: x)
-    i_l = geo.Append(["line", P[0], P[3]], leftdomain=0, rightdomain=1, bc="left", maxh=refine.bg)
-    geo.Append(["line", P[1], P[2]], leftdomain=1, rightdomain=0, bc="right", maxh=refine.bg, copy=i_l)
+    i_l = geo.Append(["line", P[0], P[3]], leftdomain=0, rightdomain=1, bc="left", maxh=bg_h)
+    geo.Append(["line", P[1], P[2]], leftdomain=1, rightdomain=0, bc="right", maxh=bg_h, copy=i_l)
 
     # bottom is primary, top is copy (Ident 2: y)
-    i_b = geo.Append(["line", P[0], P[1]], leftdomain=1, rightdomain=0, bc="bottom", maxh=refine.bg)
-    geo.Append(["line", P[3], P[2]], leftdomain=0, rightdomain=1, bc="top", maxh=refine.bg, copy=i_b)
+    i_b = geo.Append(["line", P[0], P[1]], leftdomain=1, rightdomain=0, bc="bottom", maxh=bg_h)
+    geo.Append(["line", P[3], P[2]], leftdomain=0, rightdomain=1, bc="top", maxh=bg_h, copy=i_b)
 
     # Inclusions
     tags = {1}
+    domain_maxh: Dict[int, float] = {}
     for inc in inclusions:
         kind = inc.get("kind", "circle")
         tag = inc.get("tag", 2)
         tags.add(tag)
         c = inc.get("c", (L / 2.0, H / 2.0))
-        maxh_inc = inc.get("maxh", refine.inc)
-        nseg = max(12, inc.get("nseg", refine.arc))
+        maxh_inc = float(inc["maxh"]) if "maxh" in inc else _default_inc_h(tag)
+        domain_maxh[tag] = min(domain_maxh.get(tag, maxh_inc), maxh_inc)
+        nseg_inc = max(12, inc.get("nseg", nseg))
 
         if kind in ("circle", "ellipse"):
             r = inc.get("r", None)
             rx = inc.get("rx", r)
             ry = inc.get("ry", r)
             ang = inc.get("angle", 0.0)
-            for a0, a1 in arc_segments(r=r, c=c, nseg=nseg):
+            for a0, a1 in arc_segments(r=r, c=c, nseg=nseg_inc):
                 pt0, pt_ctrl, pt1 = arc_control_points(geo, kind, c, a0, a1, r=r, rx=rx, ry=ry, angle=ang)
                 geo.Append(["spline3", pt0, pt_ctrl, pt1], leftdomain=tag, rightdomain=1, bc=f"inc{tag}", maxh=maxh_inc)
 
@@ -164,11 +186,11 @@ def unit_cell(
             r_out = inc["r_out"]
             r_in = inc["r_in"]
             # Outer circle: leftdomain = tag, rightdomain = 1
-            for a0, a1 in arc_segments(r=r_out, c=c, nseg=nseg):
+            for a0, a1 in arc_segments(r=r_out, c=c, nseg=nseg_inc):
                 pt0, pt_ctrl, pt1 = arc_control_points(geo, "circle", c, a0, a1, r=r_out)
                 geo.Append(["spline3", pt0, pt_ctrl, pt1], leftdomain=tag, rightdomain=1, bc=f"inc{tag}_out", maxh=maxh_inc)
             # Inner circle: leftdomain = 1, rightdomain = tag
-            for a0, a1 in arc_segments(r=r_in, c=c, nseg=nseg):
+            for a0, a1 in arc_segments(r=r_in, c=c, nseg=nseg_inc):
                 pt0, pt_ctrl, pt1 = arc_control_points(geo, "circle", c, a0, a1, r=r_in)
                 geo.Append(["spline3", pt0, pt_ctrl, pt1], leftdomain=1, rightdomain=tag, bc=f"inc{tag}_in", maxh=maxh_inc)
 
@@ -182,7 +204,7 @@ def unit_cell(
             c2 = (c[0] + shift_x, c[1])
             for center in (c1, c2):
                 if sub_kind in ("circle", "ellipse"):
-                    for a0, a1 in arc_segments(r=r, c=center, nseg=nseg):
+                    for a0, a1 in arc_segments(r=r, c=center, nseg=nseg_inc):
                         pt0, pt_ctrl, pt1 = arc_control_points(geo, sub_kind, center, a0, a1, r=r)
                         geo.Append(["spline3", pt0, pt_ctrl, pt1], leftdomain=tag, rightdomain=1, bc=f"inc{tag}", maxh=maxh_inc)
                 else:
@@ -200,13 +222,13 @@ def unit_cell(
                     geo.Append(["line", pts_rect[3], pts_rect[0]], leftdomain=tag, rightdomain=1, bc=f"inc{tag}", maxh=maxh_inc)
 
     geo.SetMaterial(1, "bg")
-    geo.SetDomainMaxH(1, refine.bg)
+    geo.SetDomainMaxH(1, bg_h)
     for tag in tags:
         if tag != 1:
             geo.SetMaterial(tag, f"inc{tag}")
-            geo.SetDomainMaxH(tag, refine.inc)
+            geo.SetDomainMaxH(tag, domain_maxh.get(tag, _default_inc_h(tag)))
 
-    ngm = geo.GenerateMesh(maxh=refine.bg)
+    ngm = geo.GenerateMesh(maxh=bg_h)
     ngm.Curve(curve_order)
     mesh = Mesh(ngm)
 
@@ -598,6 +620,9 @@ def mesh_from_py(
     lc: float = 0.1,
     lc2: float = 1.0,
     lc3: float = 1.0,
+    lc4: float = 1.0,
+    lc5: float = 1.0,
+    lc6: float = 1.0,
     curve_order: int = 2
 ) -> ngs.Mesh:
     """Universal Netgen Python .py geometry loader with signature validation."""
@@ -624,6 +649,9 @@ def mesh_from_py(
         "lc": lc,
         "lc2": lc2,
         "lc3": lc3,
+        "lc4": lc4,
+        "lc5": lc5,
+        "lc6": lc6,
     }
     
     # Handle known aliases between .geo and .py conventions
@@ -668,18 +696,25 @@ def mesh_from_py(
     if isinstance(result, ngs.Mesh):
         return result
     elif isinstance(result, g2.SplineGeometry):
-        ngm = result.GenerateMesh(maxh=lc)
+        ngm = result.GenerateMesh(maxh=float(merged_params["lc"]))
         if curve_order >= 2:
             ngm.Curve(curve_order)
         return Mesh(ngm)
     elif isinstance(result, (tuple, list)):
-        if len(result) == 3:
-            dy, inclusions, refine = result
-            return unit_cell(dy, inclusions, refine=refine, curve_order=curve_order)
-        elif len(result) == 2:
-            inclusions, refine = result
-            return unit_cell(py / period, inclusions, refine=refine, curve_order=curve_order)
+        if len(result) == 2 and isinstance(result[0], (int, float)):
+            dy_val, inclusions = result
+            return unit_cell(
+                float(dy_val),
+                inclusions,
+                lc=float(merged_params["lc"]),
+                lc2=float(merged_params["lc2"]),
+                lc3=float(merged_params["lc3"]),
+                lc4=float(merged_params["lc4"]),
+                lc5=float(merged_params["lc5"]),
+                lc6=float(merged_params["lc6"]),
+                curve_order=curve_order,
+            )
     raise TypeError(
         f"Builder function in '{py_file}' returned unrecognized object type {type(result)}. "
-        "Expected ngsolve.Mesh, netgen.geom2d.SplineGeometry, or (inclusions, refine) tuple."
+        "Expected ngsolve.Mesh, netgen.geom2d.SplineGeometry, or (dy, inclusions) tuple."
     )

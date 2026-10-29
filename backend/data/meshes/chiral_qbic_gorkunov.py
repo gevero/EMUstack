@@ -65,10 +65,10 @@ def build_unit_cell(
         inclusions.append({"kind": "ellipse", "c": c2, "rx": rx, "ry": ry,
                            "angle": float(rot2), "tag": 2})
 
-    inc_h = lc / lc2 if lc2 > 1.0 else lc
-    refine = meshing.Refine(bg=lc, inc=inc_h)
-    return meshing.unit_cell(dy, inclusions, refine=refine,
-                             curve_order=curve_order, period_x=1.0)
+    return meshing.unit_cell(
+        dy, inclusions, lc=lc, lc2=lc2, lc3=lc3,
+        curve_order=curve_order, period_x=1.0
+    )
 
 
 def build_geometry(*args, **kwargs) -> ngs.Mesh:
