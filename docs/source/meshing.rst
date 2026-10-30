@@ -61,8 +61,8 @@ Regardless of whether you use the **Gmsh pipeline (``.geo``)** or the **Netgen p
      - Set ``leftdomain=tag, rightdomain=1`` on counter-clockwise inclusion curves + ``geo.SetMaterial(...)``.
    * - **6. Refinement & Meshing**
      - Point sizes ``lc`` (background), ``lc2 = lc/factor`` (boundary), ``lc3`` (center) + ``gmsh`` binary call.
-     - **Automated by** ``unit_cell()`` from ``lc, lc2, lc3, ...`` (or per-inclusion ``"maxh"``) + ``Curve(2)`` + sanity checks.
-     - Call ``SetDomainMaxH(...)``, ``geo.GenerateMesh(maxh=lc)``, and ``ngm.Curve(2)``.
+     - **Automated by** ``unit_cell()`` from ``lc`` (background) and ``"lc": lc_n`` on each inclusion (converted internally to Netgen ``maxh = lc / lc_n``) + ``Curve(2)`` + sanity checks.
+     - Call ``SetDomainMaxH(..., maxh)``, ``geo.GenerateMesh(maxh=...)``, and ``ngm.Curve(2)``.
 
 Concept 1: Parameter Injection (``geo_file`` & ``geo_params``)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -162,28 +162,47 @@ During the finite-element assembly (:mod:`fem_2d`), EMUstack maps each mesh subd
 * **In the Gmsh pipeline**, you explicitly group closed ``Line Loop`` definitions into ``Plane Surface`` entities (subtracting interior inclusion loops from the outer unit-cell loop) and assign ``Physical Surface(1)`` to the background and ``Physical Surface(2)`` to the inclusion.
 * **In the Netgen pipeline**, 2D regions are defined topologically by **directed boundary curves** via ``leftdomain`` and ``rightdomain``: as you walk along a segment from its start point to its end point, ``leftdomain`` is the region ID to your left and ``rightdomain`` is the region ID to your right (where ``0`` denotes the exterior of the computational domain). When an inclusion boundary is traversed **counter-clockwise**, its interior lies on the left (``leftdomain=tag``) and the surrounding background lies on the right (``rightdomain=1``). In **Route B1**, you simply set ``"tag": 2`` (or ``3..6``) in each inclusion dictionary and :func:`meshing.unit_cell` sets ``leftdomain``, ``rightdomain``, and ``geo.SetMaterial(...)`` automatically. In **Route B2**, you pass ``leftdomain=tag, rightdomain=1`` directly to ``geo.Append(...)`` and call ``geo.SetMaterial(...)``.
 
-Concept 6: Mesh Refinement Controls (``lc``, ``lc2``, ``lc3``, ...) & Verification
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Concept 6: Mesh Refinement Controls (``lc, lc2, ..., lc_n`` vs. Netgen ``maxh``) & Verification
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Mesh resolution is controlled in dimensionless unit-cell units (fractions of ``period``):
+1. The General Role of ``lc`` and ``lc2, lc3, ..., lc_n``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-* ``lc`` (**background mesh size**): Maximum triangle edge length in the background medium (domain ``tag = 1``, ``"bg"``). For example, ``lc = 0.08`` produces roughly :math:`1 / 0.08 \approx 12\text{--}13` elements across the unit cell.
-* ``lc2, lc3, lc4, lc5, lc6`` (**inclusion refinement factors**): Divide ``lc`` to set the maximum element size inside and along the boundary of inclusions:
+Mesh resolution in EMUstack is controlled in dimensionless unit-cell units (fractions of ``period``):
+
+* ``lc`` (**baseline background mesh size**): Characteristic triangle edge length in the background medium (domain ``tag = 1``, ``"bg"``) and along the outer periodic unit-cell boundaries. For example, ``lc = 0.08`` produces roughly :math:`1 / 0.08 \approx 12\text{--}13` elements across the unit cell.
+* ``lc2, lc3, ..., lc_n`` (**dimensionless local mesh-scaling factors**, :math:`\text{lc}_n > 0`): Scale ``lc`` to set the local target element size :math:`h_n` at specific geometric features:
 
   .. math::
 
-     h_{\text{inc}, k} = \frac{\text{lc}}{\text{lc}_k} \qquad (\text{when } \text{lc}_k > 1).
+     h_n = \frac{\text{lc}}{\text{lc}_n} \qquad (\text{for any } \text{lc}_n > 0).
 
-  Higher-index dielectric or plasmonic inclusions have shorter internal wavelengths and sharper local fields, so setting ``lc2 = 2.0`` to ``5.0`` refines the resonator interior and boundary without over-refining the background:
+  * :math:`\text{lc}_n > 1` :math:`\implies h_n < \text{lc}` (**finer mesh** than the background—for example, inside or along the boundary of a high-index dielectric or plasmonic resonator where internal wavelengths are shorter and local fields are sharper).
+  * :math:`\text{lc}_n = 1` :math:`\implies h_n = \text{lc}` (**same mesh size** as the background).
+  * :math:`0 < \text{lc}_n < 1` :math:`\implies h_n > \text{lc}` (**coarser mesh** than the background—for example, inside a low-index air hole etched in a high-index slab, or at the interior center of a large inclusion whose boundary is already finely resolved).
 
-  * **In the Gmsh pipeline**, ``lc2`` typically refines the inclusion perimeter (``lc / lc2``) while ``lc3`` refines an interior control point at the inclusion center (``lc / lc3``), or refines a second inclusion in multi-inclusion templates.
-  * **In the Netgen pipeline (Route B1 —** :func:`meshing.unit_cell` **)**, ``lc, lc2, lc3, lc4, lc5, lc6`` map automatically to each subdomain material tag:
+.. important::
+   **Do** ``lc2, lc3, ..., lc_n`` **Always Map 1-to-1 to Subdomains or Inclusions? No.**
 
-    * ``tag = 1`` (``background``) :math:`\rightarrow` max element size ``lc``
-    * ``tag = 2`` (``inclusion_a``) :math:`\rightarrow` max element size ``lc / lc2``
-    * ``tag = 3`` (``inclusion_b``) :math:`\rightarrow` max element size ``lc / lc3`` *(defaults to* ``lc / lc2`` *if* ``lc3`` *is omitted or* :math:`\le 1` *)*
-    * ``tag = 4..6`` (``inclusion_c..e``) :math:`\rightarrow` max element size ``lc / lc4 .. lc / lc6`` *(defaulting to* ``lc / lc2`` *)*
-    * **Per-inclusion override (** ``"maxh"`` **):** If two inclusions share the **same** material (e.g., both have ``"tag": 2``) but one is much smaller or has a sharper tip and needs a finer mesh, you can pass ``"maxh": lc / lc3`` directly inside that inclusion's dictionary.
+   While it is often convenient to think of ``lc_n`` as the refinement factor of an inclusion or material domain, **in general a mesh-scaling parameter** ``lc_n`` **can control any local geometric feature**:
+
+   * **An embedded interior point:** In ``ellipse_msh_template.geo`` (Example A below), there is only **one** elliptical inclusion (``Physical Surface(2)``), yet there are **three** mesh parameters: ``lc`` on the outer unit-cell corners, ``lc2`` on the ellipse perimeter (``lc / lc2``), and ``lc3`` on an **isolated point embedded at the center of the ellipse** (``Point(5)`` via ``Point{5} In Surface{12};`` with size ``lc / lc3``) to grade the interior mesh smoothly between the boundary and the center.
+   * **Individual inclusions (** ``"lc": lc_n`` **):** In a multi-resonator unit cell, you can pass as many ``lc_n`` parameters as you need (``lc2, lc3, lc4, ..., lc_n``) and assign ``"lc": lc_n`` directly inside each inclusion dictionary in :func:`meshing.unit_cell`—even when all inclusions share the same material ``"tag": 2``.
+   * **Subdomain tags (** ``**lc_kwargs`` **):** If an inclusion dictionary omits ``"lc"``, :func:`meshing.unit_cell` also accepts arbitrary ``lc2=..., lc3=..., ..., lc_n=...`` keyword arguments (``**lc_kwargs``) and maps ``lc_n`` by default to subdomain ``tag = n`` (falling back to ``lc2``).
+
+2. ``lc`` (Gmsh) vs. ``maxh`` (Netgen) — How the Two Meshers Differ
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Under the hood, Gmsh and Netgen control mesh element sizes using different geometric primitives and terminology:
+
+* **In Gmsh (** ``lc`` **on 0D Points):**
+  Gmsh attaches a **characteristic length** (``lc``) to 0D ``Point`` entities (``Point(i) = {x, y, 0, lc_i};``) and interpolates element sizes across curves and surfaces. In ``.geo`` templates, EMUstack substitutes ``lc2 = lc/1;`` with ``lc2 = lc/val;``.
+* **In Netgen (** ``maxh`` **on 1D Curves & 2D Domains):**
+  Netgen's ``SplineGeometry`` does not assign characteristic lengths to points on spline curves; instead, it controls element sizes via a **maximum element size (** ``maxh`` **)** passed to 1D boundary segments (``geo.Append(..., maxh=...)``), 2D subdomains (``geo.SetDomainMaxH(tag, maxh)``), and ``geo.GenerateMesh(maxh=...)``.
+* **How EMUstack Bridges** ``lc`` **and** ``maxh``:
+
+  * **In Netgen Route B1 (** :func:`meshing.unit_cell` **):** You use EMUstack's uniform ``lc`` notation everywhere—writing ``"lc": lc2``, ``"lc": lc3``, ..., ``"lc": lc_n`` directly in each inclusion dictionary (or passing ``lc2, lc3, ..., lc_n`` via ``**lc_kwargs``)—and :func:`meshing.unit_cell` **internally converts** each factor ``lc_n`` into Netgen's ``maxh = lc / lc_n`` on both the boundary splines and the subdomain.
+  * **In Netgen Route B2 (Direct** ``SplineGeometry`` **):** Because you call Netgen's native ``geo.Append(...)`` and ``geo.SetDomainMaxH(...)`` methods directly, you compute ``inc_maxh = lc / lc2`` yourself in Python and pass it to Netgen's ``maxh=`` keyword argument.
 
 Once the mesh is generated in :func:`meshing.unit_cell`, it automatically runs **four sanity assertions**:
 
@@ -444,7 +463,7 @@ Steps 3, 4, 5, & 6 (Concepts 3–6 — Automated by ``meshing.unit_cell()``)
 
 Because both templates use standard elliptical inclusions, **Steps 3 through 6 require only a few lines of Python**:
 
-1. Build the ``inclusions`` list of dictionaries—where each dictionary specifies the shape ``"kind"`` (**Step 4**) and the material ``"tag"`` (**Step 5**):
+1. Build the ``inclusions`` list of dictionaries—where each dictionary specifies the shape ``"kind"`` (**Step 4**), the material ``"tag"`` (**Step 5**), and the inclusion's mesh-scaling factor ``"lc": lc_n`` (**Step 6**, which :func:`meshing.unit_cell` converts internally to Netgen's ``maxh = lc / lc_n``):
 
    * **In** ``ellipse_msh_template.py``:
 
@@ -457,6 +476,7 @@ Because both templates use standard elliptical inclusions, **Steps 3 through 6 r
             "ry": ry,
             "angle": ang_rad,
             "tag": 2,          # Maps to inclusion_a
+            "lc": lc2,         # Converted internally to maxh = lc / lc2
         }]
 
    * **In** ``chiral_qbic_gorkunov.py``:
@@ -467,34 +487,35 @@ Because both templates use standard elliptical inclusions, **Steps 3 through 6 r
         if include_bar1:
             inclusions.append({
                 "kind": "ellipse", "c": c1, "rx": rx, "ry": ry,
-                "angle": float(rot1), "tag": 2,
+                "angle": float(rot1), "tag": 2, "lc": lc2,
             })
         if include_bar2:
             inclusions.append({
                 "kind": "ellipse", "c": c2, "rx": rx, "ry": ry,
-                "angle": float(rot2), "tag": 2,
+                "angle": float(rot2), "tag": 2, "lc": lc2,
             })
 
-2. Pass ``dy``, ``inclusions``, and the mesh refinement parameters ``lc, lc2, lc3, ...`` directly to :func:`meshing.unit_cell` (**Steps 3 & 6**):
+2. Call :func:`meshing.unit_cell` with ``dy``, ``inclusions``, and the background mesh size ``lc`` (**Steps 3 & 6**):
 
    .. code-block:: python
 
-      return meshing.unit_cell(
-          dy, inclusions, lc=lc, lc2=lc2, lc3=lc3, curve_order=2, period_x=1.0
-      )
+      return meshing.unit_cell(dy, inclusions, lc=lc, curve_order=2, period_x=1.0)
 
    .. tip::
-      **Multi-inclusion refinement with** ``lc2..lc6`` **and** ``"maxh"``:
+      **Using an arbitrary number of** ``lc_n`` **parameters (** ``"lc": lc_n`` **and** ``**lc_kwargs`` **):**
 
-      * If your unit cell has multiple inclusions with **different materials** (``"tag": 2``, ``"tag": 3``, ``"tag": 4``, ...), simply pass ``lc=lc, lc2=lc2, lc3=lc3, lc4=lc4`` to :func:`meshing.unit_cell`—each subdomain ``tag = k`` automatically receives mesh size ``lc / lc_k``.
-      * If two inclusions share the **same material** (both ``"tag": 2``) but need different mesh densities, add ``"maxh": lc / lc3`` directly to the dictionary of the finer inclusion:
+      * You can define as many ``lc_n`` parameters (``lc2, lc3, lc4, ..., lc_n``) in ``build_unit_cell(...)`` and ``geo_params`` as you have inclusions, and map ``"lc": lc_n`` directly inside each inclusion dictionary (where :math:`\text{lc}_n > 1` refines and :math:`0 < \text{lc}_n < 1` coarsens relative to ``lc``):
 
         .. code-block:: python
 
            inclusions = [
-               {"kind": "ellipse", "c": c1, "rx": rx1, "ry": ry1, "tag": 2, "maxh": lc / lc2},
-               {"kind": "circle",  "c": c2, "r": r_small,         "tag": 2, "maxh": lc / lc3},
+               {"kind": "ellipse", "c": c1, "rx": rx1, "ry": ry1, "tag": 2, "lc": lc2},
+               {"kind": "circle",  "c": c2, "r": r2,              "tag": 2, "lc": lc3},
+               {"kind": "square",  "c": c3, "s": s3,              "tag": 3, "lc": lc4},
            ]
+           return meshing.unit_cell(dy, inclusions, lc=lc, curve_order=2, period_x=1.0)
+
+      * Alternatively, if your inclusions have distinct tags (``"tag": 2, 3, ..., n``) and omit the ``"lc"`` key in their dictionaries, you can pass ``lc2=lc2, lc3=lc3, lc4=lc4, ...`` directly as keyword arguments (``**lc_kwargs``) to :func:`meshing.unit_cell`.
 
 What ``meshing.unit_cell()`` Supports vs. When to Take Route B2
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -509,19 +530,19 @@ All standard inclusion shapes supported out of the box by :func:`meshing.unit_ce
      - Required / Optional Keys
      - Description
    * - ``"circle"``
-     - ``"c": (xc, yc)``, ``"r": radius``, ``"tag": int``
+     - ``"c": (xc, yc)``, ``"r": radius``, ``"tag": int``, ``"lc": lc_n``
      - Circular inclusion of normalized radius ``r`` built from 12 ``spline3`` arcs.
    * - ``"ellipse"``
-     - ``"c": (xc, yc)``, ``"rx": float``, ``"ry": float``, ``"angle": rad``, ``"tag": int``
+     - ``"c": (xc, yc)``, ``"rx": float``, ``"ry": float``, ``"angle": rad``, ``"tag": int``, ``"lc": lc_n``
      - Elliptical inclusion with semi-axes ``rx``, ``ry`` rotated counter-clockwise by ``angle`` (radians).
    * - ``"square"`` / ``"rectangle"``
-     - ``"c": (xc, yc)``, ``"w": width``, ``"h": height`` (or ``"s": side``), ``"tag": int``
+     - ``"c": (xc, yc)``, ``"w": width``, ``"h": height`` (or ``"s": side``), ``"tag": int``, ``"lc": lc_n``
      - Axis-aligned rectangular or square inclusion centered at ``c``.
    * - ``"ring"``
-     - ``"c": (xc, yc)``, ``"r_out": float``, ``"r_in": float``, ``"tag": int``
+     - ``"c": (xc, yc)``, ``"r_out": float``, ``"r_in": float``, ``"tag": int``, ``"lc": lc_n``
      - Annular ring between inner radius ``r_in`` (background) and outer radius ``r_out``.
    * - ``"dimer"``
-     - ``"c": (xc, yc)``, ``"sub_kind": "circle"|"square"``, ``"r": float``, ``"gap": float``, ``"tag": int``
+     - ``"c": (xc, yc)``, ``"sub_kind": "circle"|"square"``, ``"r": float``, ``"gap": float``, ``"tag": int``, ``"lc": lc_n``
      - Symmetric pair of inclusions separated along :math:`x` by edge-to-edge ``gap``.
 
 .. important::
@@ -635,7 +656,7 @@ Divide all physical dimensions in nanometers by ``period`` so the geometry lives
        dy = float(period_y) / float(period)
        L_arm = float(arm_len) / float(period)
        W_arm = float(arm_width) / float(period)
-       inc_h = lc / lc2 if lc2 > 1.0 else lc
+       inc_h = lc / lc2  # Convert EMUstack's (lc, lc2) into Netgen's maxh
 
 Step 3 (Concept 3 — Outer Unit-Cell Box & Periodic ``copy=`` Boundaries)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

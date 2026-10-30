@@ -141,33 +141,53 @@ def test_native_dimer_inclusion():
     assert rel_err_area < 5e-4, f"Dimer area error: {rel_err_area}"
 
 
-def test_unit_cell_multi_lc_and_per_inclusion_maxh():
-    """Verify direct lc, lc2, lc3, lc4 per-tag mapping and per-inclusion maxh override."""
+def test_unit_cell_arbitrary_lc_and_per_inclusion_lc():
+    """Verify per-inclusion 'lc': lc_n mapping (finer > 1 and coarser < 1) and arbitrary **lc_kwargs."""
     dy = 1.0
-    # Two inclusions with different tags (2 and 3): tag 3 has finer lc3=5.0 vs lc2=1.5
-    inclusions_multi_tag = [
-        {"kind": "circle", "c": (0.3, 0.5), "r": 0.12, "tag": 2},
-        {"kind": "circle", "c": (0.7, 0.5), "r": 0.12, "tag": 3},
+    # 1. Per-inclusion "lc": lc_n mapping on multiple inclusions
+    inclusions_per_inc = [
+        {"kind": "circle", "c": (0.3, 0.5), "r": 0.12, "tag": 2, "lc": 1.5},
+        {"kind": "circle", "c": (0.7, 0.5), "r": 0.12, "tag": 3, "lc": 5.0},
     ]
-    mesh_multi = unit_cell(dy=dy, inclusions=inclusions_multi_tag, lc=0.12, lc2=1.5, lc3=5.0)
-    n_inc2 = sum(1 for el in mesh_multi.Elements(ngs.VOL) if el.mat == "inc2")
-    n_inc3 = sum(1 for el in mesh_multi.Elements(ngs.VOL) if el.mat == "inc3")
-    assert n_inc3 > n_inc2, f"Expected finer mesh in inc3 (lc3=5.0) than inc2 (lc2=1.5), got {n_inc3} vs {n_inc2}"
+    mesh_per_inc = unit_cell(dy=dy, inclusions=inclusions_per_inc, lc=0.12)
+    n_inc2 = sum(1 for el in mesh_per_inc.Elements(ngs.VOL) if el.mat == "inc2")
+    n_inc3 = sum(1 for el in mesh_per_inc.Elements(ngs.VOL) if el.mat == "inc3")
+    assert n_inc3 > n_inc2, f"Expected finer mesh in inc3 (lc=5.0) than inc2 (lc=1.5), got {n_inc3} vs {n_inc2}"
 
-    # Per-inclusion maxh override on same tag
-    mesh_coarse = unit_cell(
+    # 2. Coarser mesh inside inclusion when 0 < lc_n < 1 vs finer when lc_n > 1
+    mesh_coarser = unit_cell(
         dy=dy,
-        inclusions=[{"kind": "circle", "c": (0.5, 0.5), "r": 0.15, "tag": 2}],
-        lc=0.12,
-        lc2=1.5,
+        inclusions=[{"kind": "circle", "c": (0.5, 0.5), "r": 0.25, "tag": 2, "lc": 0.5}],
+        lc=0.06,
     )
-    mesh_override = unit_cell(
+    mesh_equal = unit_cell(
         dy=dy,
-        inclusions=[{"kind": "circle", "c": (0.5, 0.5), "r": 0.15, "tag": 2, "maxh": 0.12 / 5.0}],
-        lc=0.12,
-        lc2=1.5,
+        inclusions=[{"kind": "circle", "c": (0.5, 0.5), "r": 0.25, "tag": 2, "lc": 1.0}],
+        lc=0.06,
     )
-    assert mesh_override.ne > mesh_coarse.ne
+    mesh_finer = unit_cell(
+        dy=dy,
+        inclusions=[{"kind": "circle", "c": (0.5, 0.5), "r": 0.25, "tag": 2, "lc": 3.0}],
+        lc=0.06,
+    )
+    n_coarser = sum(1 for el in mesh_coarser.Elements(ngs.VOL) if el.mat == "inc2")
+    n_equal = sum(1 for el in mesh_equal.Elements(ngs.VOL) if el.mat == "inc2")
+    n_finer = sum(1 for el in mesh_finer.Elements(ngs.VOL) if el.mat == "inc2")
+    assert n_coarser <= n_equal < n_finer
+
+    # 3. Arbitrary **lc_kwargs fallback (e.g. lc7 for tag=7)
+    inclusions_kwargs = [
+        {"kind": "circle", "c": (0.3, 0.5), "r": 0.12, "tag": 2},
+        {"kind": "circle", "c": (0.7, 0.5), "r": 0.12, "tag": 7},
+    ]
+    mesh_kwargs = unit_cell(dy=dy, inclusions=inclusions_kwargs, lc=0.12, lc2=1.5, lc7=5.0)
+    n_tag2 = sum(1 for el in mesh_kwargs.Elements(ngs.VOL) if el.mat == "inc2")
+    n_tag7 = sum(1 for el in mesh_kwargs.Elements(ngs.VOL) if el.mat == "inc7")
+    assert n_tag7 > n_tag2
+
+    # 4. Invalid non-lc<n> keyword argument raises TypeError
+    with pytest.raises(TypeError, match="unexpected keyword argument"):
+        unit_cell(dy=dy, inclusions=[], lc=0.1, unknown_arg=2.0)
 
 
 def test_msh4_rejection():

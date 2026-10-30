@@ -82,13 +82,10 @@ def unit_cell(
     inclusions: List[Dict[str, Any]],
     lc: float = 0.1,
     lc2: float = 2.0,
-    lc3: Optional[float] = None,
-    lc4: Optional[float] = None,
-    lc5: Optional[float] = None,
-    lc6: Optional[float] = None,
     nseg: int = 12,
     curve_order: int = 2,
     period_x: float = 1.0,
+    **lc_kwargs: Optional[float],
 ) -> ngs.Mesh:
     """Build a periodic 2D unit cell mesh using native Netgen SplineGeometry.
 
@@ -99,20 +96,15 @@ def unit_cell(
     inclusions : list of dict
         List of inclusion dictionaries specifying geometries (circle, ellipse,
         square, rectangle, ring, dimer). Each dictionary may also specify
-        ``"tag": 2..6`` (subdomain material tag) and/or ``"maxh": float`` to
-        override the mesh size for that specific inclusion.
+        ``"tag": int`` (subdomain material tag) and/or ``"lc": float`` (a mesh
+        scaling factor ``lc_n > 0`` that sets the inclusion's Netgen ``maxh``
+        to ``lc / lc_n``, producing a finer mesh when ``lc_n > 1`` and a
+        coarser mesh when ``0 < lc_n < 1``).
     lc : float, default=0.1
         Background mesh element size (domain tag 1, ``"bg"``) in normalized
         unit-cell coordinates.
     lc2 : float, default=2.0
-        Refinement factor for ``tag=2`` (``"inc2"`` / ``inclusion_a``), setting
-        maximum element size to ``lc / lc2`` (when ``lc2 > 1.0`` else ``lc``).
-        Also used as the default refinement factor for higher inclusion tags
-        when ``lc3..lc6`` are not specified.
-    lc3, lc4, lc5, lc6 : float, optional
-        Refinement factors for ``tag=3..6`` (``"inc3".."inc6"`` /
-        ``inclusion_b..e``), setting maximum element size to ``lc / lc_k``
-        (falling back to ``lc2`` if ``None`` or ``<= 1.0``).
+        Default mesh scaling factor for inclusions (``maxh = lc / lc2``).
     nseg : int, default=12
         Default number of quadratic rational Bézier spline segments per closed
         curved perimeter (circle/ellipse/ring).
@@ -120,16 +112,33 @@ def unit_cell(
         Netgen geometric curvature order (>= 2).
     period_x : float, default=1.0
         Normalized cell width.
+    **lc_kwargs : float, optional
+        Arbitrary additional scaling factors ``lc3, lc4, ..., lc_n`` mapped by
+        default to subdomain ``tag = 3, 4, ..., n`` (``maxh = lc / lc_n``) when
+        an inclusion dictionary does not specify its own ``"lc"`` key.
     """
     bg_h = float(lc)
-    lc_factors = {2: lc2, 3: lc3, 4: lc4, 5: lc5, 6: lc6}
+    if bg_h <= 0.0:
+        raise ValueError(f"lc must be positive, got {lc}")
+
+    lc_factors: Dict[int, Optional[float]] = {2: lc2}
+    for k, v in lc_kwargs.items():
+        if k.startswith("lc") and k[2:].isdigit() and int(k[2:]) >= 2:
+            lc_factors[int(k[2:])] = None if v is None else float(v)
+        else:
+            raise TypeError(
+                f"unit_cell() got an unexpected keyword argument '{k}'. "
+                "Extra keyword arguments must be mesh scaling factors of the form 'lc<n>' (e.g. lc3, lc4, ...)."
+            )
+
+    def _factor_to_maxh(factor: Optional[float]) -> float:
+        f = float(lc2) if factor is None else float(factor)
+        if f <= 0.0:
+            raise ValueError(f"lc scaling factor must be positive, got {f}")
+        return bg_h / f
 
     def _default_inc_h(tag: int) -> float:
-        factor = lc_factors.get(tag)
-        if factor is None or float(factor) <= 1.0:
-            factor = lc2
-        factor = float(factor)
-        return bg_h / factor if factor > 1.0 else bg_h
+        return _factor_to_maxh(lc_factors.get(tag))
 
     geo = g2.SplineGeometry()
     L = period_x
@@ -155,7 +164,12 @@ def unit_cell(
         tag = inc.get("tag", 2)
         tags.add(tag)
         c = inc.get("c", (L / 2.0, H / 2.0))
-        maxh_inc = float(inc["maxh"]) if "maxh" in inc else _default_inc_h(tag)
+        if inc.get("lc") is not None:
+            maxh_inc = _factor_to_maxh(inc["lc"])
+        elif inc.get("maxh") is not None:
+            maxh_inc = float(inc["maxh"])
+        else:
+            maxh_inc = _default_inc_h(tag)
         domain_maxh[tag] = min(domain_maxh.get(tag, maxh_inc), maxh_inc)
         nseg_inc = max(12, inc.get("nseg", nseg))
 
@@ -228,7 +242,8 @@ def unit_cell(
             geo.SetMaterial(tag, f"inc{tag}")
             geo.SetDomainMaxH(tag, domain_maxh.get(tag, _default_inc_h(tag)))
 
-    ngm = geo.GenerateMesh(maxh=bg_h)
+    global_maxh = max([bg_h] + list(domain_maxh.values()))
+    ngm = geo.GenerateMesh(maxh=global_maxh)
     ngm.Curve(curve_order)
     mesh = Mesh(ngm)
 
@@ -620,10 +635,8 @@ def mesh_from_py(
     lc: float = 0.1,
     lc2: float = 1.0,
     lc3: float = 1.0,
-    lc4: float = 1.0,
-    lc5: float = 1.0,
-    lc6: float = 1.0,
-    curve_order: int = 2
+    curve_order: int = 2,
+    **lc_kwargs: float,
 ) -> ngs.Mesh:
     """Universal Netgen Python .py geometry loader with signature validation."""
     if geo_params is None:
@@ -643,17 +656,19 @@ def mesh_from_py(
         )
 
     py = period if period_y is None else period_y
-    merged_params = {
+    merged_params: Dict[str, Any] = {
         "period": period,
         "period_y": py,
         "lc": lc,
         "lc2": lc2,
         "lc3": lc3,
-        "lc4": lc4,
-        "lc5": lc5,
-        "lc6": lc6,
     }
-    
+    for k, v in lc_kwargs.items():
+        if k.startswith("lc") and k[2:].isdigit() and int(k[2:]) >= 2:
+            merged_params[k] = v
+        else:
+            raise TypeError(f"mesh_from_py() got an unexpected keyword argument '{k}'")
+
     # Handle known aliases between .geo and .py conventions
     p_in = dict(geo_params)
     if "d_in_nm" in p_in and "period" not in p_in:
@@ -703,16 +718,18 @@ def mesh_from_py(
     elif isinstance(result, (tuple, list)):
         if len(result) == 2 and isinstance(result[0], (int, float)):
             dy_val, inclusions = result
+            extra_lc = {
+                k: float(v)
+                for k, v in merged_params.items()
+                if k.startswith("lc") and k[2:].isdigit() and int(k[2:]) >= 3 and v is not None
+            }
             return unit_cell(
                 float(dy_val),
                 inclusions,
                 lc=float(merged_params["lc"]),
                 lc2=float(merged_params["lc2"]),
-                lc3=float(merged_params["lc3"]),
-                lc4=float(merged_params["lc4"]),
-                lc5=float(merged_params["lc5"]),
-                lc6=float(merged_params["lc6"]),
                 curve_order=curve_order,
+                **extra_lc,
             )
     raise TypeError(
         f"Builder function in '{py_file}' returned unrecognized object type {type(result)}. "

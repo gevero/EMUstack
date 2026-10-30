@@ -60,13 +60,13 @@ def build_unit_cell(
     inclusions = []
     if include_bar1:
         inclusions.append({"kind": "ellipse", "c": c1, "rx": rx, "ry": ry,
-                           "angle": float(rot1), "tag": 2})
+                           "angle": float(rot1), "tag": 2, "lc": lc2})
     if include_bar2:
         inclusions.append({"kind": "ellipse", "c": c2, "rx": rx, "ry": ry,
-                           "angle": float(rot2), "tag": 2})
+                           "angle": float(rot2), "tag": 2, "lc": lc2})
 
     return meshing.unit_cell(
-        dy, inclusions, lc=lc, lc2=lc2, lc3=lc3,
+        dy, inclusions, lc=lc,
         curve_order=curve_order, period_x=1.0
     )
 

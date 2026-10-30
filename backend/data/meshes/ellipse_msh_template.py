@@ -67,9 +67,10 @@ def build_unit_cell(
         "rx": rx,
         "ry": ry,
         "angle": ang_rad,
-        "tag": 2
+        "tag": 2,
+        "lc": lc2,
     }]
 
     return meshing.unit_cell(
-        dy, inclusions, lc=lc, lc2=lc2, lc3=lc3, curve_order=2, period_x=1.0
+        dy, inclusions, lc=lc, curve_order=2, period_x=1.0
     )

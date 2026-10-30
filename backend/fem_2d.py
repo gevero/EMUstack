@@ -513,10 +513,6 @@ def solve_bloch_modes_2d(
                 inclusions,
                 lc=getattr(structure, "lc", 0.1),
                 lc2=getattr(structure, "lc2", 1.0),
-                lc3=getattr(structure, "lc3", 1.0),
-                lc4=getattr(structure, "lc4", 1.0),
-                lc5=getattr(structure, "lc5", 1.0),
-                lc6=getattr(structure, "lc6", 1.0),
                 curve_order=order,
                 period_x=period_x,
             )

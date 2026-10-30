@@ -1095,6 +1095,11 @@ class NanoStruct:
                         curve_order=2
                     )
                 elif self.geo_file.endswith('.py'):
+                    extra_lc = {
+                        f'lc{k}': getattr(self, f'lc{k}')
+                        for k in range(4, 7)
+                        if getattr(self, f'lc{k}', 1.0) != 1.0
+                    }
                     self.mesh = meshing.mesh_from_py(
                         self.geo_file,
                         geo_params=merged_geo_params,
@@ -1103,10 +1108,8 @@ class NanoStruct:
                         lc=self.lc,
                         lc2=self.lc2,
                         lc3=self.lc3,
-                        lc4=getattr(self, 'lc4', 1.0),
-                        lc5=getattr(self, 'lc5', 1.0),
-                        lc6=getattr(self, 'lc6', 1.0),
-                        curve_order=2
+                        curve_order=2,
+                        **extra_lc,
                     )
                 else:
                     raise ValueError(f"Unsupported geometry file format for '{self.geo_file}'. Expected .geo or .py")
@@ -1134,17 +1137,19 @@ class NanoStruct:
                     gap = getattr(self, 'gap', 0.0) / self.period
                     inclusions.append({"kind": "dimer", "c": center, "r": d1 / 2.0, "gap": gap, "tag": 2})
 
-                # geo_params lc/lc2..lc6 override lc_bkg/lc2..lc6, as on the gmsh path
+                # geo_params lc/lc2..lc_n override lc_bkg/lc2..lc_n, as on the gmsh path
                 lc = float(merged_geo_params.get('lc', self.lc))
                 lc2 = float(merged_geo_params.get('lc2', getattr(self, 'lc2', 1.0)))
-                lc3 = float(merged_geo_params.get('lc3', getattr(self, 'lc3', 1.0)))
-                lc4 = float(merged_geo_params.get('lc4', getattr(self, 'lc4', 1.0)))
-                lc5 = float(merged_geo_params.get('lc5', getattr(self, 'lc5', 1.0)))
-                lc6 = float(merged_geo_params.get('lc6', getattr(self, 'lc6', 1.0)))
+                extra_lc = {
+                    k: float(v)
+                    for k, v in merged_geo_params.items()
+                    if k.startswith('lc') and k[2:].isdigit() and int(k[2:]) >= 3
+                }
                 self.mesh = meshing.unit_cell(
                     dy, inclusions,
-                    lc=lc, lc2=lc2, lc3=lc3, lc4=lc4, lc5=lc5, lc6=lc6,
-                    curve_order=2, period_x=1.0
+                    lc=lc, lc2=lc2,
+                    curve_order=2, period_x=1.0,
+                    **extra_lc,
                 )
 
             if self.mesh is not None and (mesher == 'netgen' or py_geometry):

@@ -63,7 +63,8 @@ def build_unit_cell(
             "rx": float(rx),
             "ry": float(ry),
             "angle": angle1,
-            "tag": 2
+            "tag": 2,
+            "lc": lc2,
         },
         {
             "kind": "ellipse",
@@ -71,12 +72,13 @@ def build_unit_cell(
             "rx": float(rx),
             "ry": float(ry),
             "angle": angle2,
-            "tag": 2
+            "tag": 2,
+            "lc": lc2,
         }
     ]
 
     return meshing.unit_cell(
-        dy, inclusions, lc=lc, lc2=lc2, lc3=lc3,
+        dy, inclusions, lc=lc,
         curve_order=curve_order, period_x=1.0
     )
 
