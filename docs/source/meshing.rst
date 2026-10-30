@@ -110,7 +110,7 @@ Approximating curved dielectric or metallic resonators (such as circular nanopil
 * **In the Gmsh pipeline**, curved boundaries are defined using Gmsh's built-in ``Circle`` or ``Ellipsis`` arc primitives (optionally rotated via ``Rotate``) and meshed either as 6-node quadratic triangles (``gmsh -2 -order 2``) or curved to second order upon Netgen import (``ngm.Curve(2)``).
 * **In the Netgen pipeline**, curved boundaries are represented in ``netgen.geom2d.SplineGeometry`` using 3-point quadratic rational Bézier spline segments (``["spline3", pt0, pt_ctrl, pt1]``) together with ``ngm.Curve(2)``:
 
-  * **In Route B1 (** :func:`meshing.unit_cell` **):** You simply specify a dictionary such as ``{"kind": "ellipse", "c": (xc, yc), "rx": rx, "ry": ry, "angle": alpha, "tag": 2}``. Internally, :func:`meshing.unit_cell` divides the circle or ellipse into :math:`N_{\text{seg}} = 12` angular sectors :math:`[a_0, a_1]` (:math:`\Delta\theta = 30^\circ`) and calls :func:`meshing.arc_control_points` to compute the start point :math:`\mathbf{P}_0`, the end point :math:`\mathbf{P}_1`, and the exact **off-curve tangent intersection control point** :math:`\mathbf{P}_{\text{ctrl}}`:
+  * **In Route B1 (** :func:`meshing.unit_cell` **):** You simply specify a dictionary such as ``{"kind": "ellipse", "center": (xc, yc), "rx": rx, "ry": ry, "angle": alpha, "tag": 2, "lc": lc2}``. Internally, :func:`meshing.unit_cell` divides the circle or ellipse into :math:`N_{\text{seg}} = 24` angular sectors :math:`[a_0, a_1]` (:math:`\Delta\theta = 15^\circ`) and calls :func:`meshing.arc_control_points` to compute the start point :math:`\mathbf{P}_0`, the end point :math:`\mathbf{P}_1`, and the exact **off-curve tangent intersection control point** :math:`\mathbf{P}_{\text{ctrl}}`:
 
     .. math::
 
@@ -392,9 +392,6 @@ The template defines ``build_unit_cell(...)`` with explicit keyword arguments an
          a1: Optional[float] = None,
          ellipticity: Optional[float] = None,
          angle: Optional[float] = None,
-         r1: Optional[float] = None,
-         r2: Optional[float] = None,
-         rot: Optional[float] = None,
          lc: float = 0.12,
          lc2: float = 5.0,
          lc3: float = 1.0,
@@ -471,7 +468,7 @@ Because both templates use standard elliptical inclusions, **Steps 3 through 6 r
 
         inclusions = [{
             "kind": "ellipse",
-            "c": center,
+            "center": center,
             "rx": rx,
             "ry": ry,
             "angle": ang_rad,
@@ -486,20 +483,20 @@ Because both templates use standard elliptical inclusions, **Steps 3 through 6 r
         inclusions = []
         if include_bar1:
             inclusions.append({
-                "kind": "ellipse", "c": c1, "rx": rx, "ry": ry,
+                "kind": "ellipse", "center": c1, "rx": rx, "ry": ry,
                 "angle": float(rot1), "tag": 2, "lc": lc2,
             })
         if include_bar2:
             inclusions.append({
-                "kind": "ellipse", "c": c2, "rx": rx, "ry": ry,
+                "kind": "ellipse", "center": c2, "rx": rx, "ry": ry,
                 "angle": float(rot2), "tag": 2, "lc": lc2,
             })
 
-2. Call :func:`meshing.unit_cell` with ``dy``, ``inclusions``, and the background mesh size ``lc`` (**Steps 3 & 6**):
+2. Call :func:`meshing.unit_cell` with ``inclusions``, ``dy=dy``, and the background mesh size ``lc=lc`` (**Steps 3 & 6**):
 
    .. code-block:: python
 
-      return meshing.unit_cell(dy, inclusions, lc=lc, curve_order=2, period_x=1.0)
+      return meshing.unit_cell(inclusions, dy=dy, lc=lc)
 
    .. tip::
       **Using an arbitrary number of** ``lc_n`` **parameters (** ``"lc": lc_n`` **and** ``**lc_kwargs`` **):**
@@ -509,18 +506,18 @@ Because both templates use standard elliptical inclusions, **Steps 3 through 6 r
         .. code-block:: python
 
            inclusions = [
-               {"kind": "ellipse", "c": c1, "rx": rx1, "ry": ry1, "tag": 2, "lc": lc2},
-               {"kind": "circle",  "c": c2, "r": r2,              "tag": 2, "lc": lc3},
-               {"kind": "square",  "c": c3, "s": s3,              "tag": 3, "lc": lc4},
+               {"kind": "ellipse", "center": c1, "rx": rx1, "ry": ry1, "tag": 2, "lc": lc2},
+               {"kind": "circle",  "center": c2, "radius": r2,         "tag": 2, "lc": lc3},
+               {"kind": "square",  "center": c3, "side": s3,           "tag": 3, "lc": lc4},
            ]
-           return meshing.unit_cell(dy, inclusions, lc=lc, curve_order=2, period_x=1.0)
+           return meshing.unit_cell(inclusions, dy=dy, lc=lc)
 
       * Alternatively, if your inclusions have distinct tags (``"tag": 2, 3, ..., n``) and omit the ``"lc"`` key in their dictionaries, you can pass ``lc2=lc2, lc3=lc3, lc4=lc4, ...`` directly as keyword arguments (``**lc_kwargs``) to :func:`meshing.unit_cell`.
 
 What ``meshing.unit_cell()`` Supports vs. When to Take Route B2
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-All standard inclusion shapes supported out of the box by :func:`meshing.unit_cell` are listed below:
+All standard inclusion shapes supported out of the box by :func:`meshing.unit_cell` are listed below (both full-word keys such as ``"center"``, ``"radius"``, ``"width"``, ``"height"``, ``"side"`` and their short aliases ``"c"``, ``"r"``, ``"w"``, ``"h"``, ``"s"`` are accepted):
 
 .. list-table:: Standard Inclusion Shapes Supported by ``meshing.unit_cell()``
    :header-rows: 1
@@ -530,19 +527,19 @@ All standard inclusion shapes supported out of the box by :func:`meshing.unit_ce
      - Required / Optional Keys
      - Description
    * - ``"circle"``
-     - ``"c": (xc, yc)``, ``"r": radius``, ``"tag": int``, ``"lc": lc_n``
-     - Circular inclusion of normalized radius ``r`` built from 12 ``spline3`` arcs.
+     - ``"center": (xc, yc)`` *(or* ``"c"`` *)*, ``"radius": float`` *(or* ``"r"`` *)*, ``"tag": int``, ``"lc": lc_n``
+     - Circular inclusion of normalized radius ``radius`` built from 24 ``spline3`` arcs.
    * - ``"ellipse"``
-     - ``"c": (xc, yc)``, ``"rx": float``, ``"ry": float``, ``"angle": rad``, ``"tag": int``, ``"lc": lc_n``
+     - ``"center": (xc, yc)`` *(or* ``"c"`` *)*, ``"rx": float``, ``"ry": float``, ``"angle": rad``, ``"tag": int``, ``"lc": lc_n``
      - Elliptical inclusion with semi-axes ``rx``, ``ry`` rotated counter-clockwise by ``angle`` (radians).
    * - ``"square"`` / ``"rectangle"``
-     - ``"c": (xc, yc)``, ``"w": width``, ``"h": height`` (or ``"s": side``), ``"tag": int``, ``"lc": lc_n``
-     - Axis-aligned rectangular or square inclusion centered at ``c``.
+     - ``"center": (xc, yc)`` *(or* ``"c"`` *)*, ``"width": float``, ``"height": float`` *(or* ``"side"`` / ``"w"``, ``"h"``, ``"s"`` *)*, ``"tag": int``, ``"lc": lc_n``
+     - Axis-aligned rectangular or square inclusion centered at ``center``.
    * - ``"ring"``
-     - ``"c": (xc, yc)``, ``"r_out": float``, ``"r_in": float``, ``"tag": int``, ``"lc": lc_n``
+     - ``"center": (xc, yc)`` *(or* ``"c"`` *)*, ``"r_out": float``, ``"r_in": float``, ``"tag": int``, ``"lc": lc_n``
      - Annular ring between inner radius ``r_in`` (background) and outer radius ``r_out``.
    * - ``"dimer"``
-     - ``"c": (xc, yc)``, ``"sub_kind": "circle"|"square"``, ``"r": float``, ``"gap": float``, ``"tag": int``, ``"lc": lc_n``
+     - ``"center": (xc, yc)`` *(or* ``"c"`` *)*, ``"sub_kind": "circle"|"square"``, ``"radius": float`` *(or* ``"r"`` *)*, ``"gap": float``, ``"tag": int``, ``"lc": lc_n``
      - Symmetric pair of inclusions separated along :math:`x` by edge-to-edge ``gap``.
 
 .. important::

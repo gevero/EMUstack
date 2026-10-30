@@ -142,32 +142,39 @@ def test_native_dimer_inclusion():
 
 
 def test_unit_cell_arbitrary_lc_and_per_inclusion_lc():
-    """Verify per-inclusion 'lc': lc_n mapping (finer > 1 and coarser < 1) and arbitrary **lc_kwargs."""
+    """Verify new unit_cell(inclusions, dx, dy, lc, **lc_kwargs) signature, readable keys, and 100% backward compatibility."""
     dy = 1.0
-    # 1. Per-inclusion "lc": lc_n mapping on multiple inclusions
-    inclusions_per_inc = [
-        {"kind": "circle", "c": (0.3, 0.5), "r": 0.12, "tag": 2, "lc": 1.5},
-        {"kind": "circle", "c": (0.7, 0.5), "r": 0.12, "tag": 3, "lc": 5.0},
+    # 1. Clean new signature with readable keys ("center", "radius", "width", "height", "lc")
+    inclusions_clean = [
+        {"kind": "circle", "center": (0.3, 0.5), "radius": 0.12, "tag": 2, "lc": 1.5},
+        {"kind": "rectangle", "center": (0.7, 0.5), "width": 0.2, "height": 0.2, "tag": 3, "lc": 5.0},
     ]
-    mesh_per_inc = unit_cell(dy=dy, inclusions=inclusions_per_inc, lc=0.12)
-    n_inc2 = sum(1 for el in mesh_per_inc.Elements(ngs.VOL) if el.mat == "inc2")
-    n_inc3 = sum(1 for el in mesh_per_inc.Elements(ngs.VOL) if el.mat == "inc3")
+    mesh_clean = unit_cell(inclusions_clean, dy=dy, lc=0.12)
+    n_inc2 = sum(1 for el in mesh_clean.Elements(ngs.VOL) if el.mat == "inc2")
+    n_inc3 = sum(1 for el in mesh_clean.Elements(ngs.VOL) if el.mat == "inc3")
     assert n_inc3 > n_inc2, f"Expected finer mesh in inc3 (lc=5.0) than inc2 (lc=1.5), got {n_inc3} vs {n_inc2}"
 
-    # 2. Coarser mesh inside inclusion when 0 < lc_n < 1 vs finer when lc_n > 1
+    # 2. 100% backward compatibility with legacy positional unit_cell(dy, inclusions, period_x=1.0) and short keys
+    mesh_legacy = unit_cell(
+        0.8,
+        [{"kind": "circle", "c": (0.5, 0.4), "r": 0.15, "tag": 2}],
+        lc=0.1,
+        lc2=2.0,
+        period_x=1.0,
+    )
+    assert abs(ngs.Integrate(1.0, mesh_legacy) - 0.8) < 1e-11
+
+    # 3. Coarser mesh inside inclusion when 0 < lc_n < 1 vs finer when lc_n > 1
     mesh_coarser = unit_cell(
-        dy=dy,
-        inclusions=[{"kind": "circle", "c": (0.5, 0.5), "r": 0.25, "tag": 2, "lc": 0.5}],
+        [{"kind": "circle", "center": (0.5, 0.5), "radius": 0.25, "tag": 2, "lc": 0.5}],
         lc=0.06,
     )
     mesh_equal = unit_cell(
-        dy=dy,
-        inclusions=[{"kind": "circle", "c": (0.5, 0.5), "r": 0.25, "tag": 2, "lc": 1.0}],
+        [{"kind": "circle", "center": (0.5, 0.5), "radius": 0.25, "tag": 2, "lc": 1.0}],
         lc=0.06,
     )
     mesh_finer = unit_cell(
-        dy=dy,
-        inclusions=[{"kind": "circle", "c": (0.5, 0.5), "r": 0.25, "tag": 2, "lc": 3.0}],
+        [{"kind": "circle", "center": (0.5, 0.5), "radius": 0.25, "tag": 2, "lc": 3.0}],
         lc=0.06,
     )
     n_coarser = sum(1 for el in mesh_coarser.Elements(ngs.VOL) if el.mat == "inc2")
@@ -175,19 +182,19 @@ def test_unit_cell_arbitrary_lc_and_per_inclusion_lc():
     n_finer = sum(1 for el in mesh_finer.Elements(ngs.VOL) if el.mat == "inc2")
     assert n_coarser <= n_equal < n_finer
 
-    # 3. Arbitrary **lc_kwargs fallback (e.g. lc7 for tag=7)
+    # 4. Arbitrary **lc_kwargs fallback (e.g. lc7 for tag=7)
     inclusions_kwargs = [
-        {"kind": "circle", "c": (0.3, 0.5), "r": 0.12, "tag": 2},
-        {"kind": "circle", "c": (0.7, 0.5), "r": 0.12, "tag": 7},
+        {"kind": "circle", "center": (0.3, 0.5), "radius": 0.12, "tag": 2},
+        {"kind": "circle", "center": (0.7, 0.5), "radius": 0.12, "tag": 7},
     ]
-    mesh_kwargs = unit_cell(dy=dy, inclusions=inclusions_kwargs, lc=0.12, lc2=1.5, lc7=5.0)
+    mesh_kwargs = unit_cell(inclusions_kwargs, lc=0.12, lc2=1.5, lc7=5.0)
     n_tag2 = sum(1 for el in mesh_kwargs.Elements(ngs.VOL) if el.mat == "inc2")
     n_tag7 = sum(1 for el in mesh_kwargs.Elements(ngs.VOL) if el.mat == "inc7")
     assert n_tag7 > n_tag2
 
-    # 4. Invalid non-lc<n> keyword argument raises TypeError
+    # 5. Invalid non-lc<n> keyword argument raises TypeError
     with pytest.raises(TypeError, match="unexpected keyword argument"):
-        unit_cell(dy=dy, inclusions=[], lc=0.1, unknown_arg=2.0)
+        unit_cell([], lc=0.1, unknown_arg=2.0)
 
 
 def test_msh4_rejection():

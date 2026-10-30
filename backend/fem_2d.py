@@ -509,12 +509,12 @@ def solve_bloch_modes_2d(
                 inclusions.append({"kind": "dimer", "c": center, "r": d1 / 2.0, "gap": gap, "tag": 2})
 
             mesh = meshing.unit_cell(
-                dy,
                 inclusions,
+                dx=period_x,
+                dy=dy,
                 lc=getattr(structure, "lc", 0.1),
                 lc2=getattr(structure, "lc2", 1.0),
                 curve_order=order,
-                period_x=period_x,
             )
             structure.mesh = mesh
             structure.n_msh_pts = mesh.nv

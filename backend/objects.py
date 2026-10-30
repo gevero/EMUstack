@@ -1146,9 +1146,12 @@ class NanoStruct:
                     if k.startswith('lc') and k[2:].isdigit() and int(k[2:]) >= 3
                 }
                 self.mesh = meshing.unit_cell(
-                    dy, inclusions,
-                    lc=lc, lc2=lc2,
-                    curve_order=2, period_x=1.0,
+                    inclusions,
+                    dx=1.0,
+                    dy=dy,
+                    lc=lc,
+                    lc2=lc2,
+                    curve_order=2,
                     **extra_lc,
                 )
 

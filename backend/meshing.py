@@ -78,61 +78,74 @@ def arc_control_points(
 
 
 def unit_cell(
-    dy: float,
-    inclusions: List[Dict[str, Any]],
+    inclusions: Any,
+    dx: Any = 1.0,
+    dy: float = 1.0,
     lc: float = 0.1,
-    lc2: float = 2.0,
-    nseg: int = 12,
     curve_order: int = 2,
-    period_x: float = 1.0,
-    **lc_kwargs: Optional[float],
+    **lc_kwargs: Any,
 ) -> ngs.Mesh:
     """Build a periodic 2D unit cell mesh using native Netgen SplineGeometry.
 
     Parameters
     ----------
-    dy : float
-        Cell height / period_x (normalized cell height).
     inclusions : list of dict
-        List of inclusion dictionaries specifying geometries (circle, ellipse,
-        square, rectangle, ring, dimer). Each dictionary may also specify
-        ``"tag": int`` (subdomain material tag) and/or ``"lc": float`` (a mesh
-        scaling factor ``lc_n > 0`` that sets the inclusion's Netgen ``maxh``
-        to ``lc / lc_n``, producing a finer mesh when ``lc_n > 1`` and a
-        coarser mesh when ``0 < lc_n < 1``).
+        List of inclusion dictionaries specifying geometries (``"circle"``,
+        ``"ellipse"``, ``"square"``, ``"rectangle"``, ``"ring"``, ``"dimer"``).
+        Each dictionary may specify:
+
+        - ``"kind"`` (or ``"shape"``): shape primitive name
+        - ``"center"`` (or ``"c"``): ``(xc, yc)`` coordinates (defaults to ``(dx/2, dy/2)``)
+        - ``"radius"`` (or ``"r"``), ``"rx"``, ``"ry"``, ``"angle"`` (or ``"rot"`` in deg),
+          ``"width"``/``"height"``/``"side"`` (or ``"w"``/``"h"``/``"s"``), ``"r_out"``/``"r_in"``
+        - ``"tag"``: integer subdomain material tag (``2..6``, default ``2``)
+        - ``"lc"``: local mesh scaling factor ``lc_n > 0`` (converted internally to
+          Netgen's ``maxh = lc / lc_n``, producing a finer mesh when ``lc_n > 1``
+          and a coarser mesh when ``0 < lc_n < 1``)
+    dx : float, default=1.0
+        Normalized unit-cell width along x.
+    dy : float, default=1.0
+        Normalized unit-cell height along y (``period_y / period``).
     lc : float, default=0.1
         Background mesh element size (domain tag 1, ``"bg"``) in normalized
         unit-cell coordinates.
-    lc2 : float, default=2.0
-        Default mesh scaling factor for inclusions (``maxh = lc / lc2``).
-    nseg : int, default=12
-        Default number of quadratic rational Bézier spline segments per closed
-        curved perimeter (circle/ellipse/ring).
     curve_order : int, default=2
         Netgen geometric curvature order (>= 2).
-    period_x : float, default=1.0
-        Normalized cell width.
     **lc_kwargs : float, optional
-        Arbitrary additional scaling factors ``lc3, lc4, ..., lc_n`` mapped by
-        default to subdomain ``tag = 3, 4, ..., n`` (``maxh = lc / lc_n``) when
-        an inclusion dictionary does not specify its own ``"lc"`` key.
+        Arbitrary mesh scaling factors ``lc2, lc3, ..., lc_n`` mapped by default
+        to subdomain ``tag = 2, 3, ..., n`` (``maxh = lc / lc_n``) when an
+        inclusion dictionary does not specify its own ``"lc"`` key.
     """
+    # 100% backward compatibility with legacy positional unit_cell(dy, inclusions, ...)
+    if isinstance(inclusions, (int, float)) and isinstance(dx, list):
+        dy = float(inclusions)
+        inclusions = dx
+        dx = 1.0
+
+    if "period_x" in lc_kwargs:
+        dx = float(lc_kwargs.pop("period_x"))
+    default_nseg = int(lc_kwargs.pop("nseg", 24))
+
     bg_h = float(lc)
     if bg_h <= 0.0:
         raise ValueError(f"lc must be positive, got {lc}")
 
-    lc_factors: Dict[int, Optional[float]] = {2: lc2}
+    lc_factors: Dict[int, Optional[float]] = {2: 2.0}
     for k, v in lc_kwargs.items():
         if k.startswith("lc") and k[2:].isdigit() and int(k[2:]) >= 2:
             lc_factors[int(k[2:])] = None if v is None else float(v)
         else:
             raise TypeError(
                 f"unit_cell() got an unexpected keyword argument '{k}'. "
-                "Extra keyword arguments must be mesh scaling factors of the form 'lc<n>' (e.g. lc3, lc4, ...)."
+                "Extra keyword arguments must be mesh scaling factors of the form 'lc<n>' (e.g. lc2, lc3, ...)."
             )
 
+    default_lc2 = lc_factors.get(2)
+    if default_lc2 is None:
+        default_lc2 = 2.0
+
     def _factor_to_maxh(factor: Optional[float]) -> float:
-        f = float(lc2) if factor is None else float(factor)
+        f = float(default_lc2) if factor is None else float(factor)
         if f <= 0.0:
             raise ValueError(f"lc scaling factor must be positive, got {f}")
         return bg_h / f
@@ -141,8 +154,8 @@ def unit_cell(
         return _factor_to_maxh(lc_factors.get(tag))
 
     geo = g2.SplineGeometry()
-    L = period_x
-    H = dy
+    L = float(dx)
+    H = float(dy)
 
     # Cell boundary points
     P = [geo.AddPoint(*q) for q in [(0, 0), (L, 0), (L, H), (0, H)]]
@@ -160,10 +173,10 @@ def unit_cell(
     tags = {1}
     domain_maxh: Dict[int, float] = {}
     for inc in inclusions:
-        kind = inc.get("kind", "circle")
+        kind = inc.get("kind", inc.get("shape", "circle"))
         tag = inc.get("tag", 2)
         tags.add(tag)
-        c = inc.get("c", (L / 2.0, H / 2.0))
+        c = inc.get("center", inc.get("c", (L / 2.0, H / 2.0)))
         if inc.get("lc") is not None:
             maxh_inc = _factor_to_maxh(inc["lc"])
         elif inc.get("maxh") is not None:
@@ -171,20 +184,24 @@ def unit_cell(
         else:
             maxh_inc = _default_inc_h(tag)
         domain_maxh[tag] = min(domain_maxh.get(tag, maxh_inc), maxh_inc)
-        nseg_inc = max(12, inc.get("nseg", nseg))
+        nseg_inc = max(12, int(inc.get("nseg", default_nseg)))
 
         if kind in ("circle", "ellipse"):
-            r = inc.get("r", None)
+            r = inc.get("radius", inc.get("r", None))
             rx = inc.get("rx", r)
             ry = inc.get("ry", r)
-            ang = inc.get("angle", 0.0)
+            if "rot" in inc and "angle" not in inc:
+                ang = float(inc["rot"]) * np.pi / 180.0
+            else:
+                ang = float(inc.get("angle", 0.0))
             for a0, a1 in arc_segments(r=r, c=c, nseg=nseg_inc):
                 pt0, pt_ctrl, pt1 = arc_control_points(geo, kind, c, a0, a1, r=r, rx=rx, ry=ry, angle=ang)
                 geo.Append(["spline3", pt0, pt_ctrl, pt1], leftdomain=tag, rightdomain=1, bc=f"inc{tag}", maxh=maxh_inc)
 
         elif kind in ("square", "rectangle"):
-            w = inc.get("w", inc.get("s", 0.2))
-            h = inc.get("h", inc.get("s", 0.2))
+            side_default = inc.get("side", inc.get("s", 0.2))
+            w = float(inc.get("width", inc.get("w", side_default)))
+            h = float(inc.get("height", inc.get("h", side_default)))
             pts_rect = [
                 geo.AddPoint(c[0] - w / 2.0, c[1] - h / 2.0),
                 geo.AddPoint(c[0] + w / 2.0, c[1] - h / 2.0),
@@ -211,7 +228,7 @@ def unit_cell(
         elif kind == "dimer":
             # Two inclusions with a gap
             sub_kind = inc.get("sub_kind", "circle")
-            r = inc.get("r", 0.1)
+            r = inc.get("radius", inc.get("r", 0.1))
             gap = inc.get("gap", 0.05)
             shift_x = r + gap / 2.0
             c1 = (c[0] - shift_x, c[1])
@@ -222,8 +239,9 @@ def unit_cell(
                         pt0, pt_ctrl, pt1 = arc_control_points(geo, sub_kind, center, a0, a1, r=r)
                         geo.Append(["spline3", pt0, pt_ctrl, pt1], leftdomain=tag, rightdomain=1, bc=f"inc{tag}", maxh=maxh_inc)
                 else:
-                    w = inc.get("w", inc.get("s", 2 * r))
-                    h = inc.get("h", inc.get("s", 2 * r))
+                    side_default = inc.get("side", inc.get("s", 2 * r))
+                    w = float(inc.get("width", inc.get("w", side_default)))
+                    h = float(inc.get("height", inc.get("h", side_default)))
                     pts_rect = [
                         geo.AddPoint(center[0] - w / 2.0, center[1] - h / 2.0),
                         geo.AddPoint(center[0] + w / 2.0, center[1] - h / 2.0),
@@ -721,13 +739,12 @@ def mesh_from_py(
             extra_lc = {
                 k: float(v)
                 for k, v in merged_params.items()
-                if k.startswith("lc") and k[2:].isdigit() and int(k[2:]) >= 3 and v is not None
+                if k.startswith("lc") and k[2:].isdigit() and int(k[2:]) >= 2 and v is not None
             }
             return unit_cell(
-                float(dy_val),
                 inclusions,
+                dy=float(dy_val),
                 lc=float(merged_params["lc"]),
-                lc2=float(merged_params["lc2"]),
                 curve_order=curve_order,
                 **extra_lc,
             )

@@ -59,7 +59,7 @@ def build_unit_cell(
     inclusions = [
         {
             "kind": "ellipse",
-            "c": c1,
+            "center": c1,
             "rx": float(rx),
             "ry": float(ry),
             "angle": angle1,
@@ -68,7 +68,7 @@ def build_unit_cell(
         },
         {
             "kind": "ellipse",
-            "c": c2,
+            "center": c2,
             "rx": float(rx),
             "ry": float(ry),
             "angle": angle2,
@@ -77,10 +77,7 @@ def build_unit_cell(
         }
     ]
 
-    return meshing.unit_cell(
-        dy, inclusions, lc=lc,
-        curve_order=curve_order, period_x=1.0
-    )
+    return meshing.unit_cell(inclusions, dy=dy, lc=lc, curve_order=curve_order)
 
 
 def build_geometry(*args, **kwargs) -> ngs.Mesh:
