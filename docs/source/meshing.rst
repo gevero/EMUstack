@@ -13,7 +13,7 @@ To support both legacy simulation scripts and pure-Python workflows, EMUstack pr
    Within a Netgen ``.py`` template, you can choose between **two routes** depending on the complexity of your resonator geometry:
 
    * **Netgen Route B1 — High-Level Helper** :func:`meshing.unit_cell` **(Standard Inclusions):**
-     If your unit cell is composed of one or more **standard geometric primitives**—circles, rotated ellipses, squares, rectangles, concentric rings, or dimers (such as in ``ellipse_msh_template.py`` or the two tilted elliptical bars in ``chiral_qbic_gorkunov.py``)—you do not need to write low-level Netgen CSG code. You simply normalize your dimensions, describe each inclusion as a Python dictionary (``{"kind": "ellipse", ...}``), and pass the list to :func:`meshing.unit_cell`, which builds the periodic box, curved splines, domain tags, and mesh automatically.
+     If your unit cell is composed of one or more **standard geometric primitives**—circles, rotated ellipses, squares, rectangles, concentric rings, or dimers (such as in ``ellipse_msh_template.py`` or the two tilted elliptical bars in ``chiral_qbic_gorkunov_msh_template.py``)—you do not need to write low-level Netgen CSG code. You simply normalize your dimensions, describe each inclusion as a Python dictionary (``{"kind": "ellipse", ...}``), and pass the list to :func:`meshing.unit_cell`, which builds the periodic box, curved splines, domain tags, and mesh automatically.
    * **Netgen Route B2 — Direct** ``netgen.geom2d.SplineGeometry`` **(Fancier / Arbitrary Custom Shapes):**
      If you need a **fancier or arbitrary custom shape** that is not one of the standard primitives supported by :func:`meshing.unit_cell` (for example: an L-shaped nanoantenna, a split-ring resonator with a cut gap, a crescent, a polygon, or freeform Bézier curves), you bypass :func:`meshing.unit_cell` and construct a ``netgen.geom2d.SplineGeometry`` directly inside ``build_unit_cell(...)``.
 
@@ -44,7 +44,7 @@ Regardless of whether you use the **Gmsh pipeline (``.geo``)** or the **Netgen p
      - Python signature inspection of ``build_unit_cell(...)`` and keyword passing from ``geo_params``.
      - Python signature inspection of ``build_unit_cell(...)`` and keyword passing from ``geo_params``.
    * - **2. Coordinate Normalization**
-     - Physical lengths in nm are divided by ``d_in_nm`` (:math:`a`) onto :math:`[0, 1] \times [-d_y, 0]`.
+     - Physical lengths in nm are divided by ``period`` (:math:`a`) onto :math:`[0, 1] \times [-d_y, 0]`.
      - Physical lengths in nm are divided by ``period`` (:math:`a`) onto :math:`[0, 1] \times [0, d_y]`.
      - Physical lengths in nm are divided by ``period`` (:math:`a`) onto :math:`[0, 1] \times [0, d_y]`.
    * - **3. Periodic Outer Boundaries**
@@ -67,10 +67,164 @@ Regardless of whether you use the **Gmsh pipeline (``.geo``)** or the **Netgen p
 Concept 1: Parameter Injection (``geo_file`` & ``geo_params``)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When you instantiate ``objects.NanoStruct('2D_array', geo_file=..., geo_params={...})``, **all** geometric and mesh refinement parameters (``period`` or ``d_in_nm``, ``period_y`` or ``dy_in_nm``, ``a1``, ``ellipticity``, ``angle``, ``lc``, ``lc2``, ``lc3``) can be passed directly inside the ``geo_params`` dictionary—without repeating legacy positional arguments like ``period``, ``diameter1``, ``ellipticity``, or ``inc_shape='custom'``. EMUstack locates ``geo_file`` (searching first in your current working directory and then in ``EMUstack/backend/data/meshes/``) and dispatches ``geo_params`` to the selected template:
+When you instantiate ``objects.NanoStruct('2D_array', geo_file=..., geo_params={...})``, **all** geometric and mesh refinement parameters (``period``, ``period_y``, ``diameter1``, ``ellipticity``, ``angle``, ``lc``, ``lc2``, ``lc3``; the names are the same for ``.geo`` and ``.py`` templates, see :ref:`template-naming`) can be passed directly inside the ``geo_params`` dictionary—without repeating legacy positional arguments like ``period``, ``diameter1``, ``ellipticity``, or ``inc_shape='custom'``. EMUstack locates ``geo_file`` (searching first in your current working directory and then in ``EMUstack/backend/data/meshes/``) and dispatches ``geo_params`` to the selected template:
 
-* **In the Gmsh pipeline**, ``NanoStruct`` / :func:`meshing.mesh_from_geo` reads the ``.geo`` file as text and replaces placeholder assignments such as ``d_in_nm = 0;``, ``dy_in_nm = 0;``, ``a1 = 0;``, ``ellipticity = 0;``, ``angle = 0;``, ``lc = 0;``, and ``lc2 = lc/1;`` with the numerical values from ``geo_params``. If a key in ``geo_params`` does not have a matching placeholder in the ``.geo`` file, a ``KeyError`` is raised immediately.
-* **In the Netgen pipeline (both Routes B1 and B2)**, :func:`meshing.mesh_from_py` dynamically imports the ``.py`` module, inspects the Python signature of ``build_unit_cell(...)`` using ``inspect.signature``, verifies that every key in ``geo_params`` is a valid parameter of ``build_unit_cell`` (raising a ``TypeError`` on typos), and calls ``build_unit_cell(**call_params)``.
+* **In the Gmsh pipeline**, ``NanoStruct`` / :func:`meshing.mesh_from_geo` reads the ``.geo`` file as text and replaces placeholder assignments such as ``period = 0;``, ``period_y = 0;``, ``diameter1 = 0;``, ``ellipticity = 0;``, ``angle = 0;``, ``lc = 0;``, and ``lc2 = lc/1;`` with the numerical values from ``geo_params``. If a key in ``geo_params`` does not have a matching placeholder in the ``.geo`` file, a ``KeyError`` is raised immediately.
+* **In the Netgen pipeline (both Routes B1 and B2)**, :func:`meshing.mesh_from_py` dynamically imports the ``.py`` module, inspects the Python signature of ``build_unit_cell(...)`` using ``inspect.signature``, verifies that every key in ``geo_params`` is a valid parameter of ``build_unit_cell`` (or an old name of one) (raising a ``TypeError`` on typos), and calls ``build_unit_cell(**call_params)``.
+
+.. _template-naming:
+
+Naming: One Vocabulary for ``.geo``, ``.py`` and ``unit_cell``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The three ways of describing a unit cell use the same words for the same quantities:
+
+* **Template files** are named ``<shape>_msh_template.geo`` (gmsh) or ``<shape>_msh_template.py`` (netgen), where ``<shape>`` is the ``NanoStruct(inc_shape=...)`` name when there is one (``ring``, ``rectangle``, ``cross_shell``, ...). ``N_msh_template.geo`` holds ``N`` circular inclusions per cell. A template can also be given by its short name: ``geo_file='ring.geo'``.
+* **Template parameters** (``.geo`` placeholders, ``.py`` keyword arguments and ``geo_params`` keys) share one set of names. Lengths are in nm and angles in radians, unless the name ends in ``_deg``.
+* **unit_cell inclusion keys** use the same words in normalized coordinates: ``kind`` (the same shape names), ``center``, ``radius``, ``width``, ``height``, ``side``, ``angle``/``angle_deg``, ``radius_out``/``radius_in``.
+
+Old names keep working everywhere: old file names are looked up in ``meshing.LEGACY_TEMPLATE_NAMES``; old parameter names are listed in ``meshing.PARAM_ALIASES`` (shared by all templates) or in the ``(legacy: ...)`` comment of the template's placeholder line; old ``unit_cell`` keys are in ``meshing.INCLUSION_KEY_ALIASES``. A parameter name present in the template is always filled as is, so custom templates written with the old names behave exactly as before, and accept the new names too.
+
+.. list-table:: Template names
+   :header-rows: 1
+   :widths: 30 40 30
+
+   * - Template
+     - Parameters
+     - Old names
+   * - all
+     - ``period``, ``period_y``
+     - ``d_in_nm``, ``dy_in_nm``
+   * - ``1_``, ``2_``, ``3_``, ``4_``, ``9_``, ``16_``, ``hex_``, ``ellipse_``, ``dimer_``, ``strip_``, ``double_strip_``
+     - ``diameter1``, ``diameter2``, ...
+     - ``a1``, ``a2``, ... (``d1``, ``d2``, ... in ``16_``)
+   * - ``ring_`` (was ``ring1_``)
+     - ``diameter1`` (outer), ``diameter2`` (inner), ``xshift``
+     - ``a1``, ``a2``, ``xshift_nm``
+   * - ``rectangle_``, ``cross_`` (were ``rect1_``, ``cross1_``), ``chiral_slits_``
+     - ``width``, ``height``; ``offset_x``, ``offset_y`` in ``chiral_slits_``
+     - ``a1``, ``a2``; ``offset_x_nm``, ``offset_y_nm``
+   * - ``rectangle_shell_``, ``cross_shell_`` (were ``rect_shell1_``, ``cross_shell1_``)
+     - ``width``, ``height``, ``thickness``
+     - ``a1``, ``b1`` / ``a2``, ``t``
+   * - ``square_dimer_``, ``square_shell_dimer_`` (were ``..._dimer1_``)
+     - ``side1``, ``side2`` / ``width1``, ``width2``, ``height1``, ``height2``, ``thickness``
+     - ``a1``, ``a2`` / ``a1``, ``a2``, ``b1``, ``b2``, ``t``
+   * - ``SRR_``
+     - ``len_vertical``, ``len_horizontal``, ``width``
+     - ``lvert_nm``, ``lhori_nm``, ``width_nm``
+   * - ``L_``
+     - ``length``, ``width``, ``rounding``
+     - ``L_nm``, ``W_nm``, ``r``
+   * - ``chiral_qbic_gorkunov_msh_template.py`` (was ``chiral_qbic_gorkunov.py``)
+     - ``theta_deg``, ``length``, ``width``, ``z_offset``, ``angle1``, ``angle2``
+     - ``theta``, ``l``, ``w``, ``d``, ``rot1``, ``rot2``
+   * - ``chiral_qbic_gorkunov_c4_msh_template.py`` (new)
+     - ``theta_deg`` (rotation of each bar, the paper's θ), ``length``, ``width``, ``gap``, ``include_bar1``, ``include_bar2``
+     -
+   * - ``chiral_qbic_msh_template.py`` (was ``chiral_qbic_template.py``)
+     - unchanged; ``rx``, ``ry``, ``gap`` are normalized to the period
+     -
+   * - ``egg_``, ``egg_inclusion_``, ``elle_``
+     - unchanged; their shape parameters are normalized to the period
+     -
+
+Mesh sizes keep their names everywhere: ``lc`` is the background size and ``lc2``, ``lc3``, ... are refinement divisors (``lcN = lc/1;`` in a ``.geo`` file).
+
+.. _legacy-params:
+
+Renaming a ``.py`` Template Parameter Safely: ``@meshing.legacy_params``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A ``.geo`` template keeps its old names in a ``(legacy: ...)`` comment. A ``.py`` template is a Python function, so it needs a Python tool for the same job: the :func:`meshing.legacy_params` decorator.
+
+**The problem.** Suppose a template was written with a cryptic keyword:
+
+.. code-block:: python
+
+   def build_unit_cell(period=400.0, a1=None, lc=0.12):
+       ...
+
+and you rename ``a1`` to the readable ``diameter1``. Every script that still calls ``build_unit_cell(a1=300)``, or passes ``geo_params={'a1': 300}`` to ``NanoStruct``, now fails with ``TypeError: unexpected keyword argument 'a1'``. Keeping both keywords in the signature would work, but the function would then have two parameters for one quantity, and every template would need the same "if a1 is given, copy it to diameter1" code.
+
+**The solution.** Write the function with the new name only, and declare the old name once, above it:
+
+.. code-block:: python
+
+   from EMUstack.backend import meshing
+
+   @meshing.legacy_params(a1="diameter1")      # old name="new name"
+   def build_unit_cell(period=400.0, diameter1=None, lc=0.12):
+       ...                                      # the body only ever sees diameter1
+
+The decorator wraps the function in a thin layer that renames old keywords before the call. You can list several pairs, as the Gorkunov template does: ``@meshing.legacy_params(theta="theta_deg", l="length", w="width", d="z_offset", rot1="angle1", rot2="angle2")``.
+
+**What happens on each call.** With the template above:
+
+.. code-block:: python
+
+   build_unit_cell(diameter1=300)            # new name: passed through unchanged
+   build_unit_cell(a1=300)                   # old name: renamed to diameter1=300 first
+   build_unit_cell(500, 300)                 # positional: untouched (period=500, diameter1=300)
+   build_unit_cell(a1=300, diameter1=250)    # both: which one is meant? refuse instead of guessing
+   # TypeError: build_unit_cell() got both 'a1' and its new name 'diameter1'
+
+Step by step, the wrapper:
+
+1. looks at the keyword arguments of the call;
+2. for each ``old="new"`` pair, if ``old`` was passed, moves its value to ``new``, or raises the ``TypeError`` above if ``new`` was passed as well;
+3. calls the real function, which never sees an old name.
+
+**Under the hood.** The whole decorator is a dozen lines of :mod:`meshing`:
+
+.. code-block:: python
+
+   def legacy_params(**renames):
+       def decorator(fn):
+           @functools.wraps(fn)                     # keep name, docstring, signature
+           def wrapper(*args, **kwargs):
+               for old, new in renames.items():
+                   if old in kwargs:
+                       if new in kwargs:
+                           raise TypeError(f"{fn.__name__}() got both '{old}' and its new name '{new}'")
+                       kwargs[new] = kwargs.pop(old)
+               return fn(*args, **kwargs)
+           wrapper.legacy_params = dict(renames)    # lets mesh_from_py see the old names
+           return wrapper
+       return decorator
+
+Two details make it fit the rest of EMUstack:
+
+* ``functools.wraps`` keeps the function's name, docstring and signature. ``inspect.signature(build_unit_cell)`` still shows ``(period=400.0, diameter1=None, lc=0.12)``, so ``help()``, the API reference and tab completion show only the new names.
+* ``wrapper.legacy_params`` records the renames (here ``{'a1': 'diameter1'}``). :func:`meshing.mesh_from_py` checks every ``geo_params`` key against the builder's signature and raises ``TypeError: Unexpected parameter ...`` on a typo. It reads this attribute, so it accepts ``'a1'`` as a valid key and passes it on as ``diameter1``.
+
+**How a ``NanoStruct`` call reaches the template.** The rename works the same whichever way the template is called:
+
+.. code-block:: text
+
+   NanoStruct(geo_file='ellipse_msh_template.py', geo_params={'a1': 300, ...})
+     -> meshing.mesh_from_py(...)                    'a1' is valid: listed in build_unit_cell.legacy_params
+       -> build_unit_cell(diameter1=300, ...)        mesh_from_py already uses the new name
+
+   import ellipse_msh_template                       (calling the template directly)
+   ellipse_msh_template.build_unit_cell(a1=300)
+     -> wrapper renames a1 -> diameter1
+       -> build_unit_cell(diameter1=300)
+
+**Recipe: renaming a parameter of your own template.**
+
+1. Rename the parameter in the signature and in the body (``a1`` -> ``diameter1``).
+2. Add ``@meshing.legacy_params(a1="diameter1")`` directly above ``def build_unit_cell``.
+3. Mention the old name in the docstring, so readers know where it went.
+4. Check both spellings give the same mesh, for example ``build_unit_cell(a1=300)`` and ``build_unit_cell(diameter1=300)``.
+
+If a template defines ``build_geometry`` as an alias that calls ``build_unit_cell(*args, **kwargs)``, the alias inherits the renames.
+
+**What it does not do.**
+
+* **It renames, it does not convert.** The old and new keywords must mean exactly the same value in the same units. ``theta`` -> ``theta_deg`` is fine because both are degrees. If you change a parameter from degrees to radians, or from nm to a fraction of the period, a rename would silently give wrong geometry. Keep the old parameter and convert it in the body instead.
+* **It only applies to keyword arguments.** Positional calls are untouched, so keep the parameter in the same position when you rename it.
+* **It is only for ``.py`` templates.** ``.geo`` templates use the ``(legacy: ...)`` comment, ``unit_cell`` inclusion keys use ``meshing.INCLUSION_KEY_ALIASES``, and the names shared by all templates (``d_in_nm``, ``a1``, ...) are in ``meshing.PARAM_ALIASES``.
 
 Concept 2: Coordinate Normalization to a Dimensionless Unit Cell
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -219,7 +373,7 @@ Part II: Step-by-Step Practical Examples
 To reinforce the **6 Core Concepts** from Part I, we now examine three concrete examples where **each practical step (`Step 1` through `Step 6`) maps directly to `Concept 1` through `Concept 6` above**:
 
 * **Example A (Gmsh Pipeline):** ``ellipse_msh_template.geo`` — a rotated elliptical nanohole/nanopillar unit cell in Gmsh, passing all parameters via ``geo_params``.
-* **Example B1 (Netgen Route B1 — Standard Inclusions via** :func:`meshing.unit_cell` **):** ``ellipse_msh_template.py`` and ``chiral_qbic_gorkunov.py`` — showing how standard inclusions (such as single or multiple rotated ellipses) are built effortlessly by passing an ``inclusions`` dictionary list to :func:`meshing.unit_cell`.
+* **Example B1 (Netgen Route B1 — Standard Inclusions via** :func:`meshing.unit_cell` **):** ``ellipse_msh_template.py`` and ``chiral_qbic_gorkunov_msh_template.py`` — showing how standard inclusions (such as single or multiple rotated ellipses) are built effortlessly by passing an ``inclusions`` dictionary list to :func:`meshing.unit_cell`.
 * **Example B2 (Netgen Route B2 — Fancier Custom Shapes via Direct** ``SplineGeometry`` **):** Walking through all 6 steps using ``netgen.geom2d.SplineGeometry`` directly when you need a geometry beyond the standard primitives of :func:`meshing.unit_cell`.
 
 ---
@@ -240,9 +394,9 @@ At the top of ``ellipse_msh_template.geo``, every parameter that can be overridd
    Mesh.MshFileVersion = 2.2;
 
    d = 1;            // Normalized unit-cell width along x
-   d_in_nm = 0;      // Replaced by period (in nm)
-   dy_in_nm = 0;     // Replaced by period_y (in nm)
-   a1 = 0;           // Replaced by major axis diameter (in nm)
+   period = 0;       // Replaced by period (in nm)        (legacy: d_in_nm)
+   period_y = 0;     // Replaced by period_y (in nm)      (legacy: dy_in_nm)
+   diameter1 = 0;    // Replaced by major diameter (in nm) (legacy: a1)
    ellipticity = 0;  // Replaced by (rx - ry) / rx
    angle = 0;        // Replaced by rotation angle (in radians)
 
@@ -250,17 +404,17 @@ At the top of ``ellipse_msh_template.geo``, every parameter that can be overridd
    lc2 = lc/1;       // Replaced by lc / lc2 (on ellipse boundary)
    lc3 = lc/1;       // Replaced by lc / lc3 (at ellipse center)
 
-When you pass ``geo_params={'period': 400.0, 'a1': 300.0, 'ellipticity': 0.5, 'angle': np.pi/3, 'lc': 0.08, 'lc2': 4.0, 'lc3': 2.0}``, EMUstack replaces ``d_in_nm = 0;`` with ``d_in_nm = 400.0;``, ``a1 = 0;`` with ``a1 = 300.0;``, ``lc2 = lc/1;`` with ``lc2 = lc/4.0;``, and so on.
+When you pass ``geo_params={'period': 400.0, 'diameter1': 300.0, 'ellipticity': 0.5, 'angle': np.pi/3, 'lc': 0.08, 'lc2': 4.0, 'lc3': 2.0}``, EMUstack replaces ``period = 0;`` with ``period = 400.0;``, ``diameter1 = 0;`` with ``diameter1 = 300.0;``, ``lc2 = lc/1;`` with ``lc2 = lc/4.0;``, and so on. The ``(legacy: ...)`` comments record the old placeholder names, so ``geo_params={'d_in_nm': 400.0, 'a1': 300.0, ...}`` fills the same placeholders.
 
 Step 2 (Concept 2 — Coordinate Normalization)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Next, the script converts the physical dimensions ``d_in_nm``, ``dy_in_nm``, and ``a1`` (in nanometers) into normalized unit-cell coordinates where the width along :math:`x` is ``d = 1``:
+Next, the script converts the physical dimensions ``period``, ``period_y``, and ``diameter1`` (in nanometers) into normalized unit-cell coordinates where the width along :math:`x` is ``d = 1``:
 
 .. code-block:: c
 
-   dy = dy_in_nm / d_in_nm;             // Normalized unit-cell height along y
-   radius1 = (a1 / (2 * d_in_nm)) * d;  // Normalized semi-major axis rx
+   dy = period_y / period;                    // Normalized unit-cell height along y
+   radius1 = (diameter1 / (2 * period)) * d;  // Normalized semi-major axis rx
    hy = dy;
    hx = 0.0;
 
@@ -351,7 +505,7 @@ To use this Gmsh template in a simulation script, pass **all** geometric and mes
       geo_file='ellipse_msh_template.geo',
       geo_params={
           'period': 400.0,
-          'a1': 300.0,
+          'diameter1': 300.0,
           'ellipticity': 0.5,
           'angle': np.pi / 3,
           'lc': 0.08,
@@ -365,12 +519,12 @@ To use this Gmsh template in a simulation script, pass **all** geometric and mes
 
 ---
 
-Example B1: Netgen Route B1 — Standard Inclusions via ``meshing.unit_cell()`` (``ellipse_msh_template.py`` & ``chiral_qbic_gorkunov.py``)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Example B1: Netgen Route B1 — Standard Inclusions via ``meshing.unit_cell()`` (``ellipse_msh_template.py`` & ``chiral_qbic_gorkunov_msh_template.py``)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When your unit cell consists of one or more **standard geometric primitives** (circles, rotated ellipses, squares, rectangles, concentric rings, or dimers), you do **not** need to construct a ``SplineGeometry`` by hand. Instead, you use :func:`meshing.unit_cell`, which automates **Steps 3, 4, 5, and 6** from a list of inclusion dictionaries.
 
-Let us see how both ``ellipse_msh_template.py`` (single rotated ellipse) and ``chiral_qbic_gorkunov.py`` (the two-ellipse chiral quasi-BIC dimer from ``Chiral_qBIC_Optical_Chirality.ipynb``) are implemented using this route.
+Let us see how both ``ellipse_msh_template.py`` (single rotated ellipse) and ``chiral_qbic_gorkunov_msh_template.py`` (a two-ellipse quasi-BIC dimer) are implemented using this route. ``Chiral_qBIC_Optical_Chirality.ipynb`` uses ``chiral_qbic_gorkunov_c4_msh_template.py``, which builds the same kind of dimer four times per cell, rotated by 90° each time, as in the paper by Gorkunov *et al.*
 
 Step 1 (Concept 1 — Python Function Signature & Parameter Validation)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -382,14 +536,14 @@ The template defines ``build_unit_cell(...)`` with explicit keyword arguments an
   .. code-block:: python
 
      from typing import Optional
-     import numpy as np
      import ngsolve as ngs
      from EMUstack.backend import meshing
 
+     @meshing.legacy_params(a1="diameter1")   # the old name a1 still works
      def build_unit_cell(
          period: float = 400.0,
          period_y: Optional[float] = None,
-         a1: Optional[float] = None,
+         diameter1: Optional[float] = None,
          ellipticity: Optional[float] = None,
          angle: Optional[float] = None,
          lc: float = 0.12,
@@ -397,22 +551,24 @@ The template defines ``build_unit_cell(...)`` with explicit keyword arguments an
          lc3: float = 1.0,
      ) -> ngs.Mesh:
 
-* **In** ``chiral_qbic_gorkunov.py`` **(two tilted elliptical bars separated by a gap):**
+* **In** ``chiral_qbic_gorkunov_msh_template.py`` **(two tilted elliptical bars separated by a gap):**
 
   .. code-block:: python
 
+     @meshing.legacy_params(theta="theta_deg", d="z_offset", l="length", w="width",
+                            rot1="angle1", rot2="angle2")
      def build_unit_cell(
          period: float = 480.0,
          period_y: Optional[float] = None,
-         theta: float = 3.5,          # Tilt angle in degrees
-         d: float = 10.0,             # Vertical offset in nm
-         l: float = 220.0,            # Bar length in nm (major axis 2*ry)
-         w: float = 70.0,             # Bar width in nm  (minor axis 2*rx)
+         theta_deg: float = 3.5,      # Tilt angle in degrees
+         z_offset: float = 10.0,      # Vertical offset in nm
+         length: float = 220.0,       # Bar length in nm (major axis 2*ry)
+         width: float = 70.0,         # Bar width in nm  (minor axis 2*rx)
          gap: float = 15.0,           # Edge-to-edge gap between bars in nm
          include_bar1: bool = True,   # Toggle left bar (for 3-layer z-slicing)
          include_bar2: bool = True,   # Toggle right bar (for 3-layer z-slicing)
-         rot1: Optional[float] = None,
-         rot2: Optional[float] = None,
+         angle1: Optional[float] = None,  # Bar rotations in radians
+         angle2: Optional[float] = None,
          lc: float = 0.08,            # Background mesh size (fraction of period)
          lc2: float = 2.0,            # Inclusion refinement factor (inc = lc / lc2)
          lc3: float = 1.0,
@@ -432,12 +588,12 @@ Next, physical lengths in nanometers are divided by ``period`` (:math:`a`) so th
      py = period if period_y is None else period_y
      dy = float(py) / float(period)
 
-     rx = float(a1) / (2.0 * float(period))
+     rx = float(diameter1) / (2.0 * float(period))
      ry = rx * (1.0 - float(ellipticity))
      ang_rad = float(angle)
      center = (0.5, dy / 2.0)
 
-* **In** ``chiral_qbic_gorkunov.py``:
+* **In** ``chiral_qbic_gorkunov_msh_template.py``:
 
   .. code-block:: python
 
@@ -445,13 +601,13 @@ Next, physical lengths in nanometers are divided by ``period`` (:math:`a`) so th
      dy = float(py) / float(period)
      a = float(period)
 
-     theta_rad = np.deg2rad(float(theta))
-     rot1 = +0.5 * theta_rad if rot1 is None else rot1
-     rot2 = -0.5 * theta_rad if rot2 is None else rot2
+     theta_rad = np.deg2rad(float(theta_deg))
+     angle1 = +0.5 * theta_rad if angle1 is None else angle1
+     angle2 = -0.5 * theta_rad if angle2 is None else angle2
 
-     rx = 0.5 * float(w) / a
-     ry = 0.5 * float(l) / a
-     sep = (float(w) + float(gap)) / a
+     rx = 0.5 * float(width) / a
+     ry = 0.5 * float(length) / a
+     sep = (float(width) + float(gap)) / a
      c1 = (0.5 - 0.5 * sep, 0.5 * dy)
      c2 = (0.5 + 0.5 * sep, 0.5 * dy)
 
@@ -476,7 +632,7 @@ Because both templates use standard elliptical inclusions, **Steps 3 through 6 r
             "lc": lc2,         # Converted internally to maxh = lc / lc2
         }]
 
-   * **In** ``chiral_qbic_gorkunov.py``:
+   * **In** ``chiral_qbic_gorkunov_msh_template.py``:
 
      .. code-block:: python
 
@@ -484,12 +640,12 @@ Because both templates use standard elliptical inclusions, **Steps 3 through 6 r
         if include_bar1:
             inclusions.append({
                 "kind": "ellipse", "center": c1, "rx": rx, "ry": ry,
-                "angle": float(rot1), "tag": 2, "lc": lc2,
+                "angle": float(angle1), "tag": 2, "lc": lc2,
             })
         if include_bar2:
             inclusions.append({
                 "kind": "ellipse", "center": c2, "rx": rx, "ry": ry,
-                "angle": float(rot2), "tag": 2, "lc": lc2,
+                "angle": float(angle2), "tag": 2, "lc": lc2,
             })
 
 2. Call :func:`meshing.unit_cell` with ``inclusions``, ``dy=dy``, and the background mesh size ``lc=lc`` (**Steps 3 & 6**):
@@ -517,7 +673,7 @@ Because both templates use standard elliptical inclusions, **Steps 3 through 6 r
 What ``meshing.unit_cell()`` Supports vs. When to Take Route B2
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-All standard inclusion shapes supported out of the box by :func:`meshing.unit_cell` are listed below (both full-word keys such as ``"center"``, ``"radius"``, ``"width"``, ``"height"``, ``"side"`` and their short aliases ``"c"``, ``"r"``, ``"w"``, ``"h"``, ``"s"`` are accepted):
+All standard inclusion shapes supported out of the box by :func:`meshing.unit_cell` are listed below (old short keys are shown in brackets and still work):
 
 .. list-table:: Standard Inclusion Shapes Supported by ``meshing.unit_cell()``
    :header-rows: 1
@@ -527,29 +683,29 @@ All standard inclusion shapes supported out of the box by :func:`meshing.unit_ce
      - Required / Optional Keys
      - Description
    * - ``"circle"``
-     - ``"center": (xc, yc)`` *(or* ``"c"`` *)*, ``"radius": float`` *(or* ``"r"`` *)*, ``"tag": int``, ``"lc": lc_n``
+     - ``"center": (xc, yc)`` [``"c"``], ``"radius": float`` [``"r"``], ``"tag": int``, ``"lc": lc_n``
      - Circular inclusion of normalized radius ``radius`` built from 24 ``spline3`` arcs.
    * - ``"ellipse"``
-     - ``"center": (xc, yc)`` *(or* ``"c"`` *)*, ``"rx": float``, ``"ry": float``, ``"angle": rad``, ``"tag": int``, ``"lc": lc_n``
+     - ``"center": (xc, yc)`` [``"c"``], ``"rx": float``, ``"ry": float``, ``"angle": rad`` or ``"angle_deg": deg`` [``"rot"``], ``"tag": int``, ``"lc": lc_n``
      - Elliptical inclusion with semi-axes ``rx``, ``ry`` rotated counter-clockwise by ``angle`` (radians).
    * - ``"square"`` / ``"rectangle"``
-     - ``"center": (xc, yc)`` *(or* ``"c"`` *)*, ``"width": float``, ``"height": float`` *(or* ``"side"`` / ``"w"``, ``"h"``, ``"s"`` *)*, ``"tag": int``, ``"lc": lc_n``
+     - ``"center": (xc, yc)`` [``"c"``], ``"width": float``, ``"height": float`` [``"w"``, ``"h"``] or ``"side": float`` [``"s"``], ``"tag": int``, ``"lc": lc_n``
      - Axis-aligned rectangular or square inclusion centered at ``center``.
    * - ``"ring"``
-     - ``"center": (xc, yc)`` *(or* ``"c"`` *)*, ``"r_out": float``, ``"r_in": float``, ``"tag": int``, ``"lc": lc_n``
-     - Annular ring between inner radius ``r_in`` (background) and outer radius ``r_out``.
+     - ``"center": (xc, yc)`` [``"c"``], ``"radius_out": float``, ``"radius_in": float`` [``"r_out"``, ``"r_in"``], ``"tag": int``, ``"lc": lc_n``
+     - Annular ring between inner radius ``radius_in`` (background) and outer radius ``radius_out``.
    * - ``"dimer"``
-     - ``"center": (xc, yc)`` *(or* ``"c"`` *)*, ``"sub_kind": "circle"|"square"``, ``"radius": float`` *(or* ``"r"`` *)*, ``"gap": float``, ``"tag": int``, ``"lc": lc_n``
+     - ``"center": (xc, yc)`` [``"c"``], ``"sub_kind": "circle"|"square"``, ``"radius": float`` [``"r"``], ``"gap": float``, ``"tag": int``, ``"lc": lc_n``
      - Symmetric pair of inclusions separated along :math:`x` by edge-to-edge ``gap``.
 
 .. important::
    **The Exact Role and Boundary of** :func:`meshing.unit_cell`:
 
-   * **Use Route B1 (** :func:`meshing.unit_cell` **)** whenever your unit cell consists of one or more non-overlapping inclusions drawn from the 6 standard shapes in the table above (in any combination of positions ``c``, sizes, rotation angles, and material tags ``2..6``).
+   * **Use Route B1 (** :func:`meshing.unit_cell` **)** whenever your unit cell consists of one or more non-overlapping inclusions drawn from the 6 standard shapes in the table above (in any combination of positions ``center``, sizes, rotation angles, and material tags ``2..6``).
    * **Use Route B2 (Direct** ``SplineGeometry`` **, shown next)** whenever you need a **fancier custom inclusion** that is *not* in the table above—for example, an L-shaped resonator, a split-ring with an angular cut, a crescent, a triangle/hexagonal prism, a rotated rectangle, or freeform splines.
 
-Calling ``ellipse_msh_template.py`` and ``chiral_qbic_gorkunov.py`` from ``NanoStruct``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Calling ``ellipse_msh_template.py`` and ``chiral_qbic_gorkunov_msh_template.py`` from ``NanoStruct``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 To run ``ellipse_msh_template.py``, you pass the **exact same** ``geo_params`` dictionary as in the Gmsh example—simply changing ``.geo`` to ``.py``:
 
@@ -563,7 +719,7 @@ To run ``ellipse_msh_template.py``, you pass the **exact same** ``geo_params`` d
        geo_file='ellipse_msh_template.py',
        geo_params={
            'period': 400.0,
-           'a1': 300.0,
+           'diameter1': 300.0,
            'ellipticity': 0.5,
            'angle': np.pi / 3,
            'lc': 0.08,
@@ -575,7 +731,7 @@ To run ``ellipse_msh_template.py``, you pass the **exact same** ``geo_params`` d
        height_nm=50.0,
    )
 
-Similarly, to build the chiral qBIC dimer layer with ``chiral_qbic_gorkunov.py`` and plot the triangulated mesh:
+Similarly, to build the chiral qBIC dimer layer with ``chiral_qbic_gorkunov_msh_template.py`` and plot the triangulated mesh:
 
 .. code-block:: python
 
@@ -586,10 +742,10 @@ Similarly, to build the chiral qBIC dimer layer with ``chiral_qbic_gorkunov.py``
    period = 480.0
    lay2 = objects.NanoStruct(
        '2D_array',
-       geo_file='chiral_qbic_gorkunov.py',
+       geo_file='chiral_qbic_gorkunov_msh_template.py',
        geo_params={
            'period': period,
-           'theta': 3.5,
+           'theta_deg': 3.5,
            'include_bar1': True,
            'include_bar2': True,
            'lc': 0.15,

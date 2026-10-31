@@ -53,7 +53,7 @@ Create homogeneous thin films and periodic nanostructures:
         background=materials.Air,
         inclusion_a=materials.Si_c,
         thickness=200.0,
-        geo_params={'period': 600.0, 'a1': 240.0, 'lc': 0.1, 'lc2': 2.0},
+        geo_params={'period': 600.0, 'diameter1': 240.0, 'lc': 0.1, 'lc2': 2.0},
     )
 
     # Superstrate (semi-infinite air)
@@ -203,7 +203,7 @@ Available Tutorial Notebooks
    * - ``Chiral_qBIC_Optical_Chirality.ipynb``
      - No
      - Yes
-     - Flagship: Chiral quasi-BIC, parallel adaptive spectrum (300-700 nm), and in-plane optical chirality maps.
+     - Flagship: BIC to quasi-BIC in a bar-dimer metasurface (Gorkunov et al., Fig. 3a): parallel adaptive spectra (520-650 nm), field and optical chirality enhancement at the q-BIC.
 
 Native Netgen CSG Tutorials (In-Memory Meshing)
 -----------------------------------------------

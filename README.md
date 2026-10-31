@@ -47,6 +47,9 @@ EMUstack v2.0 is a pure Python package. It requires **no Fortran compilers**, **
 ### Prerequisites
 * **Python:** 3.10, 3.11, 3.12, 3.13, or 3.14.
 * **Core Dependencies:** `numpy>=1.22`, `scipy>=1.9`, `matplotlib>=3.6`, `ngsolve>=6.2.2401`, `netgen-mesher>=6.2.2401`, `xarray>=2023.1`.
+* **Optional (installed by `.[all]`):** `gmsh` (the default mesher), Jupyter, `adaptive`, `loky`, pytest, Sphinx.
+
+The commands below install EMUstack **with all optional packages** (`.[all]`), so the gmsh mesher, the example notebooks, the tests and the docs build all work right away.
 
 ### Environment Setup & Installation
 
@@ -57,7 +60,7 @@ We recommend installing EMUstack into an isolated environment using Conda, stand
 conda create -n emustack python=3.12 -y
 conda activate emustack
 pip install --upgrade pip
-pip install -e .
+pip install -e ".[all]"
 ```
 
 #### Option 2: Dedicated Virtual Environment (`venv`) + Pip
@@ -65,29 +68,26 @@ pip install -e .
 python3 -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install --upgrade pip
-pip install -e .
+pip install -e ".[all]"
 ```
 
 #### Option 3: Dedicated Virtual Environment with `uv`
 ```bash
 uv venv .venv --python 3.12
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install -e .
+uv pip install -e ".[all]"
 ```
 
-### Optional Extras
+### Smaller Installs
+`[all]` is a shortcut for every optional group. To install only part of it:
 ```bash
-# With pip:
-pip install -e ".[notebooks]"   # Jupyter, nbconvert, adaptive
-pip install -e ".[dev]"         # Pytest, ruff
-pip install -e ".[docs]"        # Sphinx, sphinx-rtd-theme, nbsphinx
-pip install -e ".[dev,notebooks,docs]"
-
-# Or with uv:
-uv pip install -e ".[notebooks]"
-uv pip install -e ".[dev]"
-uv pip install -e ".[docs]"
+pip install -e .                    # core only: simulations with mesher='netgen'
+pip install -e ".[gmsh]"            # + Gmsh, the default mesher for the .geo templates
+pip install -e ".[notebooks]"       # + Jupyter, nbconvert, adaptive, loky
+pip install -e ".[dev]"             # + pytest, ruff
+pip install -e ".[docs]"            # + Sphinx, sphinx-rtd-theme, nbsphinx
 ```
+(Use `uv pip install` in place of `pip install` with uv.) A system Gmsh also works: EMUstack checks `GMSH_BIN`, then `gmsh` on your `PATH`.
 
 ---
 
@@ -115,7 +115,7 @@ pillar_layer = objects.NanoStruct(
     background=materials.Material(1.0),
     inclusion_a=materials.Si_c,
     height_nm=150.0,
-    geo_params={'period': period, 'a1': 160.0, 'lc': 0.15, 'lc2': 2.0}
+    geo_params={'period': period, 'diameter1': 160.0, 'lc': 0.15, 'lc2': 2.0}
 )
 
 # 3. Compute modes and build scattering stack
@@ -134,7 +134,7 @@ print(f"Total Reflection:   {float(ds_spectra['R_total'].values[0]):.4f}")
 
 ### 2. Custom 2D Geometries with Python & Gmsh Templates
 
-EMUstack supports both pure-Python Netgen geometry templates (`*.py`) and classic Gmsh scripts (`*.geo`) located in the working directory or `backend/data/meshes/` (e.g. `ellipse_msh_template.py`, `ellipse_msh_template.geo`, `chiral_qbic_gorkunov.py`).
+EMUstack supports both pure-Python Netgen geometry templates (`*.py`) and classic Gmsh scripts (`*.geo`) located in the working directory or `backend/data/meshes/` (e.g. `ellipse_msh_template.py`, `ellipse_msh_template.geo`, `chiral_qbic_gorkunov_msh_template.py`). Templates are named `<shape>_msh_template.<ext>`, and `.geo` and `.py` templates take the same parameter names (`period`, `period_y`, `diameter1`, `width`, `thickness`, ...; lengths in nm, angles in radians). Old file and parameter names such as `ring1_msh_template.geo`, `d_in_nm` or `a1` still work.
 
 In a Python template, `build_unit_cell(...)` receives the parameters from `geo_params`, normalizes physical dimensions by `period` onto the dimensionless unit cell $[0, 1] \times [0, d_y]$, defines a list of `inclusions` (with `"tag": 2` mapped to `inclusion_a`, `"tag": 3` to `inclusion_b`, etc., and `"tag": 1` reserved for `background`), and calls `meshing.unit_cell()` to build a curved second-order periodic `ngsolve.Mesh` in memory:
 
@@ -147,11 +147,11 @@ ellipse_layer = objects.NanoStruct(
     inclusion_a=materials.Material(2.0),
     height_nm=150.0,
     geo_file='ellipse_msh_template.py',  # or 'ellipse_msh_template.geo'
-    geo_params={'period': 400.0, 'a1': 100.0, 'ellipticity': 0.5, 'angle': 0.0, 'lc': 0.15, 'lc2': 2.0}
+    geo_params={'period': 400.0, 'diameter1': 100.0, 'ellipticity': 0.5, 'angle': 0.0, 'lc': 0.15, 'lc2': 2.0}
 )
 ```
 
-For a complete, step-by-step guide comparing the Gmsh (`.geo`) and Netgen (`.py`) pipelines—with line-by-line walkthroughs of `ellipse_msh_template.geo`, `ellipse_msh_template.py`, and `chiral_qbic_gorkunov.py`—see the **[2D Geometry & Meshing Guide](https://bjornsturmberg.github.io/EMUstack/meshing.html)** in the documentation.
+For a complete, step-by-step guide comparing the Gmsh (`.geo`) and Netgen (`.py`) pipelines—with line-by-line walkthroughs of `ellipse_msh_template.geo`, `ellipse_msh_template.py`, and `chiral_qbic_gorkunov_msh_template.py`—see the **[2D Geometry & Meshing Guide](https://bjornsturmberg.github.io/EMUstack/meshing.html)** in the documentation.
 
 ### 3. Evaluating Electric & Magnetic Near-Fields, Poynting Vector, and Optical Chirality
 
@@ -208,7 +208,7 @@ EMUstack v2.0 provides **45 didactic Jupyter Notebooks** organized into two dedi
 | `simo_091-slab_mode_finding.ipynb` | Guided slab mode dispersion finding via determinant zeros | [View](examples/simo_091-slab_mode_finding.ipynb) | [View](examples_netgen/simo_091-slab_mode_finding.ipynb) |
 | `Au Nanodisk Array with Interpolators.ipynb` | Plasmonic gold nanodisk array & 3-plane field maps (`xy`, `xz`, `yz`) | [View](examples/Au%20Nanodisk%20Array%20with%20Interpolators.ipynb) | [View](examples_netgen/Au%20Nanodisk%20Array%20with%20Interpolators.ipynb) |
 | `Elliptical Nanohole Array (custom target interface).ipynb` | Custom geometry template tutorial & 3-plane maps (`xy`, `xz`, `yz`) | [View](examples/Elliptical%20Nanohole%20Array%20(custom%20target%20interface).ipynb) | [View](examples_netgen/Elliptical%20Nanohole%20Array%20(custom%20target%20interface).ipynb) |
-| `Chiral_qBIC_Optical_Chirality.ipynb` | Chiral quasi-BIC metasurface & in-plane optical chirality $\hat{C}$ (broadband [300, 700] nm) | — | [View](examples_netgen/Chiral_qBIC_Optical_Chirality.ipynb) |
+| `Chiral_qBIC_Optical_Chirality.ipynb` | BIC to quasi-BIC in a bar-dimer metasurface (Gorkunov et al., Fig. 3a, [520, 650] nm), field & optical chirality enhancement $\hat{C}$ at the q-BIC | — | [View](examples_netgen/Chiral_qBIC_Optical_Chirality.ipynb) |
 
 ---
 
@@ -268,7 +268,7 @@ Legacy file dumps can be re-enabled at any time by explicitly passing `save_pdf=
    - Pure-Python 1D FEM using high-order polynomial elements with coupled TE/TM states for conical incidence.
    - NGSolve 2D FEM utilizing mixed vector-scalar spaces ($H(\text{curl}) \times H^1$) with exact tangential continuity and zero spurious eigenmodes.
 3. **In-Memory Netgen CSG Geometry:**
-   - Parameterized Python geometry templates (`*_template.py`) enabling curved second-order elements with zero disk I/O.
+   - Parameterized Python geometry templates (`*_msh_template.py`) enabling curved second-order elements with zero disk I/O.
 4. **Full Near-Field & Chirality Suite:**
    - Faraday reconstruction of true 3D magnetic fields $\mathbf{H}$.
    - Fast `FieldBundle` interpolators for in-plane slices ($xy$), cross-sections ($xz$, $yz$), Poynting vector flux, Lipkin optical chirality density $C$, and normalized chirality enhancement $\hat{C}$.

@@ -26,6 +26,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# `all` installs every extra below, so tests, notebooks and docs run out of the box.
+all = ["emustack-fem[gmsh,notebooks,dev,docs]"]
+gmsh = ["gmsh>=4.11"]  # mesher for the .geo templates (the default mesher)
 dev = ["pytest>=7.0", "ruff>=0.4"]
 notebooks = ["jupyter>=1.0", "nbconvert>=7.0", "ipykernel>=6.0", "adaptive>=1.0", "loky>=3.0"]
 docs = ["sphinx>=7.0", "sphinx-rtd-theme>=2.0", "nbsphinx>=0.9", "ipython>=8.0", "pyyaml>=6.0"]
