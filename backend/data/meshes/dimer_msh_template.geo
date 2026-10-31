@@ -7,22 +7,22 @@ Mesh.MshFileVersion = 2.2;
 
 d = 1; // grating period
 ff = 0;
-d_in_nm = 0; // input geo params
-dy_in_nm = 0;
-dy = dy_in_nm/d_in_nm;
-a1 = 0;
-a2 = 0;
+period = 0; // input geo params (legacy: d_in_nm)
+period_y = 0; // (legacy: dy_in_nm)
+dy = period_y/period;
+diameter1 = 0; // (legacy: a1)
+diameter2 = 0; // (legacy: a2)
 gap = 0;
 ellipticity = 0;
 lc = 0; // input mesh params
 lc2 = lc/1; // on cylinder surfaces and center
 lc3 = lc/1; // on gap
-center1 = d_in_nm/2 - a1/2 - gap/2; // derived params
-center2 = d_in_nm/2 + a2/2 + gap/2;
-r1 = (a1/(2*d_in_nm))*d;
-r2 = (a2/(2*d_in_nm))*d;
-c1 = (center1/d_in_nm)*d;
-c2 = (center2/d_in_nm)*d;
+center1 = period/2 - diameter1/2 - gap/2; // derived params
+center2 = period/2 + diameter2/2 + gap/2;
+r1 = (diameter1/(2*period))*d;
+r2 = (diameter2/(2*period))*d;
+c1 = (center1/period)*d;
+c2 = (center2/period)*d;
 ell = ellipticity;
 
 hy = dy; // Thickness: Square profile => hy=d

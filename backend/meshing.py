@@ -6,14 +6,30 @@ Provides:
 - .mail file reader and importer (read_mail_file) converting legacy .mail to linear MSH 2.2.
 - Periodic Boundary Coupling: algebraic constraint operator (bloch_constraint).
 - Bloch product spaces (bloch_spaces) with mandatory assertions.
+
+Naming is shared by the three ways of describing a unit cell (see the
+"Templates & naming" section of the docs):
+
+- ``.geo`` (gmsh) and ``.py`` (netgen) templates are named
+  ``<shape>_msh_template.<ext>`` and take the same parameter names, in nm:
+  ``period``, ``period_y``, ``diameter1``, ``width``, ``thickness``, ...
+  Angles are in radians unless the name ends in ``_deg``.
+- ``unit_cell`` takes inclusion dicts in normalized coordinates with the
+  matching keys: ``kind``, ``center``, ``radius``, ``width``, ``angle``, ...
+
+Old file names, old parameter names and old dict keys keep working through the
+alias tables below.
 """
 import os
+import re
 import tempfile
 import shutil
 import subprocess
 import inspect
+import functools
+import warnings
 import importlib.util
-from typing import List, Tuple, Dict, Any, Optional
+from typing import List, Tuple, Dict, Any, Optional, Iterable
 
 import numpy as np
 import netgen.geom2d as g2
@@ -22,6 +38,222 @@ from netgen.read_gmsh import ReadGmsh
 import ngsolve as ngs
 from ngsolve import Mesh, HCurl, H1
 from ngsolve.fem import NODE_TYPE
+
+
+# ---------------------------------------------------------------------------
+# Shared names
+# ---------------------------------------------------------------------------
+
+# gmsh Physical Line numbers used by every .geo template and .mail file.
+BOUNDARY_NAMES = {1: "top", 2: "bottom", 3: "left", 4: "right"}
+# Material names: domain 1 is the background, domain n >= 2 is inclusion n.
+BACKGROUND_NAME = "bg"
+
+
+def inclusion_name(tag: int) -> str:
+    """Material name of inclusion domain ``tag`` (``2 -> "inc2"``)."""
+    return f"inc{tag}"
+
+
+TEMPLATE_SUFFIX = "_msh_template"
+
+# Old template file names -> current names. Old names keep resolving everywhere.
+LEGACY_TEMPLATE_NAMES = {
+    "ring1_msh_template.geo": "ring_msh_template.geo",
+    "rect1_msh_template.geo": "rectangle_msh_template.geo",
+    "rect_shell1_msh_template.geo": "rectangle_shell_msh_template.geo",
+    "cross1_msh_template.geo": "cross_msh_template.geo",
+    "cross_shell1_msh_template.geo": "cross_shell_msh_template.geo",
+    "dimer1_msh_template.geo": "dimer_msh_template.geo",
+    "square_dimer1_msh_template.geo": "square_dimer_msh_template.geo",
+    "square_shell_dimer1_msh_template.geo": "square_shell_dimer_msh_template.geo",
+    "1_strip_msh_template.geo": "strip_msh_template.geo",
+    "1_2strip_msh_template.geo": "double_strip_msh_template.geo",
+    "chiral_qbic_template.py": "chiral_qbic_msh_template.py",
+    "chiral_qbic_gorkunov.py": "chiral_qbic_gorkunov_msh_template.py",
+}
+
+# Template parameter names shared by all templates: canonical -> legacy spellings.
+# Names that only one template uses declare their legacy spelling inside that
+# template, on the placeholder line: ``width = 0; // nm (legacy: a1)``.
+PARAM_ALIASES: Dict[str, Tuple[str, ...]] = {
+    "period": ("d_in_nm",),
+    "period_y": ("dy_in_nm",),
+    "thickness": ("t",),
+    **{f"diameter{k}": (f"a{k}",) for k in range(1, 17)},
+}
+
+
+def _build_alias_groups(aliases: Dict[str, Tuple[str, ...]]) -> Dict[str, Tuple[str, ...]]:
+    """Map every name (canonical or legacy) to its other spellings, canonical first."""
+    groups: Dict[str, Tuple[str, ...]] = {}
+    for canonical, legacy in aliases.items():
+        names = (canonical,) + tuple(legacy)
+        for name in names:
+            groups[name] = tuple(n for n in names if n != name)
+    return groups
+
+
+_PARAM_EQUIVALENTS = _build_alias_groups(PARAM_ALIASES)
+
+
+def param_equivalents(name: str) -> Tuple[str, ...]:
+    """Other spellings of a template parameter (``"a1" -> ("diameter1",)``)."""
+    return _PARAM_EQUIVALENTS.get(name, ())
+
+
+# A .geo placeholder is ``name = 0;`` (a value) or ``name = lc/1;`` (a mesh
+# refinement divisor), optionally followed by ``// ... (legacy: old_name)``.
+_GEO_PLACEHOLDER = re.compile(
+    r"(?<![\w.])(?P<name>[A-Za-z_]\w*)(?P<sep>[ \t]*=[ \t]*)(?P<val>0|lc/1)[ \t]*;"
+    r"(?P<rest>[^\n]*)"
+)
+_GEO_LEGACY_TAG = re.compile(r"\(legacy:\s*([^)]*)\)")
+
+
+def geo_placeholders(text: str) -> Tuple[Dict[str, str], Dict[str, str]]:
+    """Find the placeholders of a .geo template.
+
+    Returns ``(placeholders, legacy)``: ``placeholders`` maps each name to
+    ``"value"`` (``name = 0;``) or ``"lc"`` (``name = lc/1;``), and ``legacy``
+    maps each legacy name declared with ``(legacy: ...)`` to its current name.
+    """
+    placeholders: Dict[str, str] = {}
+    legacy: Dict[str, str] = {}
+    for m in _GEO_PLACEHOLDER.finditer(text):
+        name = m.group("name")
+        placeholders.setdefault(name, "lc" if m.group("val") == "lc/1" else "value")
+        tag = _GEO_LEGACY_TAG.search(m.group("rest"))
+        if tag:
+            for old in re.split(r"[,\s]+", tag.group(1).strip()):
+                if old:
+                    legacy[old] = name
+    return placeholders, legacy
+
+
+def _geo_target(key: str, placeholders: Dict[str, str], legacy: Dict[str, str]) -> Optional[str]:
+    """Placeholder that ``key`` fills: exact name first, then its other spellings."""
+    if key in placeholders:
+        return key
+    for alt in param_equivalents(key):
+        if alt in placeholders:
+            return alt
+    for alt in (key,) + param_equivalents(key):
+        if alt in legacy:
+            return legacy[alt]
+    return None
+
+
+def fill_geo_template(
+    text: str,
+    params: Dict[str, Any],
+    fmt: str = "%f",
+    strict: bool = True,
+    optional: Iterable[str] = (),
+    template: str = "template",
+) -> str:
+    """Fill the placeholders of a .geo template.
+
+    Each key fills the placeholder of the same name. If the template has no
+    such placeholder, the key's other spellings are tried: the shared ones in
+    ``PARAM_ALIASES`` (``d_in_nm`` <-> ``period``, ``a1`` <-> ``diameter1``, ...)
+    and the ``(legacy: ...)`` tags of the template itself. So old keys fill
+    renamed templates, and new keys fill old custom templates.
+
+    ``name = 0;`` becomes ``name = <value>;`` and ``name = lc/1;`` becomes
+    ``name = lc/<value>;``. Numbers are written with ``fmt``; strings are
+    written as they are. When two keys fill the same placeholder, the later
+    one wins.
+
+    A key that matches no placeholder raises ``KeyError`` when ``strict`` is
+    set, unless it is listed in ``optional``; otherwise it is ignored.
+    """
+    placeholders, legacy = geo_placeholders(text)
+    optional = set(optional)
+    values: Dict[str, Any] = {}
+    for key, value in params.items():
+        target = _geo_target(key, placeholders, legacy)
+        if target is None:
+            if strict and key not in optional:
+                expected = f"{key} = lc/1;" if key.startswith("lc") and key[2:].isdigit() else f"{key} = 0;"
+                raise KeyError(
+                    f"Parameter '{key}' in geo_params was not found in template '{template}'. "
+                    f"Expected placeholder '{expected}'."
+                )
+            continue
+        values[target] = value
+
+    def _sub(m: "re.Match[str]") -> str:
+        name = m.group("name")
+        if name not in values:
+            return m.group(0)
+        value = values[name]
+        number = value if isinstance(value, str) else fmt % value
+        if m.group("val") == "lc/1":
+            number = "lc/" + number
+        return f"{name}{m.group('sep')}{number};{m.group('rest')}"
+
+    return _GEO_PLACEHOLDER.sub(_sub, text)
+
+
+def legacy_params(**renames: str):
+    """Let a template builder accept old keyword names after a rename.
+
+    ``@legacy_params(a1="diameter1")`` above ``def build_unit_cell(..., diameter1=None, ...)``
+    turns a call with ``a1=300`` into ``diameter1=300``. Passing both names raises
+    ``TypeError``. The renames are stored on the function as ``legacy_params``, so
+    ``mesh_from_py`` accepts the old names in ``geo_params`` too. It only renames;
+    values are not converted. See "Renaming a .py Template Parameter Safely" in the
+    meshing guide.
+    """
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            for old, new in renames.items():
+                if old in kwargs:
+                    if new in kwargs:
+                        raise TypeError(f"{fn.__name__}() got both '{old}' and its new name '{new}'")
+                    kwargs[new] = kwargs.pop(old)
+            return fn(*args, **kwargs)
+        wrapper.legacy_params = dict(renames)
+        return wrapper
+    return decorator
+
+
+# unit_cell inclusion keys: legacy key -> canonical key.
+INCLUSION_KEY_ALIASES = {
+    "shape": "kind",
+    "c": "center",
+    "r": "radius",
+    "w": "width",
+    "h": "height",
+    "s": "side",
+    "rot": "angle_deg",
+    "r_out": "radius_out",
+    "r_in": "radius_in",
+}
+INCLUSION_KEYS = frozenset({
+    "kind", "center", "radius", "rx", "ry", "width", "height", "side",
+    "angle", "angle_deg", "radius_out", "radius_in", "gap", "sub_kind",
+    "tag", "lc", "maxh", "nseg",
+})
+
+
+def _normalize_inclusion(inc: Dict[str, Any]) -> Dict[str, Any]:
+    """Return ``inc`` with canonical keys. A canonical key wins over its alias."""
+    out = {k: v for k, v in inc.items() if k in INCLUSION_KEYS}
+    for old, new in INCLUSION_KEY_ALIASES.items():
+        if old in inc and new not in out:
+            out[new] = inc[old]
+    unknown = sorted(k for k in inc if k not in INCLUSION_KEYS and k not in INCLUSION_KEY_ALIASES)
+    if unknown:
+        warnings.warn(
+            f"unit_cell(): ignoring unknown inclusion key(s) {unknown}. "
+            f"Valid keys: {sorted(INCLUSION_KEYS)}.",
+            UserWarning,
+            stacklevel=3,
+        )
+    return out
 
 
 def arc_segments(r: float, c: Tuple[float, float], nseg: int = 12):
@@ -83,40 +315,45 @@ def unit_cell(
     dy: float = 1.0,
     lc: float = 0.1,
     curve_order: int = 2,
+    nseg: int = 24,
     **lc_kwargs: Any,
 ) -> ngs.Mesh:
     """Build a periodic 2D unit cell mesh using native Netgen SplineGeometry.
 
+    All lengths are normalized to the period along x. The old call
+    ``unit_cell(dy, inclusions, period_x=...)`` still works.
+
     Parameters
     ----------
     inclusions : list of dict
-        List of inclusion dictionaries specifying geometries (``"circle"``,
-        ``"ellipse"``, ``"square"``, ``"rectangle"``, ``"ring"``, ``"dimer"``).
-        Each dictionary may specify:
+        One dict per inclusion. Keys (old spellings in brackets still work):
 
-        - ``"kind"`` (or ``"shape"``): shape primitive name
-        - ``"center"`` (or ``"c"``): ``(xc, yc)`` coordinates (defaults to ``(dx/2, dy/2)``)
-        - ``"radius"`` (or ``"r"``), ``"rx"``, ``"ry"``, ``"angle"`` (or ``"rot"`` in deg),
-          ``"width"``/``"height"``/``"side"`` (or ``"w"``/``"h"``/``"s"``), ``"r_out"``/``"r_in"``
-        - ``"tag"``: integer subdomain material tag (``2..6``, default ``2``)
-        - ``"lc"``: local mesh scaling factor ``lc_n > 0`` (converted internally to
-          Netgen's ``maxh = lc / lc_n``, producing a finer mesh when ``lc_n > 1``
-          and a coarser mesh when ``0 < lc_n < 1``)
-    dx : float, default=1.0
-        Normalized unit-cell width along x.
-    dy : float, default=1.0
-        Normalized unit-cell height along y (``period_y / period``).
-    lc : float, default=0.1
-        Background mesh element size (domain tag 1, ``"bg"``) in normalized
-        unit-cell coordinates.
-    curve_order : int, default=2
+        - ``"kind"`` [``"shape"``]: ``"circle"`` (default), ``"ellipse"``,
+          ``"square"``, ``"rectangle"``, ``"ring"`` or ``"dimer"``
+        - ``"center"`` [``"c"``]: ``(x, y)``, default ``(dx/2, dy/2)``
+        - circle/ellipse: ``"radius"`` [``"r"``] or ``"rx"``, ``"ry"``
+        - square/rectangle: ``"side"`` [``"s"``] or ``"width"``, ``"height"``
+          [``"w"``, ``"h"``]
+        - ring: ``"radius_out"``, ``"radius_in"`` [``"r_out"``, ``"r_in"``]
+        - dimer: ``"radius"``, ``"gap"`` and ``"sub_kind"`` (``"circle"`` or a
+          square with ``"side"``/``"width"``/``"height"``)
+        - ``"angle"``: rotation in radians, or ``"angle_deg"`` [``"rot"``] in degrees
+        - ``"tag"``: material tag ``n >= 2`` (domain ``"inc<n>"``, default 2)
+        - ``"lc"``: refinement factor, ``maxh = lc / lc_n`` (finer when > 1),
+          or ``"maxh"`` directly; ``"nseg"``: arcs per curved boundary
+    dx, dy : float, default 1.0
+        Unit-cell width and height (``dy = period_y / period``).
+    lc : float, default 0.1
+        Background mesh size (domain ``"bg"``).
+    curve_order : int, default 2
         Netgen geometric curvature order (>= 2).
-    **lc_kwargs : float, optional
-        Arbitrary mesh scaling factors ``lc2, lc3, ..., lc_n`` mapped by default
-        to subdomain ``tag = 2, 3, ..., n`` (``maxh = lc / lc_n``) when an
-        inclusion dictionary does not specify its own ``"lc"`` key.
+    nseg : int, default 24
+        Default number of arcs per curved boundary (at least 12).
+    **lc_kwargs : float
+        ``lc2, lc3, ..., lc<n>``: refinement factor of inclusions with
+        ``tag = n`` that do not set their own ``"lc"``.
     """
-    # 100% backward compatibility with legacy positional unit_cell(dy, inclusions, ...)
+    # Old positional form unit_cell(dy, inclusions, ...)
     if isinstance(inclusions, (int, float)) and isinstance(dx, list):
         dy = float(inclusions)
         inclusions = dx
@@ -124,7 +361,7 @@ def unit_cell(
 
     if "period_x" in lc_kwargs:
         dx = float(lc_kwargs.pop("period_x"))
-    default_nseg = int(lc_kwargs.pop("nseg", 24))
+    default_nseg = int(nseg)
 
     bg_h = float(lc)
     if bg_h <= 0.0:
@@ -173,10 +410,12 @@ def unit_cell(
     tags = {1}
     domain_maxh: Dict[int, float] = {}
     for inc in inclusions:
-        kind = inc.get("kind", inc.get("shape", "circle"))
+        inc = _normalize_inclusion(inc)
+        kind = inc.get("kind", "circle")
         tag = inc.get("tag", 2)
         tags.add(tag)
-        c = inc.get("center", inc.get("c", (L / 2.0, H / 2.0)))
+        name = inclusion_name(tag)
+        c = inc.get("center", (L / 2.0, H / 2.0))
         if inc.get("lc") is not None:
             maxh_inc = _factor_to_maxh(inc["lc"])
         elif inc.get("maxh") is not None:
@@ -187,48 +426,48 @@ def unit_cell(
         nseg_inc = max(12, int(inc.get("nseg", default_nseg)))
 
         if kind in ("circle", "ellipse"):
-            r = inc.get("radius", inc.get("r", None))
+            r = inc.get("radius", None)
             rx = inc.get("rx", r)
             ry = inc.get("ry", r)
-            if "rot" in inc and "angle" not in inc:
-                ang = float(inc["rot"]) * np.pi / 180.0
+            if "angle" in inc:
+                ang = float(inc["angle"])
             else:
-                ang = float(inc.get("angle", 0.0))
+                ang = float(inc.get("angle_deg", 0.0)) * np.pi / 180.0
             for a0, a1 in arc_segments(r=r, c=c, nseg=nseg_inc):
                 pt0, pt_ctrl, pt1 = arc_control_points(geo, kind, c, a0, a1, r=r, rx=rx, ry=ry, angle=ang)
-                geo.Append(["spline3", pt0, pt_ctrl, pt1], leftdomain=tag, rightdomain=1, bc=f"inc{tag}", maxh=maxh_inc)
+                geo.Append(["spline3", pt0, pt_ctrl, pt1], leftdomain=tag, rightdomain=1, bc=name, maxh=maxh_inc)
 
         elif kind in ("square", "rectangle"):
-            side_default = inc.get("side", inc.get("s", 0.2))
-            w = float(inc.get("width", inc.get("w", side_default)))
-            h = float(inc.get("height", inc.get("h", side_default)))
+            side_default = inc.get("side", 0.2)
+            w = float(inc.get("width", side_default))
+            h = float(inc.get("height", side_default))
             pts_rect = [
                 geo.AddPoint(c[0] - w / 2.0, c[1] - h / 2.0),
                 geo.AddPoint(c[0] + w / 2.0, c[1] - h / 2.0),
                 geo.AddPoint(c[0] + w / 2.0, c[1] + h / 2.0),
                 geo.AddPoint(c[0] - w / 2.0, c[1] + h / 2.0),
             ]
-            geo.Append(["line", pts_rect[0], pts_rect[1]], leftdomain=tag, rightdomain=1, bc=f"inc{tag}", maxh=maxh_inc)
-            geo.Append(["line", pts_rect[1], pts_rect[2]], leftdomain=tag, rightdomain=1, bc=f"inc{tag}", maxh=maxh_inc)
-            geo.Append(["line", pts_rect[2], pts_rect[3]], leftdomain=tag, rightdomain=1, bc=f"inc{tag}", maxh=maxh_inc)
-            geo.Append(["line", pts_rect[3], pts_rect[0]], leftdomain=tag, rightdomain=1, bc=f"inc{tag}", maxh=maxh_inc)
+            geo.Append(["line", pts_rect[0], pts_rect[1]], leftdomain=tag, rightdomain=1, bc=name, maxh=maxh_inc)
+            geo.Append(["line", pts_rect[1], pts_rect[2]], leftdomain=tag, rightdomain=1, bc=name, maxh=maxh_inc)
+            geo.Append(["line", pts_rect[2], pts_rect[3]], leftdomain=tag, rightdomain=1, bc=name, maxh=maxh_inc)
+            geo.Append(["line", pts_rect[3], pts_rect[0]], leftdomain=tag, rightdomain=1, bc=name, maxh=maxh_inc)
 
         elif kind == "ring":
-            r_out = inc["r_out"]
-            r_in = inc["r_in"]
+            r_out = inc["radius_out"]
+            r_in = inc["radius_in"]
             # Outer circle: leftdomain = tag, rightdomain = 1
             for a0, a1 in arc_segments(r=r_out, c=c, nseg=nseg_inc):
                 pt0, pt_ctrl, pt1 = arc_control_points(geo, "circle", c, a0, a1, r=r_out)
-                geo.Append(["spline3", pt0, pt_ctrl, pt1], leftdomain=tag, rightdomain=1, bc=f"inc{tag}_out", maxh=maxh_inc)
+                geo.Append(["spline3", pt0, pt_ctrl, pt1], leftdomain=tag, rightdomain=1, bc=f"{name}_out", maxh=maxh_inc)
             # Inner circle: leftdomain = 1, rightdomain = tag
             for a0, a1 in arc_segments(r=r_in, c=c, nseg=nseg_inc):
                 pt0, pt_ctrl, pt1 = arc_control_points(geo, "circle", c, a0, a1, r=r_in)
-                geo.Append(["spline3", pt0, pt_ctrl, pt1], leftdomain=1, rightdomain=tag, bc=f"inc{tag}_in", maxh=maxh_inc)
+                geo.Append(["spline3", pt0, pt_ctrl, pt1], leftdomain=1, rightdomain=tag, bc=f"{name}_in", maxh=maxh_inc)
 
         elif kind == "dimer":
             # Two inclusions with a gap
             sub_kind = inc.get("sub_kind", "circle")
-            r = inc.get("radius", inc.get("r", 0.1))
+            r = inc.get("radius", 0.1)
             gap = inc.get("gap", 0.05)
             shift_x = r + gap / 2.0
             c1 = (c[0] - shift_x, c[1])
@@ -237,27 +476,27 @@ def unit_cell(
                 if sub_kind in ("circle", "ellipse"):
                     for a0, a1 in arc_segments(r=r, c=center, nseg=nseg_inc):
                         pt0, pt_ctrl, pt1 = arc_control_points(geo, sub_kind, center, a0, a1, r=r)
-                        geo.Append(["spline3", pt0, pt_ctrl, pt1], leftdomain=tag, rightdomain=1, bc=f"inc{tag}", maxh=maxh_inc)
+                        geo.Append(["spline3", pt0, pt_ctrl, pt1], leftdomain=tag, rightdomain=1, bc=name, maxh=maxh_inc)
                 else:
-                    side_default = inc.get("side", inc.get("s", 2 * r))
-                    w = float(inc.get("width", inc.get("w", side_default)))
-                    h = float(inc.get("height", inc.get("h", side_default)))
+                    side_default = inc.get("side", 2 * r)
+                    w = float(inc.get("width", side_default))
+                    h = float(inc.get("height", side_default))
                     pts_rect = [
                         geo.AddPoint(center[0] - w / 2.0, center[1] - h / 2.0),
                         geo.AddPoint(center[0] + w / 2.0, center[1] - h / 2.0),
                         geo.AddPoint(center[0] + w / 2.0, center[1] + h / 2.0),
                         geo.AddPoint(center[0] - w / 2.0, center[1] + h / 2.0),
                     ]
-                    geo.Append(["line", pts_rect[0], pts_rect[1]], leftdomain=tag, rightdomain=1, bc=f"inc{tag}", maxh=maxh_inc)
-                    geo.Append(["line", pts_rect[1], pts_rect[2]], leftdomain=tag, rightdomain=1, bc=f"inc{tag}", maxh=maxh_inc)
-                    geo.Append(["line", pts_rect[2], pts_rect[3]], leftdomain=tag, rightdomain=1, bc=f"inc{tag}", maxh=maxh_inc)
-                    geo.Append(["line", pts_rect[3], pts_rect[0]], leftdomain=tag, rightdomain=1, bc=f"inc{tag}", maxh=maxh_inc)
+                    geo.Append(["line", pts_rect[0], pts_rect[1]], leftdomain=tag, rightdomain=1, bc=name, maxh=maxh_inc)
+                    geo.Append(["line", pts_rect[1], pts_rect[2]], leftdomain=tag, rightdomain=1, bc=name, maxh=maxh_inc)
+                    geo.Append(["line", pts_rect[2], pts_rect[3]], leftdomain=tag, rightdomain=1, bc=name, maxh=maxh_inc)
+                    geo.Append(["line", pts_rect[3], pts_rect[0]], leftdomain=tag, rightdomain=1, bc=name, maxh=maxh_inc)
 
-    geo.SetMaterial(1, "bg")
+    geo.SetMaterial(1, BACKGROUND_NAME)
     geo.SetDomainMaxH(1, bg_h)
     for tag in tags:
         if tag != 1:
-            geo.SetMaterial(tag, f"inc{tag}")
+            geo.SetMaterial(tag, inclusion_name(tag))
             geo.SetDomainMaxH(tag, domain_maxh.get(tag, _default_inc_h(tag)))
 
     global_maxh = max([bg_h] + list(domain_maxh.values()))
@@ -289,6 +528,95 @@ def bloch_spaces(
     space = ngs.Periodic(fes, phase=phase)
     assert space.FreeDofs().NumSet() < fes.ndof, "Periodic() left the space unconstrained"
     return space
+
+
+# Dimension of each MSH 2.2 element type (points, lines, surfaces, volumes).
+_MSH2_ELEMENT_DIM = {15: 0, 1: 1, 8: 1, 26: 1, 27: 1, 28: 1,
+                     2: 2, 3: 2, 9: 2, 10: 2, 16: 2, 20: 2, 21: 2, 22: 2, 23: 2, 24: 2, 25: 2,
+                     4: 3, 5: 3, 6: 3, 7: 3, 11: 3, 12: 3, 13: 3, 14: 3, 17: 3, 18: 3, 19: 3}
+
+
+def _prepare_msh_for_netgen(msh_text: str) -> Optional[str]:
+    """Make an MSH 2.2 mesh safe for netgen's ReadGmsh.
+
+    ReadGmsh needs a name for every physical group, and it numbers domains and
+    boundaries by gmsh's elementary tags; with more elementary surfaces than
+    boundaries it reads out of bounds (random crashes). So, as ``mail_to_msh22``
+    does, every element gets its physical tag as elementary tag, and unnamed
+    groups get names: boundary lines after the cell side they lie on
+    (``BOUNDARY_NAMES``, or ``bnd<N>`` inside the cell), surfaces ``bg`` (tag 1)
+    or ``inc<N>``. Returns None when the mesh needs no change.
+    """
+    lines = msh_text.split("\n")
+
+    def section(name):
+        try:
+            start = lines.index("$" + name)
+        except ValueError:
+            return None, None
+        return start, lines.index("$End" + name, start)
+
+    names: Dict[Tuple[int, int], str] = {}
+    ps, pe = section("PhysicalNames")
+    if ps is not None:
+        for line in lines[ps + 2:pe]:
+            dim, tag, name = line.split(maxsplit=2)
+            names[(int(dim), int(tag))] = name.strip()
+
+    ns, ne_ = section("Nodes")
+    es, ee = section("Elements")
+    if ns is None or es is None:
+        return None
+    xy = {}
+    for line in lines[ns + 2:ne_]:
+        parts = line.split()
+        xy[int(parts[0])] = (float(parts[1]), float(parts[2]))
+
+    used: Dict[Tuple[int, int], set] = {}
+    retagged = False
+    for i in range(es + 2, ee):
+        parts = [int(v) for v in lines[i].split()]
+        dim = _MSH2_ELEMENT_DIM.get(parts[1])
+        if dim is None or parts[2] == 0:
+            continue
+        used.setdefault((dim, parts[3]), set()).update(parts[3 + parts[2]:])
+        if parts[2] >= 2 and parts[4] != parts[3]:
+            parts[4] = parts[3]
+            lines[i] = " ".join(str(v) for v in parts)
+            retagged = True
+
+    missing = [key for key in used if key not in names]
+    if not missing and not retagged:
+        return None
+
+    pts = np.array(list(xy.values()))
+    lo, hi = pts.min(axis=0), pts.max(axis=0)
+    tol = 1e-6 * max(hi - lo)
+    sides = {"left": (0, lo[0]), "right": (0, hi[0]), "bottom": (1, lo[1]), "top": (1, hi[1])}
+
+    for dim, tag in sorted(missing):
+        if dim == 1:
+            nodes = np.array([xy[n] for n in used[(dim, tag)]])
+            on_side = {side: np.sum(np.abs(nodes[:, axis] - value) < tol) for side, (axis, value) in sides.items()}
+            side = max(on_side, key=on_side.get)
+            name = side if on_side[side] > len(nodes) / 2 else f"bnd{tag}"
+        elif dim == 2:
+            name = BACKGROUND_NAME if tag == 1 else inclusion_name(tag)
+        else:
+            name = f"group{dim}_{tag}"
+        names[(dim, tag)] = f'"{name}"'
+    if not missing:
+        return "\n".join(lines)
+
+    block = ["$PhysicalNames", str(len(names))]
+    block += [f"{dim} {tag} {name}" for (dim, tag), name in sorted(names.items())]
+    block.append("$EndPhysicalNames")
+    if ps is None:
+        _, fe = section("MeshFormat")
+        lines[fe + 1:fe + 1] = block
+    else:
+        lines[ps:pe + 1] = block
+    return "\n".join(lines)
 
 
 def import_gmsh_mesh(
@@ -324,8 +652,19 @@ def import_gmsh_mesh(
                         "Netgen requires legacy Gmsh MSH 2.2 format (-format msh2 -order 1)."
                     )
 
-    # Read with Netgen
-    ngm = ReadGmsh(msh_path)
+    # Read with Netgen, which needs a name for every physical group
+    with open(msh_path, "r", errors="ignore") as f:
+        named = _prepare_msh_for_netgen(f.read())
+    if named is None:
+        ngm = ReadGmsh(msh_path)
+    else:
+        with tempfile.NamedTemporaryFile("w", suffix=".msh", delete=False) as f:
+            f.write(named)
+            named_path = f.name
+        try:
+            ngm = ReadGmsh(named_path)
+        finally:
+            os.remove(named_path)
     # Ensure mesh dimension is 2D for planar unit cells
     ngm.dim = 2
     if curve_order >= 2:
@@ -420,13 +759,10 @@ def mail_to_msh22(mail_path: str) -> str:
     out = [
         "$MeshFormat\n2.2 0 8\n$EndMeshFormat",
         f"$PhysicalNames\n{4 + len(unique_types)}",
-        '1 1 "top"',
-        '1 2 "bottom"',
-        '1 3 "left"',
-        '1 4 "right"',
+        *(f'1 {num} "{side}"' for num, side in BOUNDARY_NAMES.items()),
     ]
     for typ in unique_types:
-        name = "bg" if typ == 1 else f"inc{typ}"
+        name = BACKGROUND_NAME if typ == 1 else inclusion_name(typ)
         out.append(f'2 {typ} "{name}"')
     out.append("$EndPhysicalNames")
 
@@ -534,17 +870,32 @@ def conv_gmsh(root: str) -> Tuple[int, int]:
 
 
 def resolve_mesh_file_path(filename: str) -> str:
-    """Locate a .geo, .py, .msh, or .mail file in CWD or the dedicated meshes folder."""
+    """Find a .geo, .py, .msh or .mail file.
+
+    Looks in the current directory first, then in ``backend/data/meshes``.
+    A template can be given by its full name (``ring_msh_template.geo``), its
+    old name (``ring1_msh_template.geo``) or its short name (``ring.geo``).
+    """
     if os.path.exists(filename):
         return os.path.abspath(filename)
     base_dir = os.path.dirname(os.path.abspath(__file__))
     mesh_dir = os.path.join(base_dir, "data", "meshes")
-    candidate = os.path.join(mesh_dir, os.path.basename(filename))
+    base = os.path.basename(filename)
+    candidate = os.path.join(mesh_dir, base)
     if os.path.exists(candidate):
         return candidate
-    if not filename.endswith("_template.geo") and filename.endswith(".geo"):
-        tmpl = os.path.basename(filename)[:-4] + "_template.geo"
-        for path in (tmpl, os.path.join(mesh_dir, tmpl)):
+
+    stem, ext = os.path.splitext(base)
+    names = []
+    if ext in (".geo", ".py") and not stem.endswith(TEMPLATE_SUFFIX):
+        # short name: ring.geo -> ring_msh_template.geo; ring_msh.geo -> ring_msh_template.geo
+        long_stem = stem + "_template" if stem.endswith("_msh") else stem + TEMPLATE_SUFFIX
+        names.append(long_stem + ext)
+    for name in [base] + names:
+        if name in LEGACY_TEMPLATE_NAMES:
+            names.append(LEGACY_TEMPLATE_NAMES[name])
+    for name in names:
+        for path in (name, os.path.join(mesh_dir, name)):
             if os.path.exists(path):
                 return os.path.abspath(path)
     raise FileNotFoundError(f"Geometry / mesh file not found: {filename}")
@@ -572,46 +923,23 @@ def mesh_from_geo(
     period_y_val = geo_params.get("period_y", geo_params.get("dy_in_nm", period_y))
     py = period_val if period_y_val is None else float(period_y_val)
 
-    geo_text = geo_text.replace("d_in_nm = 0;", f"d_in_nm = {period_val:.16e};")
-    geo_text = geo_text.replace("dy_in_nm = 0;", f"dy_in_nm = {py:.16e};")
+    # Arguments fill the template when present; geo_params must all be used.
+    base: Dict[str, Any] = {"period": period_val, "period_y": py}
     if "lc" not in geo_params:
-        geo_text = geo_text.replace("lc = 0;", f"lc = {lc:.16e};")
+        base["lc"] = lc
     if "lc2" not in geo_params and lc2 != 1.0:
-        geo_text = geo_text.replace("lc2 = lc/1;", f"lc2 = lc/{lc2:.16e};")
+        base["lc2"] = lc2
     if "lc3" not in geo_params and lc3 != 1.0:
-        geo_text = geo_text.replace("lc3 = lc/1;", f"lc3 = lc/{lc3:.16e};")
+        base["lc3"] = lc3
+    user = {k: v for k, v in geo_params.items() if k not in ("period", "period_y", "d_in_nm", "dy_in_nm")}
+    geo_text = fill_geo_template(geo_text, {**base, **user}, fmt="%.16e",
+                                 optional=base.keys(), template=geo_file)
 
-    for key, val in geo_params.items():
-        if key in ("period", "period_y", "d_in_nm", "dy_in_nm"):
-            continue
-        if key.startswith("lc") and key not in ("lc", "lc2", "lc3"):
-            str_in = f"{key} = lc/1;"
-            str_out = f"{key} = lc/{val:.16e};"
-        elif key in ("lc", "lc2", "lc3"):
-            if key == "lc":
-                str_in = "lc = 0;"
-                str_out = f"lc = {val:.16e};"
-            else:
-                str_in = f"{key} = lc/1;"
-                str_out = f"{key} = lc/{val:.16e};"
-        else:
-            str_in = f"{key} = 0;"
-            str_out = f"{key} = {val:.16e};"
-
-        if str_in in geo_text:
-            geo_text = geo_text.replace(str_in, str_out)
-        else:
-            raise KeyError(
-                f"Parameter '{key}' in geo_params was not found in template '{geo_file}'. "
-                f"Expected placeholder '{str_in}'."
-            )
-
-    geo_text = geo_text.replace('Physical Line(1) =', 'Physical Line("left") =')
-    geo_text = geo_text.replace('Physical Line(2) =', 'Physical Line("bottom") =')
-    geo_text = geo_text.replace('Physical Line(3) =', 'Physical Line("right") =')
-    geo_text = geo_text.replace('Physical Line(4) =', 'Physical Line("top") =')
-    geo_text = geo_text.replace('Physical Surface(1) =', 'Physical Surface("bg") =')
-    geo_text = geo_text.replace('Physical Surface(2) =', 'Physical Surface("inc2") =')
+    # Name the boundaries and the first two domains for netgen.
+    for num, side in BOUNDARY_NAMES.items():
+        geo_text = geo_text.replace(f"Physical Line({num}) =", f'Physical Line("{side}") =')
+    geo_text = geo_text.replace("Physical Surface(1) =", f'Physical Surface("{BACKGROUND_NAME}") =')
+    geo_text = geo_text.replace("Physical Surface(2) =", f'Physical Surface("{inclusion_name(2)}") =')
 
     gmsh_bin = (
         os.environ.get("GMSH_BIN")
@@ -687,43 +1015,52 @@ def mesh_from_py(
         else:
             raise TypeError(f"mesh_from_py() got an unexpected keyword argument '{k}'")
 
-    # Handle known aliases between .geo and .py conventions
-    p_in = dict(geo_params)
-    if "d_in_nm" in p_in and "period" not in p_in:
-        p_in["period"] = p_in.pop("d_in_nm")
-    else:
-        p_in.pop("d_in_nm", None)
-
-    if "dy_in_nm" in p_in and "period_y" not in p_in:
-        p_in["period_y"] = p_in.pop("dy_in_nm")
-    else:
-        p_in.pop("dy_in_nm", None)
-
-    if "diameter1" in p_in and "a1" not in p_in:
-        p_in["a1"] = p_in.pop("diameter1")
-    else:
-        p_in.pop("diameter1", None)
-
-    merged_params.update(p_in)
-
+    # Give each parameter to the builder under a name it accepts: its own name,
+    # the new name of a @legacy_params keyword, or another spelling from
+    # PARAM_ALIASES (d_in_nm -> period, diameter1 <-> a1, ...).
     sig = inspect.signature(builder)
     has_var_kw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+    explicit = {
+        name for name, p in sig.parameters.items()
+        if p.kind not in (inspect.Parameter.VAR_KEYWORD, inspect.Parameter.VAR_POSITIONAL)
+    }
+    renamed = getattr(builder, "legacy_params", {})
+
+    def _target(key: str) -> Optional[str]:
+        if key in explicit:
+            return key
+        if key in renamed:
+            return renamed[key]
+        for alt in param_equivalents(key):
+            if alt in explicit:
+                return alt
+        return None
+
+    def _ordered(params: Dict[str, Any]):
+        # A key the builder takes as is wins over another spelling of it.
+        return sorted(params.items(), key=lambda kv: kv[0] in explicit)
+
+    p_in = dict(geo_params)
     if not has_var_kw:
-        valid_keys = set(sig.parameters.keys())
-        for k in p_in.keys():
-            if k not in valid_keys:
+        for k in p_in:
+            if _target(k) is None:
                 raise TypeError(
                     f"Unexpected parameter '{k}' in geo_params for template '{py_file}'. "
-                    f"Valid parameters: {sorted(valid_keys)}"
+                    f"Valid parameters: {sorted(explicit | set(renamed))}"
                 )
 
-    call_params = {}
-    if has_var_kw:
-        call_params = merged_params
-    else:
-        for k, v in merged_params.items():
-            if k in sig.parameters:
+    call_params: Dict[str, Any] = {}
+    for params in (merged_params, p_in):
+        for k, v in _ordered(params):
+            target = _target(k)
+            if target is not None:
+                call_params[target] = v
+            elif has_var_kw:
+                # Into **kwargs, under every spelling, as older builders read old names.
                 call_params[k] = v
+                for alt in param_equivalents(k):
+                    call_params.setdefault(alt, v)
+    merged_params.update(p_in)
 
     result = builder(**call_params)
     if isinstance(result, ngs.Mesh):

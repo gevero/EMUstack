@@ -9,12 +9,12 @@ d = 1; // grating period
 ff = 0;
 
 // input geo params
-d_in_nm = 0;
-dy_in_nm = 0;
-dy = dy_in_nm/d_in_nm;
-a1 = 0; // rect1 horizontal side
-b1 = 0; // rect1 vertical side
-t = 0;
+period = 0; // (legacy: d_in_nm)
+period_y = 0; // (legacy: dy_in_nm)
+dy = period_y/period;
+width = 0; // rect1 horizontal side (legacy: a1)
+height = 0; // rect1 vertical side (legacy: b1)
+thickness = 0; // (legacy: t)
 ellipticity = 0;
 smooth = 0;
 
@@ -27,15 +27,15 @@ hy = dy; // Thickness: Square profile => hy=d
 hx = 0.;
 
 // derived params
-center1 = d_in_nm/2; // rectangle centers in nm
+center1 = period/2; // rectangle centers in nm
 
-r1 = (a1/(2*d_in_nm))*d; // normalized inner rectangles horizontal sides
-r1Big = ((a1+2*t)/(2*d_in_nm))*d; // normalized outer rectangles horizontal sides
+r1 = (width/(2*period))*d; // normalized inner rectangles horizontal sides
+r1Big = ((width+2*thickness)/(2*period))*d; // normalized outer rectangles horizontal sides
 
-r1b = (b1/(2*d_in_nm))*d; // normalized inner rectangles vertical sides
-r1bBig = ((b1+2*t)/(2*d_in_nm))*d; // normalized outer rectangles vertical sides
+r1b = (height/(2*period))*d; // normalized inner rectangles vertical sides
+r1bBig = ((height+2*thickness)/(2*period))*d; // normalized outer rectangles vertical sides
 
-c1 = (center1/d_in_nm)*d; // normalized centers
+c1 = (center1/period)*d; // normalized centers
 ell = ellipticity;
 
 s1 = r1b*smooth; // normalized inner rectangles curvature radii

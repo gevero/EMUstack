@@ -9,11 +9,11 @@ d = 1; // grating period
 ff = 0;
 
 // input geo params
-d_in_nm = 0;
-dy_in_nm = 0;
-dy = dy_in_nm/d_in_nm;
-a1 = 0; // horizontal rectangle side
-a2 = 0; // vertical rectangle side
+period = 0; // (legacy: d_in_nm)
+period_y = 0; // (legacy: dy_in_nm)
+dy = period_y/period;
+width = 0; // horizontal rectangle side (legacy: a1)
+height = 0; // vertical rectangle side (legacy: a2)
 smooth = 0;
 
 // input mesh params
@@ -25,8 +25,8 @@ hy = dy; // Thickness: Square profile => hy=d
 hx = 0.;
 
 // derived params
-r1 = (a1/(2*d_in_nm))*d;
-r2 = (a2/(2*d_in_nm))*d;
+r1 = (width/(2*period))*d;
+r2 = (height/(2*period))*d;
 s2 = r2*smooth;
 r1r=r1-s2;
 r2r=r2-s2;

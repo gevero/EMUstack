@@ -7,21 +7,21 @@ Mesh.MshFileVersion = 2.2;
 
 d = 1; // grating period
 ff = 0;
-d_in_nm = 0;
-dy_in_nm = 0;
-dy = dy_in_nm/d_in_nm;
-a1 = 0; // outside radius
-radius1 = (a1/(2*d_in_nm))*d;
-a2 = 0; // inside radius
-radius2 = (a2/(2*d_in_nm))*d;
+period = 0; // (legacy: d_in_nm)
+period_y = 0; // (legacy: dy_in_nm)
+dy = period_y/period;
+diameter1 = 0; // outer diameter (legacy: a1)
+radius1 = (diameter1/(2*period))*d;
+diameter2 = 0; // inner diameter (legacy: a2)
+radius2 = (diameter2/(2*period))*d;
 ellipticity = 0;
 square = 0;
 lc = 0; // 0.501 0.201 0.0701;
 lc2 = lc/1; // on cylinder surfaces
 lc3 = lc/1; // cylinder1 centres
 
-xshift_nm = 0;
-xshift = xshift_nm/d_in_nm;
+xshift = 0; // (legacy: xshift_nm)
+xshift_norm = xshift/period;
 
 hy = dy; // Thickness: Squre profile => hy=d
 hx = 0.;
@@ -34,22 +34,22 @@ Point(4) = {d, 0, 0,lc};
 
 // Vertices of the triangles
 
-Point(5) = {xshift-hx+d/2, -hy/2, 0,lc3};
+Point(5) = {xshift_norm-hx+d/2, -hy/2, 0,lc3};
 
-Point(6) = {xshift-hx+d/2, -hy/2+(radius1-ellipticity*radius1), 0, lc2};
-Point(7) = {xshift-hx+d/2-radius1, -hy/2, 0, lc2};
-Point(8) = {xshift-hx+d/2, -hy/2-(radius1-ellipticity*radius1), 0, lc2};
-Point(9) = {xshift-hx+d/2+radius1, -hy/2, 0, lc2};
+Point(6) = {xshift_norm-hx+d/2, -hy/2+(radius1-ellipticity*radius1), 0, lc2};
+Point(7) = {xshift_norm-hx+d/2-radius1, -hy/2, 0, lc2};
+Point(8) = {xshift_norm-hx+d/2, -hy/2-(radius1-ellipticity*radius1), 0, lc2};
+Point(9) = {xshift_norm-hx+d/2+radius1, -hy/2, 0, lc2};
 
-Point(10) = {xshift-hx+d/2, 0, 0, lc};
+Point(10) = {xshift_norm-hx+d/2, 0, 0, lc};
 Point(11) = {0,-hy/2, 0, lc};
-Point(12) = {xshift-hx+d/2, -hy, 0, lc};
+Point(12) = {xshift_norm-hx+d/2, -hy, 0, lc};
 Point(13) = {d, -hy/2, 0, lc};
 
-Point(14) = {xshift-hx+d/2, -hy/2+(radius2-ellipticity*radius2), 0, lc3};
-Point(15) = {xshift-hx+d/2-radius2, -hy/2, 0, lc3};
-Point(16) = {xshift-hx+d/2, -hy/2-(radius2-ellipticity*radius2), 0, lc3};
-Point(17) = {xshift-hx+d/2+radius2, -hy/2, 0, lc3};
+Point(14) = {xshift_norm-hx+d/2, -hy/2+(radius2-ellipticity*radius2), 0, lc3};
+Point(15) = {xshift_norm-hx+d/2-radius2, -hy/2, 0, lc3};
+Point(16) = {xshift_norm-hx+d/2, -hy/2-(radius2-ellipticity*radius2), 0, lc3};
+Point(17) = {xshift_norm-hx+d/2+radius2, -hy/2, 0, lc3};
 
 Line(1) = {1, 10};
 Line(2) = {10, 4};

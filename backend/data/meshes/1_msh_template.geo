@@ -7,11 +7,11 @@ Mesh.MshFileVersion = 2.2;
 
 d = 1; // grating period
 ff = 0;
-d_in_nm = 0;
-dy_in_nm = 0;
-dy = dy_in_nm/d_in_nm;
-a1 = 0;
-radius1 = (a1/(2*d_in_nm))*d;
+period = 0; // (legacy: d_in_nm)
+period_y = 0; // (legacy: dy_in_nm)
+dy = period_y/period;
+diameter1 = 0; // (legacy: a1)
+radius1 = (diameter1/(2*period))*d;
 ellipticity = 0;
 square = 0;
 lc = 0; // 0.501 0.201 0.0701;

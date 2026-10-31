@@ -9,10 +9,12 @@ References:
 - Gorkunov et al., Phys. Rev. Lett. 125, 093901 (2020)
 - Overvig et al., Phys. Rev. Lett. 126, 073001 (2021)
 """
-from typing import Optional, Dict, Any, List
-import numpy as np
+from typing import Optional
 import ngsolve as ngs
-import meshing
+try:
+    from EMUstack.backend import meshing
+except ImportError:
+    import meshing
 
 
 def build_unit_cell(
@@ -31,6 +33,8 @@ def build_unit_cell(
 ) -> ngs.Mesh:
     """Build a periodic 2D unit cell mesh for a chiral qBIC metasurface.
     
+    Unlike most templates, the resonator sizes here are normalized to the period.
+
     Parameters:
     - period: unit cell lattice period along x in nm (default 700 nm)
     - period_y: unit cell lattice period along y in nm (defaults to period)
@@ -39,7 +43,7 @@ def build_unit_cell(
     - theta0: base tilt angle in radians (~14.3 degrees)
     - rx: semi-minor axis of resonators (normalized to period)
     - ry: semi-major axis of resonators (normalized to period)
-    - gap: center-to-center distance between the two dimer resonators along x
+    - gap: center-to-center distance between the two dimer resonators along x (normalized to period)
     - lc: background mesh size (relative to period)
     - lc2: inclusion refinement factor
     - lc3: center refinement factor
@@ -81,5 +85,5 @@ def build_unit_cell(
 
 
 def build_geometry(*args, **kwargs) -> ngs.Mesh:
-    """Alias for build_unit_cell to support both naming conventions."""
+    """Old name of build_unit_cell."""
     return build_unit_cell(*args, **kwargs)

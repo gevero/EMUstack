@@ -9,13 +9,13 @@ d = 1; // grating period
 ff = 0;
 
 // input geo params
-d_in_nm = 0;
-dy_in_nm = 0;
-dy = dy_in_nm/d_in_nm;
-a1 = 0; // horizontal rectangle side
-a2 = 0; // vertical rectangle side
+period = 0; // (legacy: d_in_nm)
+period_y = 0; // (legacy: dy_in_nm)
+dy = period_y/period;
+width = 0; // horizontal rectangle side (legacy: a1)
+height = 0; // vertical rectangle side (legacy: a2)
 smooth = 0;
-t = 0;
+thickness = 0; // (legacy: t)
 
 // input mesh params
 lc = 0; // 0.501 0.201 0.0701;
@@ -26,37 +26,37 @@ hy = dy; // Thickness: Square profile => hy=d
 hx = 0.;
 
 // choosing long and short side
-ss=a2;
-ls=a1;
-If(a1<a2)
-ss=a1;
-ls=a2;
+ss=height;
+ls=width;
+If(width<height)
+ss=width;
+ls=height;
 EndIf
 
 // derived params horizontal arm
-r1 = (ls/(2*d_in_nm))*d;
-r2 = (ss/(2*d_in_nm))*d;
+r1 = (ls/(2*period))*d;
+r2 = (ss/(2*period))*d;
 s2 = r2*smooth;
 r1r=r1-s2;
 r2r=r2-s2;
 
 // derived params horizontal arm Big
-r1Big = ((ls+2*t)/(2*d_in_nm))*d;
-r2Big = ((ss+2*t)/(2*d_in_nm))*d;
+r1Big = ((ls+2*thickness)/(2*period))*d;
+r2Big = ((ss+2*thickness)/(2*period))*d;
 s2Big = r2Big*smooth;
 r1rBig=r1Big-s2Big;
 r2rBig=r2Big-s2Big;
 
 // derived params vertical arm
-r1v = (ss/(2*d_in_nm))*d;
-r2v = (ls/(2*d_in_nm))*d;
+r1v = (ss/(2*period))*d;
+r2v = (ls/(2*period))*d;
 s2v = r2*smooth;
 r1rv=r1v-s2v;
 r2rv=r2v-s2v;
 
 // derived params vertical arm Big
-r1vBig = ((ss+2*t)/(2*d_in_nm))*d;
-r2vBig = ((ls+2*t)/(2*d_in_nm))*d;
+r1vBig = ((ss+2*thickness)/(2*period))*d;
+r2vBig = ((ls+2*thickness)/(2*period))*d;
 s2vBig = r2Big*smooth;
 r1rvBig=r1vBig-s2vBig;
 r2rvBig=r2vBig-s2vBig;

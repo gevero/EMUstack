@@ -6,15 +6,15 @@ d = 1; // grating period
 ff = 0;
 
 // input geo params
-d_in_nm = 0;
-dy_in_nm = 0;
-dy = dy_in_nm/d_in_nm;
-a1 = 0; // rect1 horizontal side
-a2 = 0; // rect2 horizontal side
-b1 = 0; // rect1 vertical side
-b2 = 0; // rect2 vertical side
+period = 0; // (legacy: d_in_nm)
+period_y = 0; // (legacy: dy_in_nm)
+dy = period_y/period;
+width1 = 0; // rect1 horizontal side (legacy: a1)
+width2 = 0; // rect2 horizontal side (legacy: a2)
+height1 = 0; // rect1 vertical side (legacy: b1)
+height2 = 0; // rect2 vertical side (legacy: b2)
 gap = 0;
-thickness = 0;
+thickness = 0; // nm (legacy: t)
 ellipticity = 0;
 smooth = 0;
 
@@ -27,21 +27,21 @@ hy = dy; // Thickness: Square profile => hy=d
 hx = 0.;
 
 // derived params
-center1 = d_in_nm/2 - a1/2 - gap/2; // rectangle centers in nm
-center2 = d_in_nm/2 + a2/2 + gap/2;
+center1 = period/2 - width1/2 - gap/2; // rectangle centers in nm
+center2 = period/2 + width2/2 + gap/2;
 
-r1 = (a1/(2*d_in_nm))*d; // normalized inner rectangles horizontal sides
-r2 = (a2/(2*d_in_nm))*d;
-r1Big = ((a1+2*t)/(2*d_in_nm))*d; // normalized outer rectangles horizontal sides
-r2Big = ((a2+2*t)/(2*d_in_nm))*d;
+r1 = (width1/(2*period))*d; // normalized inner rectangles horizontal sides
+r2 = (width2/(2*period))*d;
+r1Big = ((width1+2*thickness)/(2*period))*d; // normalized outer rectangles horizontal sides
+r2Big = ((width2+2*thickness)/(2*period))*d;
 
-r1b = (b1/(2*d_in_nm))*d; // normalized inner rectangles vertical sides
-r2b = (b2/(2*d_in_nm))*d;
-r1bBig = ((b1+2*t)/(2*d_in_nm))*d; // normalized outer rectangles vertical sides
-r2bBig = ((b2+2*t)/(2*d_in_nm))*d;
+r1b = (height1/(2*period))*d; // normalized inner rectangles vertical sides
+r2b = (height2/(2*period))*d;
+r1bBig = ((height1+2*thickness)/(2*period))*d; // normalized outer rectangles vertical sides
+r2bBig = ((height2+2*thickness)/(2*period))*d;
 
-c1 = (center1/d_in_nm)*d; // normalized centers
-c2 = (center2/d_in_nm)*d;
+c1 = (center1/period)*d; // normalized centers
+c2 = (center2/period)*d;
 ell = ellipticity;
 
 s1 = r1b*smooth; // normalized inner rectangles curvature radii
@@ -138,7 +138,7 @@ Point(36) = {-hx+d, -hy/2, 0,lc};
 
 
 // If gap larger than zero
-If(gap-2.0*t>0)
+If(gap-2.0*thickness>0)
 
 // now connecting the dots :)
 Line(1) = {1,4}; // unit cell perimeter
@@ -243,7 +243,7 @@ EndIf
 
 
 // If gap equal or smaller than zero
-If(gap-2.0*t<=0)
+If(gap-2.0*thickness<=0)
 
 // Removing middle points
 Delete {Point {106,107,108,109,117,118,119};}

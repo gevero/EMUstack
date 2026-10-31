@@ -27,13 +27,13 @@ EMUstack supports two complete meshing pipelines for 2D nanostructured layers, b
 1. **Native Built-in Netgen Meshing (Pure Python):**
    Unit cells are built directly in memory using Netgen's 2D constructive solid geometry (``netgen.geom2d.SplineGeometry``) with zero external binaries or temporary disk files. Within a ``.py`` template, you can either:
 
-   * **Use the high-level helper** :func:`meshing.unit_cell` **(Route B1)** for unit cells composed of standard inclusion primitives (``circle``, ``ellipse``, ``square``, ``rectangle``, ``ring``, ``dimer``), such as ``ellipse_msh_template.py`` or ``chiral_qbic_gorkunov.py``, where :func:`meshing.unit_cell` automatically constructs the periodic box, 12-segment quadratic rational Bézier spline arcs (``spline3``), domain tags, and second-order curving (``ngm.Curve(2)``); or
+   * **Use the high-level helper** :func:`meshing.unit_cell` **(Route B1)** for unit cells composed of standard inclusion primitives (``circle``, ``ellipse``, ``square``, ``rectangle``, ``ring``, ``dimer``), such as ``ellipse_msh_template.py`` or ``chiral_qbic_gorkunov_msh_template.py``, where :func:`meshing.unit_cell` automatically constructs the periodic box, 12-segment quadratic rational Bézier spline arcs (``spline3``), domain tags, and second-order curving (``ngm.Curve(2)``); or
    * **Construct a** ``netgen.geom2d.SplineGeometry`` **directly (Route B2)** when you need a fancier custom resonator shape (such as an L-antenna, split ring, crescent, or arbitrary polygon/spline).
 
 2. **Gmsh Template Import:**
    Legacy or custom geometries defined in Gmsh ``.geo`` scripts (e.g., ``ellipse_msh_template.geo``) have their ``key = 0;`` placeholders substituted from ``geo_params``, are meshed in MSH 2.2 format, and have opposite outer boundary vertices paired via 1-based ``AddPointIdentification`` for Bloch periodicity.
 
-For a complete, step-by-step walkthrough of both pipelines—including side-by-side line-by-line explanations of ``ellipse_msh_template.geo``, ``ellipse_msh_template.py``, and ``chiral_qbic_gorkunov.py``—see the :doc:`meshing`.
+For a complete, step-by-step walkthrough of both pipelines—including side-by-side line-by-line explanations of ``ellipse_msh_template.geo``, ``ellipse_msh_template.py``, and ``chiral_qbic_gorkunov_msh_template.py``—see the :doc:`meshing`.
 
 Material Surface Mapping
 ------------------------

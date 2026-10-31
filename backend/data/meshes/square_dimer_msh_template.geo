@@ -9,11 +9,11 @@ d = 1; // grating period
 ff = 0;
 
 // input geo params
-d_in_nm = 0;
-dy_in_nm = 0;
-dy = dy_in_nm/d_in_nm;
-a1 = 0;
-a2 = 0;
+period = 0; // (legacy: d_in_nm)
+period_y = 0; // (legacy: dy_in_nm)
+dy = period_y/period;
+side1 = 0; // (legacy: a1)
+side2 = 0; // (legacy: a2)
 gap = 0;
 ellipticity = 0;
 smooth = 0;
@@ -27,12 +27,12 @@ hy = dy; // Thickness: Square profile => hy=d
 hx = 0.;
 
 // derived params
-center1 = d_in_nm/2 - a1/2 - gap/2;
-center2 = d_in_nm/2 + a2/2 + gap/2;
-r1 = (a1/(2*d_in_nm))*d;
-r2 = (a2/(2*d_in_nm))*d;
-c1 = (center1/d_in_nm)*d;
-c2 = (center2/d_in_nm)*d;
+center1 = period/2 - side1/2 - gap/2;
+center2 = period/2 + side2/2 + gap/2;
+r1 = (side1/(2*period))*d;
+r2 = (side2/(2*period))*d;
+c1 = (center1/period)*d;
+c2 = (center2/period)*d;
 ell = ellipticity;
 s1 = r1*smooth;
 s2 = r2*smooth;

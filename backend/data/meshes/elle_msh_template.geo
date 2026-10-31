@@ -5,9 +5,9 @@
 Mesh.MshFileVersion = 2.2;
 
 d = 1; // grating period
-d_in_nm = 0;
-dy_in_nm = 0;
-dy = dy_in_nm/d_in_nm;
+period = 0; // (legacy: d_in_nm)
+period_y = 0; // (legacy: dy_in_nm)
+dy = period_y/period;
 
 // input parameters in units of period d
 L1 = 0;

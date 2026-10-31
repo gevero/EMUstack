@@ -4,9 +4,9 @@ Mesh.MshFileVersion = 2.2;
 
 d = 1; // grating period
 ff = 0;
-d_in_nm = 0;
-dy_in_nm = 0;
-dy = dy_in_nm/d_in_nm;
+period = 0; // (legacy: d_in_nm)
+period_y = 0; // (legacy: dy_in_nm)
+dy = period_y/period;
 r1 = 0;
 r2 = 0;
 r3 = 0;
@@ -22,15 +22,15 @@ shift_inc_y = 0;
 ///////////////////////////////////
 ///////////////////////////////////
 ///////////////////////////////////
-rr1 = (r1/(d_in_nm))*d;
-rr2 = (r2/(d_in_nm))*d;
-rr3 = (r3/(d_in_nm))*d;
-rr_inc = (r_inc/(d_in_nm))*d;
-inc_sshiftx = (shift_inc_x/(d_in_nm))*d;
-inc_sshifty = (shift_inc_y/(d_in_nm))*d;
+rr1 = (r1/(period))*d;
+rr2 = (r2/(period))*d;
+rr3 = (r3/(period))*d;
+rr_inc = (r_inc/(period))*d;
+inc_sshiftx = (shift_inc_x/(period))*d;
+inc_sshifty = (shift_inc_y/(period))*d;
 inc_delta = 0.0000001; // this is a numerical trick to distinguish point(5) from point(105) when there is no shift
-sshiftx=(shiftx/(d_in_nm))*d;
-sshifty=(shifty/(d_in_nm))*d;
+sshiftx=(shiftx/(period))*d;
+sshifty=(shifty/(period))*d;
 lc = 0; // 0.501 0.201 0.0701;
 lc2 = lc/1; // on cylinder surfaces
 lc3 = lc/1; // cylinder1 centres

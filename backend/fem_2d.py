@@ -499,14 +499,15 @@ def solve_bloch_modes_2d(
 
             inclusions = []
             if inc_shape in ("circle", "ellipse") and d1 > 0:
-                inclusions.append({"kind": inc_shape, "c": center, "r": d1 / 2.0, "tag": 2})
+                inclusions.append({"kind": inc_shape, "center": center, "radius": d1 / 2.0, "tag": 2})
             elif inc_shape in ("square", "rectangle") and d1 > 0:
-                inclusions.append({"kind": inc_shape, "c": center, "s": d1, "tag": 2})
+                inclusions.append({"kind": inc_shape, "center": center, "side": d1, "tag": 2})
             elif inc_shape == "ring" and d1 > 0:
-                inclusions.append({"kind": "ring", "c": center, "r_out": d1 / 2.0, "r_in": d2 / 2.0, "tag": 2})
+                inclusions.append({"kind": "ring", "center": center, "radius_out": d1 / 2.0,
+                                   "radius_in": d2 / 2.0, "tag": 2})
             elif inc_shape == "dimer" and d1 > 0:
                 gap = getattr(structure, "gap", 0.0) / float(structure.period)
-                inclusions.append({"kind": "dimer", "c": center, "r": d1 / 2.0, "gap": gap, "tag": 2})
+                inclusions.append({"kind": "dimer", "center": center, "radius": d1 / 2.0, "gap": gap, "tag": 2})
 
             mesh = meshing.unit_cell(
                 inclusions,

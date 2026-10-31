@@ -194,8 +194,8 @@ def test_chiral_qbic_template_generation():
     from EMUstack.backend import paths
     if paths.template_path not in sys.path:
         sys.path.insert(0, paths.template_path)
-    import chiral_qbic_template
-    mesh = chiral_qbic_template.build_unit_cell(
+    import chiral_qbic_msh_template
+    mesh = chiral_qbic_msh_template.build_unit_cell(
         period=700.0,
         alpha=0.15,
         theta0=0.25,
@@ -223,7 +223,7 @@ def test_nanostruct_sol1_and_interpolators_full_stack():
     # Chiral qBIC layer with plotting_fields enabled
     layer_struct = objects.NanoStruct(
         '2D_array', period, 200.0,
-        geo_file='chiral_qbic_template.py',
+        geo_file='chiral_qbic_msh_template.py',
         geo_params={'alpha': 0.15, 'lc': 0.20, 'lc2': 1.5},
         background=materials.Material(1.0),
         inclusion_a=materials.Material(3.5),
@@ -307,7 +307,7 @@ def test_circular_dichroism_qbic():
 
     layer_struct = objects.NanoStruct(
         '2D_array', period, 200.0,
-        geo_file='chiral_qbic_template.py',
+        geo_file='chiral_qbic_msh_template.py',
         geo_params={'alpha': 0.15, 'lc': 0.20, 'lc2': 1.5},
         background=materials.Material(1.0),
         inclusion_a=materials.Material(3.5),
@@ -342,7 +342,7 @@ def test_cross_section_matches_in_plane():
 
     layer_struct = objects.NanoStruct(
         '2D_array', period, 200.0,
-        geo_file='chiral_qbic_template.py',
+        geo_file='chiral_qbic_msh_template.py',
         geo_params={'alpha': 0.15, 'lc': 0.20, 'lc2': 1.5},
         background=materials.Material(1.0),
         inclusion_a=materials.Material(3.5),

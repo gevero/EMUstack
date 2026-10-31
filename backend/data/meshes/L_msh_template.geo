@@ -4,18 +4,18 @@
 Mesh.MshFileVersion = 2.2;
 
 d = 1; // grating period
-d_in_nm = 0;
-dy_in_nm = 0;
-dy = dy_in_nm/d_in_nm;
+period = 0; // (legacy: d_in_nm)
+period_y = 0; // (legacy: dy_in_nm)
+dy = period_y/period;
 
 // input parameters in nm
-L_nm = 0;
-W_nm = 0;
-r = 0;
+length = 0; // (legacy: L_nm)
+width = 0; // (legacy: W_nm)
+rounding = 0; // (legacy: r)
 
 // normalized input parameters
-L = L_nm/d_in_nm;
-W = W_nm/d_in_nm;
+L = length/period;
+W = width/period;
 
 // mesh finesse parameters
 lc = 0; // 0.501 0.201 0.0701;
@@ -28,24 +28,24 @@ Point(3) = {0.5*d,0.5*dy, 0, lc};
 Point(4) = {-0.5*d,0.5*dy, 0, lc};
 
 // L points
-Point(5) = {0.5*W*r-0.5*L,0-0.5*L, 0, lc2};
+Point(5) = {0.5*W*rounding-0.5*L,0-0.5*L, 0, lc2};
 Point(6) = {L-0.5*W-0.5*L,0-0.5*L, 0, lc};
 Point(7) = {L-0.5*W-0.5*L,0.5*W-0.5*L, 0, lc};
 Point(8) = {L-0.5*W-0.5*L+0.5*Sqrt(2)*W/2,0.5*W-0.5*L - 0.5*Sqrt(2)*W/2, 0, lc2}; // lower right corner
 Point(9) = {L-0.5*L,0.5*W-0.5*L, 0, lc2};
 Point(10) = {L-0.5*W-0.5*L+0.5*Sqrt(2)*W/2,0.5*W-0.5*L + 0.5*Sqrt(2)*W/2, 0, lc2};
 Point(11) = {L-0.5*W-0.5*L,W-0.5*L, 0, lc};
-Point(12) = {W+0.5*W*r-0.5*L,W-0.5*L, 0, lc2};
-Point(13) = {W+0.5*W*r-0.5*L,W+0.5*W*r-0.5*L, 0, lc};
-Point(14) = {W-0.5*L,W+0.5*W*r-0.5*L, 0, lc2};
+Point(12) = {W+0.5*W*rounding-0.5*L,W-0.5*L, 0, lc2};
+Point(13) = {W+0.5*W*rounding-0.5*L,W+0.5*W*rounding-0.5*L, 0, lc};
+Point(14) = {W-0.5*L,W+0.5*W*rounding-0.5*L, 0, lc2};
 Point(15) = {W-0.5*L,L-0.5*W-0.5*L, 0, lc};
 Point(16) = {0.5*W-0.5*L,L-0.5*W-0.5*L, 0, lc};
 Point(17) = {0.5*W-0.5*L+0.5*Sqrt(2)*W/2,L-0.5*W-0.5*L+0.5*Sqrt(2)*W/2, 0, lc2}; // upper left corner
 Point(18) = {0.5*W-0.5*L,L-0.5*L, 0, lc2};
 Point(19) = {0.5*W-0.5*L-0.5*Sqrt(2)*W/2,L-0.5*W-0.5*L+0.5*Sqrt(2)*W/2, 0, lc2};
 Point(20) = {0.0-0.5*L,L-0.5*W-0.5*L, 0, lc};
-Point(21) = {0.0-0.5*L,0.5*W*r-0.5*L, 0, lc2};
-Point(22) = {0.5*W*r-0.5*L,0.5*W*r-0.5*L, 0, lc};
+Point(21) = {0.0-0.5*L,0.5*W*rounding-0.5*L, 0, lc2};
+Point(22) = {0.5*W*rounding-0.5*L,0.5*W*rounding-0.5*L, 0, lc};
 
 // L lines
 Line(1) = {1,2};

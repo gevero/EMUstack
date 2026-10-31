@@ -6,16 +6,16 @@ Mesh.MshFileVersion = 2.2;
 
 d = 1; // grating period
 
-d_in_nm  = 0;
-dy_in_nm = 0;
-dy = dy_in_nm/d_in_nm;
-lvert_nm = 0;
-lhori_nm = 0;
-width_nm = 0;
+period  = 0; // (legacy: d_in_nm)
+period_y = 0; // (legacy: dy_in_nm)
+dy = period_y/period;
+len_vertical = 0; // (legacy: lvert_nm)
+len_horizontal = 0; // (legacy: lhori_nm)
+width = 0; // (legacy: width_nm)
 
-lvert = lvert_nm/d_in_nm*d;
-lhori = lhori_nm/d_in_nm*d;
-w     = width_nm/d_in_nm*d;
+lvert = len_vertical/period*d;
+lhori = len_horizontal/period*d;
+w     = width/period*d;
 
 lc = 0;
 lc2 = lc/1; // on SRR edgesq

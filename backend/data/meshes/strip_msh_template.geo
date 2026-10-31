@@ -7,17 +7,15 @@ Mesh.MshFileVersion = 2.2;
 
 d = 1; // grating period
 ff = 0;
-d_in_nm = 0;
-dy_in_nm = 0;
-dy = dy_in_nm/d_in_nm;
-a1 = 0;
-radius1 = (a1/(2*d_in_nm))*d;
+period = 0; // (legacy: d_in_nm)
+period_y = 0; // (legacy: dy_in_nm)
+dy = period_y/period;
+diameter1 = 0; // (legacy: a1)
+radius1 = (diameter1/(2*period))*d;
 ellipticity = 0;
 square = 0;
 strip = 0;
-strip2 = 0;
-st = strip/d_in_nm;
-st2 = strip2/d_in_nm;
+st = strip/period;
 lc = 0; // 0.501 0.201 0.0701;
 lc2 = lc/1; // on cylinder surfaces
 lc3 = lc/1; // cylinder1 centres
@@ -50,75 +48,33 @@ Point(16) = {d, -hy/2+st/2, 0, lc3};
 Point(17) = {d, -hy/2-st/2, 0, lc3};
 Point(18) = {-hx+d/2, -hy/2+st/2, 0, lc3};
 Point(19) = {-hx+d/2, -hy/2-st/2, 0, lc3};
-Point(24) = {0,-hy/2+st/2+st2/2, 0, lc3};
-Point(25) = {0,-hy/2-st/2-st2/2, 0, lc3};
-Point(26) = {d, -hy/2+st/2+st2/2, 0, lc3};
-Point(27) = {d, -hy/2-st/2-st2/2, 0, lc3};
-Point(28) = {-hx+d/2, -hy/2+st/2+st2/2, 0, lc3};
-Point(29) = {-hx+d/2, -hy/2-st/2-st2/2, 0, lc3};
 
 Line(1) = {1,10};
 Line(2) = {10,4};
 Line(3) = {2,12};
 Line(4) = {12,3};
+Line(21) = {1, 14};
 Line(22) = {14, 11};
 Line(23) = {11, 15};
+Line(24) = {15, 2};
 Line(25) = {11, 7};
 Line(26) = {7, 5};
 Line(27) = {5, 9};
 Line(28) = {9, 13};
+Line(29) = {4, 16};
 Line(30) = {16, 13};
 Line(31) = {13, 17};
+Line(32) = {17, 3};
 Line(33) = {14, 18};
 Line(34) = {18, 16};
 Line(35) = {15, 19};
 Line(36) = {19, 17};
+Line(37) = {10, 18};
 Line(38) = {18, 6};
 Line(39) = {6, 5};
 Line(40) = {5, 8};
 Line(41) = {8, 19};
-Line(71) = {14, 24};
-Line(72) = {24, 1};
-Line(73) = {10, 28};
-Line(74) = {28, 18};
-Line(75) = {4, 26};
-Line(76) = {26, 16};
-Line(77) = {26, 28};
-Line(78) = {28, 24};
-Line(79) = {15, 25};
-Line(80) = {25, 2};
-Line(81) = {12, 29};
-Line(82) = {29, 19};
-Line(83) = {17, 27};
-Line(84) = {27, 3};
-Line(85) = {27, 29};
-Line(86) = {25, 29};
-
-Physical Line(87) = {72, 71, 22, 23, 79, 80};
-Physical Line(88) = {75, 76, 30, 31, 83, 84};
-Physical Line(68) = {1, 2};
-Physical Line(70) = {4, 3};
-
-
-Line Loop(89) = {72, 1, 73, 78};
-Plane Surface(90) = {89};
-Line Loop(91) = {73, -77, -75, -2};
-Plane Surface(92) = {91};
-Line Loop(93) = {77, 74, 34, -76};
-Plane Surface(94) = {93};
-Line Loop(95) = {74, -33, 71, -78};
-Plane Surface(96) = {95};
-Line Loop(97) = {35, -82, -86, -79};
-Plane Surface(98) = {97};
-Line Loop(99) = {82, 36, 83, 85};
-Plane Surface(100) = {99};
-Line Loop(101) = {85, -81, 4, -84};
-Plane Surface(102) = {101};
-Line Loop(103) = {81, -86, 80, 3};
-Plane Surface(104) = {103};
-
-Physical Surface(1) = {90, 92, 102, 104};
-Physical Surface(4) = {98, 100, 94, 96};
+Line(42) = {19, 12};
 
 
 If(square == 0)
@@ -127,6 +83,14 @@ Ellipsis(18) = {6,5,7,7};
 Ellipsis(19) = {7,5,8,8};
 Ellipsis(20) = {8,5,9,9};
 
+Line Loop(43) = {21, 33, -37, -1};
+Plane Surface(44) = {43};
+Line Loop(45) = {37, 34, -29, -2};
+Plane Surface(46) = {45};
+Line Loop(47) = {24, 3, -42, -35};
+Plane Surface(48) = {47};
+Line Loop(49) = {42, 4, -32, -36};
+Plane Surface(50) = {49};
 Line Loop(51) = {22, 25, -18, -38, -33};
 Plane Surface(52) = {51};
 Line Loop(53) = {23, 35, -41, -19, -25};
@@ -144,12 +108,15 @@ Plane Surface(64) = {63};
 Line Loop(65) = {20, -27, 40};
 Plane Surface(66) = {65};
 
+Physical Line(67) = {21, 22, 23, 24};
+Physical Line(68) = {1, 2};
+Physical Line(69) = {29, 30, 31, 32};
+Physical Line(70) = {4, 3};
+
+Physical Surface(1) = {44, 46, 48, 50};
 Physical Surface(2) = {62, 64, 66, 60};
 Physical Surface(3) = {52, 56, 58, 54};
-
 EndIf
-
-
 
 If(square == 1)
 // square
@@ -167,7 +134,14 @@ Line(56) = {153, 8};
 Line(57) = {152, 8};
 Line(58) = {152, 9};
 
-
+Line Loop(43) = {21, 33, -37, -1};
+Plane Surface(44) = {43};
+Line Loop(45) = {37, 34, -29, -2};
+Plane Surface(46) = {45};
+Line Loop(47) = {24, 3, -42, -35};
+Plane Surface(48) = {47};
+Line Loop(49) = {42, 4, -32, -36};
+Plane Surface(50) = {49};
 Line Loop(59) = {22, 25, 51, 52, -38, -33};
 Plane Surface(60) = {59};
 Line Loop(61) = {38, 53, 54, 28, -30, -34};
@@ -185,9 +159,11 @@ Plane Surface(72) = {71};
 Line Loop(73) = {26, 40, -56, -55};
 Plane Surface(74) = {73};
 
+Physical Surface(1) = {44, 46, 48, 50};
 Physical Surface(2) = {68, 70, 72, 74};
 Physical Surface(3) = {60, 62, 64, 66};
 
 EndIf
+
 
 

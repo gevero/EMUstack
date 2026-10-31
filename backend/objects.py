@@ -396,35 +396,35 @@ class NanoStruct:
         self.plot_abs = plot_abs
         self.plot_field_conc = plot_field_conc
 
+    def _fill_template(self, template, params):
+        """Text of a shipped .geo template filled as legacy EMUstack does.
+
+        Numbers are written with %f, and placeholders the template lacks are skipped.
+        """
+        import meshing
+        with open(template_location + template, "r") as f:
+            text = f.read()
+        return meshing.fill_geo_template(text, params, fmt='%f', strict=False, template=template)
+
     def _legacy_custom_geo(self):
         """Text of a custom .geo template with geo_params filled in, as legacy EMUstack writes it."""
         import meshing
         params = dict(self.geo_params or {})
-        for key in ('period', 'period_y', 'd_in_nm', 'dy_in_nm', 'diameter1'):
+        for key in ('period', 'period_y', 'd_in_nm', 'dy_in_nm'):
             params.pop(key, None)  # already used by the constructor
         # lc* in geo_params override the lc_bkg/lc2.. arguments (legacy ignored them there)
-        lcs = {'lc': self.lc, 'lc2': self.lc2, 'lc3': self.lc3,
-               'lc4': self.lc4, 'lc5': self.lc5, 'lc6': self.lc6}
-        for key in lcs:
+        base = {'period': self.period, 'period_y': self.period_y, 'lc': self.lc,
+                'lc2': self.lc2, 'lc3': self.lc3, 'lc4': self.lc4, 'lc5': self.lc5, 'lc6': self.lc6}
+        for key in list(base):
             if key in params:
-                lcs[key] = params.pop(key)
-        geo_tmp = open(meshing.resolve_mesh_file_path(self.geo_file), "r").read()
-        geo = geo_tmp.replace('d_in_nm = 0;', "d_in_nm  = %f;" % self.period)
-        geo = geo.replace('dy_in_nm = 0;', "dy_in_nm = %f;" % self.period_y)
-        geo = geo.replace('lc = 0;', "lc = %f;" % lcs['lc'])
-        for key in ('lc2', 'lc3', 'lc4', 'lc5', 'lc6'):
-            geo = geo.replace('%s = lc/1;' % key, "%s = lc/%f;" % (key, lcs[key]))
-        for key, value in params.items():
-            if key[0:2] == 'lc':
-                str_in = key + ' = lc/1;'
-                str_out = key + ' = lc/%f;' % value
-            else:
-                str_in = key + ' = 0;'
-                str_out = key + ' = %f;' % value
-            if str_in not in geo:
-                raise KeyError('Could not find "%s" in geometry file %s.' % (str_in, self.geo_file))
-            geo = geo.replace(str_in, str_out)
-        return geo
+                base[key] = params.pop(key)
+        with open(meshing.resolve_mesh_file_path(self.geo_file), "r") as f:
+            text = f.read()
+        # Every geo_params key must match a placeholder, except diameter1, which
+        # the constructor also reads (legacy ignored it here).
+        return meshing.fill_geo_template(text, {**base, **params}, fmt='%f',
+                                         optional=set(base) | {'diameter1'},
+                                         template=self.geo_file)
 
     def make_mesh(self):
         if self.periodicity == '2D_array':
@@ -466,7 +466,6 @@ class NanoStruct:
                         'dy': dec_float_str(self.period_y),
                         'dia': dec_float_str(self.diameter1),
                         'dias': dec_float_str(self.diameter2),
-                        'dias': dec_float_str(self.diameter2),
                         'diass': dec_float_str(self.diameter3),
                         'diasss': dec_float_str(self.diameter4),
                         'diassss': dec_float_str(self.diameter5)
@@ -507,7 +506,7 @@ class NanoStruct:
                         'd': dec_float_str(self.period),
                         'dy': dec_float_str(self.period_y),
                         'dia': dec_float_str(self.diameter1),
-                        'diameters': dec_float_str(self.diameter2)
+                        'dias': dec_float_str(self.diameter2)
                     }
                 elif self.diameter1 > 0:
                     supercell = 1
@@ -602,87 +601,24 @@ class NanoStruct:
 
                 if not os.path.exists(msh_location + msh_name +
                                       '.mail') or self.force_mesh is True:
-                    if self.is_hex is False:
-                        geo_tmp = open(
-                            template_location +
-                            '%s_msh_template.geo' % supercell, "r").read()
-                    else:
-                        geo_tmp = open(
-                            template_location + 'hex_msh_template.geo',
-                            "r").read()
-
-                    geo = geo_tmp.replace('ff = 0;', "ff = %f;" % self.ff)
-                    geo = geo.replace('d_in_nm = 0;',
-                                      "d_in_nm = %f;" % self.period)
-                    geo = geo.replace('dy_in_nm = 0;',
-                                      "dy_in_nm = %f;" % self.period_y)
-                    geo = geo.replace('a1 = 0;', "a1 = %f;" % self.diameter1)
-                    geo = geo.replace('ellipticity = 0;',
-                                      "ellipticity = %f;" % self.ellipticity)
+                    template = ('%s_msh_template.geo' % supercell if self.is_hex is False
+                                else 'hex_msh_template.geo')
+                    params = {'ff': self.ff, 'period': self.period, 'period_y': self.period_y,
+                              'diameter1': self.diameter1, 'ellipticity': self.ellipticity,
+                              'lc': self.lc, 'lc2': self.lc2, 'lc3': self.lc3}
                     if self.inc_shape == 'square':
-                        geo = geo.replace('square = 0;', "square = 1;")
-                    geo = geo.replace('lc = 0;', "lc = %f;" % self.lc)
-                    geo = geo.replace('lc2 = lc/1;', "lc2 = lc/%f;" % self.lc2)
-                    geo = geo.replace('lc3 = lc/1;', "lc3 = lc/%f;" % self.lc3)
+                        params['square'] = '1'
+                    # posx/posy: fraction of the distance an inclusion can move before touching
+                    room = self.period / (2 * np.sqrt(supercell)) - self.diameter1 / 2.0
                     if self.posx != 0:
-                        # appropriate for old definition of fraction of distance to touching
-                        geo = geo.replace(
-                            'posx = 0;', "posx = %f;" %
-                            (self.posx / self.period *
-                             (self.period /
-                              (2 * np.sqrt(supercell)) - self.diameter1 / 2.0))
-                        )
-                        # appropriate for % shift of distance of centre point to (ind) unitcell boundary (ie d/2)
-                        # geo = geo.replace('posx = 0;', "posx = %f;" % float(self.posx/supercell))
+                        params['posx'] = self.posx / self.period * room
                     if self.posy != 0:
-                        geo = geo.replace(
-                            'posy = 0;', "posy = %f;" %
-                            (self.posy / self.period *
-                             (self.period /
-                              (2 * np.sqrt(supercell)) - self.diameter1 / 2.0))
-                        )
-                        # geo = geo.replace('posy = 0;', "posy = %f;" % float(self.posy/supercell))
-                    if supercell > 1:
-                        geo = geo.replace('a2 = 0;',
-                                          "a2 = %f;" % self.diameter2)
-                        geo = geo.replace('lc4 = lc/1;',
-                                          "lc4 = lc/%f;" % self.lc4)
-                    if supercell > 2:
-                        geo = geo.replace('a3 = 0;',
-                                          "a3 = %f;" % self.diameter3)
-                        geo = geo.replace('lc5 = lc/1;',
-                                          "lc5 = lc/%f;" % self.lc5)
-                    if supercell > 3:
-                        geo = geo.replace('a4 = 0;',
-                                          "a4 = %f;" % self.diameter4)
-                        geo = geo.replace('lc6 = lc/1;',
-                                          "lc6 = lc/%f;" % self.lc6)
-                    if supercell > 4:
-                        geo = geo.replace('a5 = 0;',
-                                          "a5 = %f;" % self.diameter5)
-                        geo = geo.replace('a6 = 0;',
-                                          "a6 = %f;" % self.diameter6)
-                        geo = geo.replace('a7 = 0;',
-                                          "a7 = %f;" % self.diameter7)
-                        geo = geo.replace('a8 = 0;',
-                                          "a8 = %f;" % self.diameter8)
-                        geo = geo.replace('a9 = 0;',
-                                          "a9 = %f;" % self.diameter9)
-                    if supercell > 9:
-                        geo = geo.replace('a10 = 0;',
-                                          "a10 = %f;" % self.diameter10)
-                        geo = geo.replace('a11 = 0;',
-                                          "a11 = %f;" % self.diameter11)
-                        geo = geo.replace('a12 = 0;',
-                                          "a12 = %f;" % self.diameter12)
-                        geo = geo.replace('a13 = 0;',
-                                          "a13 = %f;" % self.diameter13)
-                        geo = geo.replace('a14 = 0;',
-                                          "a14 = %f;" % self.diameter14)
-                        geo = geo.replace('a15 = 0;',
-                                          "a15 = %f;" % self.diameter15)
-                        geo = geo.replace('a16 = 0;',
-                                          "a16 = %f;" % self.diameter16)
+                        params['posy'] = self.posy / self.period * room
+                    for k in range(2, supercell + 1):
+                        params['diameter%d' % k] = getattr(self, 'diameter%d' % k)
+                    for k in range(4, min(supercell, 4) + 3):
+                        params['lc%d' % k] = getattr(self, 'lc%d' % k)
+                    geo = self._fill_template(template, params)
 
             elif self.inc_shape == 'SRR':
                 msh_name = 'SRR_%(d)s_%(dy)s_%(lvert)s_%(lhori)s_%(dia)s' % {
@@ -694,22 +630,11 @@ class NanoStruct:
                 }
                 if not os.path.exists(msh_location + msh_name +
                                       '.mail') or self.force_mesh is True:
-                    geo_tmp = open(template_location + 'SRR_msh_template.geo',
-                                   "r").read()
-                    geo = geo_tmp.replace('ff = 0;', "ff = %f;" % self.ff)
-                    geo = geo.replace('d_in_nm  = 0;',
-                                      "d_in_nm  = %f;" % self.period)
-                    geo = geo.replace('dy_in_nm = 0;',
-                                      "dy_in_nm = %f;" % self.period_y)
-                    geo = geo.replace('lvert_nm = 0;',
-                                      "lvert_nm = %f;" % self.len_vertical)
-                    geo = geo.replace('lhori_nm = 0;',
-                                      "lhori_nm = %f;" % self.len_horizontal)
-                    geo = geo.replace('width_nm = 0;',
-                                      "width_nm = %f;" % self.diameter1)
-                    geo = geo.replace('lc = 0;', "lc = %f;" % self.lc)
-                    geo = geo.replace('lc2 = lc/1;', "lc2 = lc/%f;" % self.lc2)
-                    geo = geo.replace('lc3 = lc/1;', "lc3 = lc/%f;" % self.lc3)
+                    geo = self._fill_template('SRR_msh_template.geo', {
+                        'ff': self.ff, 'period': self.period, 'period_y': self.period_y,
+                        'len_vertical': self.len_vertical, 'len_horizontal': self.len_horizontal,
+                        'width': self.diameter1,
+                        'lc': self.lc, 'lc2': self.lc2, 'lc3': self.lc3})
 
             elif self.inc_shape == 'ring':
                 msh_name = 'ring_%(d)s_%(dy)s_%(dia_out)s_%(dia_in)s' % {
@@ -720,21 +645,11 @@ class NanoStruct:
                 }
                 if not os.path.exists(msh_location + msh_name +
                                       '.mail') or self.force_mesh is True:
-                    geo_tmp = open(
-                        template_location + 'ring1_msh_template.geo',
-                        "r").read()
-                    geo = geo_tmp.replace('ff = 0;', "ff = %f;" % self.ff)
-                    geo = geo.replace('d_in_nm = 0;',
-                                      "d_in_nm  = %f;" % self.period)
-                    geo = geo.replace('dy_in_nm = 0;',
-                                      "dy_in_nm = %f;" % self.period_y)
-                    geo = geo.replace('a1 = 0;', "a1 = %f;" % self.diameter1)
-                    geo = geo.replace('a2 = 0;', "a2 = %f;" % self.diameter2)
-                    geo = geo.replace('lc = 0;', "lc = %f;" % self.lc)
-                    geo = geo.replace('lc2 = lc/1;', "lc2 = lc/%f;" % self.lc2)
-                    geo = geo.replace('lc3 = lc/1;', "lc3 = lc/%f;" % self.lc3)
-                    geo = geo.replace('xshift_nm = 0;',
-                                      "xshift_nm = %f;" % self.xshift)
+                    geo = self._fill_template('ring_msh_template.geo', {
+                        'ff': self.ff, 'period': self.period, 'period_y': self.period_y,
+                        'diameter1': self.diameter1, 'diameter2': self.diameter2,
+                        'xshift': 0 if self.xshift is None else self.xshift,
+                        'lc': self.lc, 'lc2': self.lc2, 'lc3': self.lc3})
 
             elif self.inc_shape == 'dimer':
                 msh_name = 'dimer_%(d)s_%(dy)s_%(d_one)s_%(d_two)s_%(gap)s' % {
@@ -746,20 +661,10 @@ class NanoStruct:
                 }
                 if not os.path.exists(msh_location + msh_name +
                                       '.mail') or self.force_mesh is True:
-                    geo_tmp = open(
-                        template_location + 'dimer1_msh_template.geo',
-                        "r").read()
-                    geo = geo_tmp.replace('ff = 0;', "ff = %f;" % self.ff)
-                    geo = geo.replace('d_in_nm = 0;',
-                                      "d_in_nm  = %f;" % self.period)
-                    geo = geo.replace('dy_in_nm = 0;',
-                                      "dy_in_nm = %f;" % self.period_y)
-                    geo = geo.replace('a1 = 0;', "a1 = %f;" % self.diameter1)
-                    geo = geo.replace('a2 = 0;', "a2 = %f;" % self.diameter2)
-                    geo = geo.replace('gap = 0;', "gap = %f;" % self.gap)
-                    geo = geo.replace('lc = 0;', "lc = %f;" % self.lc)
-                    geo = geo.replace('lc2 = lc/1;', "lc2 = lc/%f;" % self.lc2)
-                    geo = geo.replace('lc3 = lc/1;', "lc3 = lc/%f;" % self.lc3)
+                    geo = self._fill_template('dimer_msh_template.geo', {
+                        'ff': self.ff, 'period': self.period, 'period_y': self.period_y,
+                        'diameter1': self.diameter1, 'diameter2': self.diameter2, 'gap': self.gap,
+                        'lc': self.lc, 'lc2': self.lc2, 'lc3': self.lc3})
 
             elif self.inc_shape == 'square_dimer':
                 msh_name = 'square_dimer_%(d)s_%(dy)s_%(d_one)s_%(d_two)s_%(gap)s_%(smooth)s' % {
@@ -772,22 +677,10 @@ class NanoStruct:
                 }
                 if not os.path.exists(msh_location + msh_name +
                                       '.mail') or self.force_mesh is True:
-                    geo_tmp = open(
-                        template_location + 'square_dimer1_msh_template.geo',
-                        "r").read()
-                    geo = geo_tmp.replace('ff = 0;', "ff = %f;" % self.ff)
-                    geo = geo.replace('d_in_nm = 0;',
-                                      "d_in_nm  = %f;" % self.period)
-                    geo = geo.replace('dy_in_nm = 0;',
-                                      "dy_in_nm = %f;" % self.period_y)
-                    geo = geo.replace('a1 = 0;', "a1 = %f;" % self.diameter1)
-                    geo = geo.replace('a2 = 0;', "a2 = %f;" % self.diameter2)
-                    geo = geo.replace('gap = 0;', "gap = %f;" % self.gap)
-                    geo = geo.replace('smooth = 0;',
-                                      "smooth = %f;" % self.smooth)
-                    geo = geo.replace('lc = 0;', "lc = %f;" % self.lc)
-                    geo = geo.replace('lc2 = lc/1;', "lc2 = lc/%f;" % self.lc2)
-                    geo = geo.replace('lc3 = lc/1;', "lc3 = lc/%f;" % self.lc3)
+                    geo = self._fill_template('square_dimer_msh_template.geo', {
+                        'ff': self.ff, 'period': self.period, 'period_y': self.period_y,
+                        'side1': self.diameter1, 'side2': self.diameter2, 'gap': self.gap, 'smooth': self.smooth,
+                        'lc': self.lc, 'lc2': self.lc2, 'lc3': self.lc3})
 
             elif self.inc_shape == 'square_shell_dimer':
                 msh_name = 'square_shell_dimer_%(d)s_%(dy)s_%(d_one)s_%(d_two)s_%(d_three)s_%(d_four)s_%(gap)s_%(smooth)s_%(t)s' % {
@@ -803,25 +696,12 @@ class NanoStruct:
                 }
                 if not os.path.exists(msh_location + msh_name +
                                       '.mail') or self.force_mesh is True:
-                    geo_tmp = open(
-                        template_location +
-                        'square_shell_dimer1_msh_template.geo', "r").read()
-                    geo = geo_tmp.replace('ff = 0;', "ff = %f;" % self.ff)
-                    geo = geo.replace('d_in_nm = 0;',
-                                      "d_in_nm  = %f;" % self.period)
-                    geo = geo.replace('dy_in_nm = 0;',
-                                      "dy_in_nm = %f;" % self.period_y)
-                    geo = geo.replace('a1 = 0;', "a1 = %f;" % self.diameter1)
-                    geo = geo.replace('a2 = 0;', "a2 = %f;" % self.diameter2)
-                    geo = geo.replace('b1 = 0;', "b1 = %f;" % self.diameter3)
-                    geo = geo.replace('b2 = 0;', "b2 = %f;" % self.diameter4)
-                    geo = geo.replace('gap = 0;', "gap = %f;" % self.gap)
-                    geo = geo.replace('smooth = 0;',
-                                      "smooth = %f;" % self.smooth)
-                    geo = geo.replace('t = 0;', "t = %f;" % self.t)
-                    geo = geo.replace('lc = 0;', "lc = %f;" % self.lc)
-                    geo = geo.replace('lc2 = lc/1;', "lc2 = lc/%f;" % self.lc2)
-                    geo = geo.replace('lc3 = lc/1;', "lc3 = lc/%f;" % self.lc3)
+                    geo = self._fill_template('square_shell_dimer_msh_template.geo', {
+                        'ff': self.ff, 'period': self.period, 'period_y': self.period_y,
+                        'width1': self.diameter1, 'width2': self.diameter2,
+                        'height1': self.diameter3, 'height2': self.diameter4,
+                        'gap': self.gap, 'smooth': self.smooth, 'thickness': self.t,
+                        'lc': self.lc, 'lc2': self.lc2, 'lc3': self.lc3})
             elif self.inc_shape == 'rectangle':
                 msh_name = 'rect_%(d)s_%(dy)s_%(d_one)s_%(d_two)s_%(smooth)s' % {
                     'd': dec_float_str(self.period),
@@ -832,21 +712,10 @@ class NanoStruct:
                 }
                 if not os.path.exists(msh_location + msh_name +
                                       '.mail') or self.force_mesh is True:
-                    geo_tmp = open(
-                        template_location + 'rect1_msh_template.geo',
-                        "r").read()
-                    geo = geo_tmp.replace('ff = 0;', "ff = %f;" % self.ff)
-                    geo = geo.replace('d_in_nm = 0;',
-                                      "d_in_nm  = %f;" % self.period)
-                    geo = geo.replace('dy_in_nm = 0;',
-                                      "dy_in_nm = %f;" % self.period_y)
-                    geo = geo.replace('a1 = 0;', "a1 = %f;" % self.diameter1)
-                    geo = geo.replace('a2 = 0;', "a2 = %f;" % self.diameter2)
-                    geo = geo.replace('smooth = 0;',
-                                      "smooth = %f;" % self.smooth)
-                    geo = geo.replace('lc = 0;', "lc = %f;" % self.lc)
-                    geo = geo.replace('lc2 = lc/1;', "lc2 = lc/%f;" % self.lc2)
-                    geo = geo.replace('lc3 = lc/1;', "lc3 = lc/%f;" % self.lc3)
+                    geo = self._fill_template('rectangle_msh_template.geo', {
+                        'ff': self.ff, 'period': self.period, 'period_y': self.period_y,
+                        'width': self.diameter1, 'height': self.diameter2, 'smooth': self.smooth,
+                        'lc': self.lc, 'lc2': self.lc2, 'lc3': self.lc3})
             elif self.inc_shape == 'rectangle_shell':
                 msh_name = 'rect_shell_%(d)s_%(dy)s_%(d_one)s_%(d_two)s_%(smooth)s_%(t)s' % {
                     'd': dec_float_str(self.period),
@@ -858,22 +727,10 @@ class NanoStruct:
                 }
                 if not os.path.exists(msh_location + msh_name +
                                       '.mail') or self.force_mesh is True:
-                    geo_tmp = open(
-                        template_location + 'rect_shell1_msh_template.geo',
-                        "r").read()
-                    geo = geo_tmp.replace('ff = 0;', "ff = %f;" % self.ff)
-                    geo = geo.replace('d_in_nm = 0;',
-                                      "d_in_nm  = %f;" % self.period)
-                    geo = geo.replace('dy_in_nm = 0;',
-                                      "dy_in_nm = %f;" % self.period_y)
-                    geo = geo.replace('a1 = 0;', "a1 = %f;" % self.diameter1)
-                    geo = geo.replace('b1 = 0;', "b1 = %f;" % self.diameter2)
-                    geo = geo.replace('smooth = 0;',
-                                      "smooth = %f;" % self.smooth)
-                    geo = geo.replace('t = 0;', "t = %f;" % self.t)
-                    geo = geo.replace('lc = 0;', "lc = %f;" % self.lc)
-                    geo = geo.replace('lc2 = lc/1;', "lc2 = lc/%f;" % self.lc2)
-                    geo = geo.replace('lc3 = lc/1;', "lc3 = lc/%f;" % self.lc3)
+                    geo = self._fill_template('rectangle_shell_msh_template.geo', {
+                        'ff': self.ff, 'period': self.period, 'period_y': self.period_y,
+                        'width': self.diameter1, 'height': self.diameter2, 'smooth': self.smooth, 'thickness': self.t,
+                        'lc': self.lc, 'lc2': self.lc2, 'lc3': self.lc3})
             elif self.inc_shape == 'cross':
                 msh_name = 'cross_%(d)s_%(dy)s_%(d_one)s_%(d_two)s_%(smooth)s' % {
                     'd': dec_float_str(self.period),
@@ -884,21 +741,10 @@ class NanoStruct:
                 }
                 if not os.path.exists(msh_location + msh_name +
                                       '.mail') or self.force_mesh is True:
-                    geo_tmp = open(
-                        template_location + 'cross1_msh_template.geo',
-                        "r").read()
-                    geo = geo_tmp.replace('ff = 0;', "ff = %f;" % self.ff)
-                    geo = geo.replace('d_in_nm = 0;',
-                                      "d_in_nm  = %f;" % self.period)
-                    geo = geo.replace('dy_in_nm = 0;',
-                                      "dy_in_nm = %f;" % self.period_y)
-                    geo = geo.replace('a1 = 0;', "a1 = %f;" % self.diameter1)
-                    geo = geo.replace('a2 = 0;', "a2 = %f;" % self.diameter2)
-                    geo = geo.replace('smooth = 0;',
-                                      "smooth = %f;" % self.smooth)
-                    geo = geo.replace('lc = 0;', "lc = %f;" % self.lc)
-                    geo = geo.replace('lc2 = lc/1;', "lc2 = lc/%f;" % self.lc2)
-                    geo = geo.replace('lc3 = lc/1;', "lc3 = lc/%f;" % self.lc3)
+                    geo = self._fill_template('cross_msh_template.geo', {
+                        'ff': self.ff, 'period': self.period, 'period_y': self.period_y,
+                        'width': self.diameter1, 'height': self.diameter2, 'smooth': self.smooth,
+                        'lc': self.lc, 'lc2': self.lc2, 'lc3': self.lc3})
             elif self.inc_shape == 'cross_shell':
                 msh_name = 'cross_shell_%(d)s_%(dy)s_%(d_one)s_%(d_two)s_%(smooth)s_%(t)s' % {
                     'd': dec_float_str(self.period),
@@ -910,22 +756,10 @@ class NanoStruct:
                 }
                 if not os.path.exists(msh_location + msh_name +
                                       '.mail') or self.force_mesh is True:
-                    geo_tmp = open(
-                        template_location + 'cross_shell1_msh_template.geo',
-                        "r").read()
-                    geo = geo_tmp.replace('ff = 0;', "ff = %f;" % self.ff)
-                    geo = geo.replace('d_in_nm = 0;',
-                                      "d_in_nm  = %f;" % self.period)
-                    geo = geo.replace('dy_in_nm = 0;',
-                                      "dy_in_nm = %f;" % self.period_y)
-                    geo = geo.replace('a1 = 0;', "a1 = %f;" % self.diameter1)
-                    geo = geo.replace('a2 = 0;', "a2 = %f;" % self.diameter2)
-                    geo = geo.replace('smooth = 0;',
-                                      "smooth = %f;" % self.smooth)
-                    geo = geo.replace('t = 0;', "t = %f;" % self.t)
-                    geo = geo.replace('lc = 0;', "lc = %f;" % self.lc)
-                    geo = geo.replace('lc2 = lc/1;', "lc2 = lc/%f;" % self.lc2)
-                    geo = geo.replace('lc3 = lc/1;', "lc3 = lc/%f;" % self.lc3)
+                    geo = self._fill_template('cross_shell_msh_template.geo', {
+                        'ff': self.ff, 'period': self.period, 'period_y': self.period_y,
+                        'width': self.diameter1, 'height': self.diameter2, 'smooth': self.smooth, 'thickness': self.t,
+                        'lc': self.lc, 'lc2': self.lc2, 'lc3': self.lc3})
 
             elif self.inc_shape == 'L':
                 msh_name = 'L_%(d)s_%(dy)s_%(L)s_%(W)s_%(r)s' % {
@@ -937,20 +771,10 @@ class NanoStruct:
                 }
                 if not os.path.exists(msh_location + msh_name +
                                       '.mail') or self.force_mesh is True:
-                    geo_tmp = open(template_location + 'L_msh_template.geo',
-                                   "r").read()
-                    geo = geo_tmp.replace('ff = 0;', "ff = %f;" % self.ff)
-                    geo = geo.replace('d_in_nm = 0;',
-                                      "d_in_nm  = %f;" % self.period)
-                    geo = geo.replace('dy_in_nm = 0;',
-                                      "dy_in_nm = %f;" % self.period_y)
-                    geo = geo.replace('L_nm = 0;',
-                                      "L_nm = %f;" % self.diameter1)
-                    geo = geo.replace('W_nm = 0;',
-                                      "W_nm = %f;" % self.diameter2)
-                    geo = geo.replace('r = 0;', "r = %f;" % self.smooth)
-                    geo = geo.replace('lc = 0;', "lc = %f;" % self.lc)
-                    geo = geo.replace('lc2 = lc/1;', "lc2 = lc/%f;" % self.lc2)
+                    geo = self._fill_template('L_msh_template.geo', {
+                        'ff': self.ff, 'period': self.period, 'period_y': self.period_y,
+                        'length': self.diameter1, 'width': self.diameter2, 'rounding': self.smooth,
+                        'lc': self.lc, 'lc2': self.lc2})
             elif self.inc_shape == 'strip_circle':
                 msh_name = 'strip_circle_%(d)s_%(dy)s_%(d_one)s_%(d_two)s' % {
                     'd': dec_float_str(self.period),
@@ -960,20 +784,10 @@ class NanoStruct:
                 }
                 if not os.path.exists(msh_location + msh_name +
                                       '.mail') or self.force_mesh is True:
-                    geo_tmp = open(
-                        template_location + '1_strip_msh_template.geo',
-                        "r").read()
-                    geo = geo_tmp.replace('ff = 0;', "ff = %f;" % self.ff)
-                    geo = geo.replace('d_in_nm = 0;',
-                                      "d_in_nm  = %f;" % self.period)
-                    geo = geo.replace('dy_in_nm = 0;',
-                                      "dy_in_nm = %f;" % self.period_y)
-                    geo = geo.replace('a1 = 0;', "a1 = %f;" % self.diameter1)
-                    geo = geo.replace('strip = 0;',
-                                      "strip = %f;" % self.diameter2)
-                    geo = geo.replace('lc = 0;', "lc = %f;" % self.lc)
-                    geo = geo.replace('lc2 = lc/1;', "lc2 = lc/%f;" % self.lc2)
-                    geo = geo.replace('lc3 = lc/1;', "lc3 = lc/%f;" % self.lc3)
+                    geo = self._fill_template('strip_msh_template.geo', {
+                        'ff': self.ff, 'period': self.period, 'period_y': self.period_y,
+                        'diameter1': self.diameter1, 'strip': self.diameter2,
+                        'lc': self.lc, 'lc2': self.lc2, 'lc3': self.lc3})
 
             elif self.inc_shape == 'strip_square':
                 msh_name = 'strip_square_%(d)s_%(dy)s_%(d_one)s_%(d_two)s' % {
@@ -984,21 +798,10 @@ class NanoStruct:
                 }
                 if not os.path.exists(msh_location + msh_name +
                                       '.mail') or self.force_mesh is True:
-                    geo_tmp = open(
-                        template_location + '1_strip_msh_template.geo',
-                        "r").read()
-                    geo = geo_tmp.replace('ff = 0;', "ff = %f;" % self.ff)
-                    geo = geo.replace('d_in_nm = 0;',
-                                      "d_in_nm  = %f;" % self.period)
-                    geo = geo.replace('dy_in_nm = 0;',
-                                      "dy_in_nm = %f;" % self.period_y)
-                    geo = geo.replace('a1 = 0;', "a1 = %f;" % self.diameter1)
-                    geo = geo.replace('strip = 0;',
-                                      "strip = %f;" % self.diameter2)
-                    geo = geo.replace('lc = 0;', "lc = %f;" % self.lc)
-                    geo = geo.replace('lc2 = lc/1;', "lc2 = lc/%f;" % self.lc2)
-                    geo = geo.replace('lc3 = lc/1;', "lc3 = lc/%f;" % self.lc3)
-                    geo = geo.replace('square = 0;', "square = 1;")
+                    geo = self._fill_template('strip_msh_template.geo', {
+                        'ff': self.ff, 'period': self.period, 'period_y': self.period_y,
+                        'diameter1': self.diameter1, 'strip': self.diameter2,
+                        'lc': self.lc, 'lc2': self.lc2, 'lc3': self.lc3, 'square': '1'})
 
             elif self.inc_shape == 'double_strip_circle':
                 msh_name = 'double_strip_circle_%(d)s_%(dy)s_%(d_one)s_%(d_two)s_%(d_three)s' % {
@@ -1010,21 +813,10 @@ class NanoStruct:
                 }
                 if not os.path.exists(msh_location + msh_name +
                                       '.mail') or self.force_mesh is True:
-                    geo_tmp = open(template_location + '1_2strip_msh_template.geo',
-                                   "r").read()
-                    geo = geo_tmp.replace('ff = 0;', "ff = %f;" % self.ff)
-                    geo = geo.replace('d_in_nm = 0;',
-                                      "d_in_nm  = %f;" % self.period)
-                    geo = geo.replace('dy_in_nm = 0;',
-                                      "dy_in_nm = %f;" % self.period_y)
-                    geo = geo.replace('a1 = 0;', "a1 = %f;" % self.diameter1)
-                    geo = geo.replace('strip = 0;',
-                                      "strip = %f;" % self.diameter2)
-                    geo = geo.replace('strip2 = 0;',
-                                      "strip2 = %f;" % self.diameter3)
-                    geo = geo.replace('lc = 0;', "lc = %f;" % self.lc)
-                    geo = geo.replace('lc2 = lc/1;', "lc2 = lc/%f;" % self.lc2)
-                    geo = geo.replace('lc3 = lc/1;', "lc3 = lc/%f;" % self.lc3)
+                    geo = self._fill_template('double_strip_msh_template.geo', {
+                        'ff': self.ff, 'period': self.period, 'period_y': self.period_y,
+                        'diameter1': self.diameter1, 'strip': self.diameter2, 'strip2': self.diameter3,
+                        'lc': self.lc, 'lc2': self.lc2, 'lc3': self.lc3})
 
             elif self.inc_shape == 'double_strip_square':
                 msh_name = 'double_strip_square_%(d)s_%(dy)s_%(d_one)s_%(d_two)s_%(d_three)s' % {
@@ -1036,22 +828,10 @@ class NanoStruct:
                 }
                 if not os.path.exists(msh_location + msh_name +
                                       '.mail') or self.force_mesh is True:
-                    geo_tmp = open(template_location + '1_2strip_msh_template.geo',
-                                   "r").read()
-                    geo = geo_tmp.replace('ff = 0;', "ff = %f;" % self.ff)
-                    geo = geo.replace('d_in_nm = 0;',
-                                      "d_in_nm  = %f;" % self.period)
-                    geo = geo.replace('dy_in_nm = 0;',
-                                      "dy_in_nm = %f;" % self.period_y)
-                    geo = geo.replace('a1 = 0;', "a1 = %f;" % self.diameter1)
-                    geo = geo.replace('strip = 0;',
-                                      "strip = %f;" % self.diameter2)
-                    geo = geo.replace('strip2 = 0;',
-                                      "strip2 = %f;" % self.diameter3)
-                    geo = geo.replace('lc = 0;', "lc = %f;" % self.lc)
-                    geo = geo.replace('lc2 = lc/1;', "lc2 = lc/%f;" % self.lc2)
-                    geo = geo.replace('lc3 = lc/1;', "lc3 = lc/%f;" % self.lc3)
-                    geo = geo.replace('square = 0;', "square = 1;")
+                    geo = self._fill_template('double_strip_msh_template.geo', {
+                        'ff': self.ff, 'period': self.period, 'period_y': self.period_y,
+                        'diameter1': self.diameter1, 'strip': self.diameter2, 'strip2': self.diameter3,
+                        'lc': self.lc, 'lc2': self.lc2, 'lc3': self.lc3, 'square': '1'})
 
             else:
                 raise NotImplementedError("\n Selected inc_shape = '%s' \n \
@@ -1126,16 +906,17 @@ class NanoStruct:
                         el = getattr(self, 'ellipticity', 0.0)
                         rx = d1 / 2.0
                         ry = rx * (1.0 - el)
-                        inclusions.append({"kind": "ellipse", "c": center, "rx": rx, "ry": ry, "tag": 2})
+                        inclusions.append({"kind": "ellipse", "center": center, "rx": rx, "ry": ry, "tag": 2})
                     else:
-                        inclusions.append({"kind": self.inc_shape, "c": center, "r": d1 / 2.0, "tag": 2})
+                        inclusions.append({"kind": self.inc_shape, "center": center, "radius": d1 / 2.0, "tag": 2})
                 elif self.inc_shape in ('square', 'rectangle') and d1 > 0:
-                    inclusions.append({"kind": self.inc_shape, "c": center, "s": d1, "tag": 2})
+                    inclusions.append({"kind": self.inc_shape, "center": center, "side": d1, "tag": 2})
                 elif self.inc_shape == "ring" and d1 > 0:
-                    inclusions.append({"kind": "ring", "c": center, "r_out": d1 / 2.0, "r_in": d2 / 2.0, "tag": 2})
+                    inclusions.append({"kind": "ring", "center": center, "radius_out": d1 / 2.0,
+                                       "radius_in": d2 / 2.0, "tag": 2})
                 elif self.inc_shape == "dimer" and d1 > 0:
                     gap = getattr(self, 'gap', 0.0) / self.period
-                    inclusions.append({"kind": "dimer", "c": center, "r": d1 / 2.0, "gap": gap, "tag": 2})
+                    inclusions.append({"kind": "dimer", "center": center, "radius": d1 / 2.0, "gap": gap, "tag": 2})
 
                 # geo_params lc/lc2..lc_n override lc_bkg/lc2..lc_n, as on the gmsh path
                 lc = float(merged_geo_params.get('lc', self.lc))
@@ -1727,12 +1508,9 @@ class NanoStruct:
             params['period'] = self.period
         if hasattr(self, 'period_y') and self.period_y is not None:
             params['period_y'] = self.period_y
-        if hasattr(self, 'diameter1') and self.diameter1:
-            params['a1'] = self.diameter1
-        if hasattr(self, 'diameter2') and self.diameter2:
-            params['a2'] = self.diameter2
-        if hasattr(self, 'diameter3') and self.diameter3:
-            params['a3'] = self.diameter3
+        for k in (1, 2, 3):
+            if getattr(self, 'diameter%d' % k, 0):
+                params['diameter%d' % k] = getattr(self, 'diameter%d' % k)
         if hasattr(self, 'gap') and self.gap:
             params['gap'] = self.gap
         if hasattr(self, 'ellipticity') and self.ellipticity:
@@ -1753,6 +1531,11 @@ class NanoStruct:
             params['lc6'] = self.lc6
 
         if hasattr(self, 'geo_params') and self.geo_params:
+            import meshing
+            # a geo_params key also replaces the other spellings of it (a1 -> diameter1)
+            for key in self.geo_params:
+                for alt in meshing.param_equivalents(key):
+                    params.pop(alt, None)
             params.update(self.geo_params)
             if 'period' in self.geo_params:
                 self.period = float(self.geo_params['period'])
