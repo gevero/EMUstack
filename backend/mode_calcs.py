@@ -24,7 +24,7 @@ import sys
 import os
 from EMUstack.backend import paths
 from EMUstack.backend.linalg import mat
-from EMUstack.backend.legacy_sort import legacy_argsort
+from EMUstack.backend.legacy_sort import legacy_argsort, grating_orders_2d
 
 
 
@@ -59,18 +59,7 @@ class Modes:
 
     def calc_2d_grating_orders(self, max_order):
         """ Return the grating order indices px and py, unsorted. """
-        # Create arrays of grating order indexes (-p, ..., p)
-        pxs = pys = np.arange(-max_order, max_order + 1)
-        # The inner loop in the fortran is over y, not x
-        # So we call meshgrid with y first
-        pys_mesh, pxs_mesh = np.meshgrid(pys, pxs)
-        # Which elements of pys_mesh and pxs_mesh correspond to
-        # orders low enough that we're interested in?
-        dx = self.structure.period
-        dy = self.structure.period_y
-        low_ord = ((pxs_mesh/dx)**2 + (pys_mesh/dy)**2 <=
-            (max_order/max(dx, dy))**2)
-        return pxs_mesh[low_ord], pys_mesh[low_ord]
+        return grating_orders_2d(max_order, self.structure.period, self.structure.period_y)
 
     def prop_fwd(self, height_norm):
         """ Return the matrix P corresponding to forward propagation/decay. """

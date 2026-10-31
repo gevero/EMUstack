@@ -18,7 +18,7 @@ from ngsolve import Mesh, HCurl, H1, GridFunction, BilinearForm
 
 from modes import BlochModes, FEMConvergenceError
 import meshing
-from legacy_sort import z_indexx
+from legacy_sort import z_indexx, grating_orders_2d
 import paths
 
 
@@ -281,12 +281,7 @@ def compute_overlaps_2d(
         space_pri = ngs.Periodic(fes, phase=[np.exp(+1j * kx * period_x), np.exp(+1j * ky * dy)])
         space_adj = ngs.Periodic(fes, phase=[np.exp(-1j * kx * period_x), np.exp(-1j * ky * dy)])
 
-    px_range = np.arange(-max_order_PWs, max_order_PWs + 1)
-    py_mesh, px_mesh = np.meshgrid(px_range, px_range)
-    mask = (px_mesh / period_x)**2 + (py_mesh / dy)**2 <= (max_order_PWs / max(period_x, dy))**2
-
-    pxs = px_mesh[mask]
-    pys = py_mesh[mask]
+    pxs, pys = grating_orders_2d(max_order_PWs, period_x, dy)
     alphas = kx + 2.0 * np.pi * pxs / period_x
     betas = ky + 2.0 * np.pi * pys / dy
 
