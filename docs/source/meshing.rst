@@ -131,6 +131,13 @@ Old names keep working everywhere: old file names are looked up in ``meshing.LEG
 
 Mesh sizes keep their names everywhere: ``lc`` is the background size and ``lc2``, ``lc3``, ... are refinement divisors (``lcN = lc/1;`` in a ``.geo`` file).
 
+A few templates have layout rules:
+
+* ``4_``, ``9_`` and ``16_`` place their inclusions on a 2×2, 3×3 and 4×4 grid, numbered row by row from the top left. Inclusion 1 is ``inclusion_a``, all others ``inclusion_b``. ``posx`` and ``posy`` move the inclusions towards the cell centre.
+* ``strip_`` puts the inclusion (``diameter1``) inside a strip of width ``strip`` (``diameter2`` for ``NanoStruct``) that runs along *x*, so the strip must be wider than the inclusion and narrower than the cell. ``double_strip_`` adds a band of total width ``strip2`` (``diameter3``) around it. ``NanoStruct`` checks these rules before meshing.
+
+gmsh never returns on some invalid geometries, such as lines that cross an inclusion. EMUstack stops gmsh after ``meshing.gmsh_timeout`` seconds (default 600, or the ``EMUSTACK_GMSH_TIMEOUT`` environment variable) and raises an error that names the ``.geo`` file.
+
 .. _legacy-params:
 
 Renaming a ``.py`` Template Parameter Safely: ``@meshing.legacy_params``

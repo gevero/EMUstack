@@ -687,6 +687,12 @@ def import_gmsh_mesh(
 
         x_pairs = list(zip(sorted(lo, key=lambda i: P[i][1]), sorted(ri, key=lambda i: P[i][1])))
         y_pairs = list(zip(sorted(bo, key=lambda i: P[i][0]), sorted(to, key=lambda i: P[i][0])))
+        # Paired nodes must face each other, or the Bloch conditions would join wrong points.
+        dy_max = max((abs(P[a][1] - P[b][1]) for a, b in x_pairs), default=0.0)
+        dx_max = max((abs(P[a][0] - P[b][0]) for a, b in y_pairs), default=0.0)
+        assert dy_max < tol and dx_max < tol, (
+            "Boundary nodes on opposite faces of the unit cell do not match (offset up to "
+            f"{max(dx_max, dy_max):.3g}); the mesh is not periodic.")
 
         # 1-based identification numbers: 1 for x-pairs, 2 for y-pairs
         for p1, p2 in x_pairs:
@@ -814,6 +820,26 @@ def _gmsh_binary() -> str:
     )
 
 
+# Seconds gmsh may take for one mesh. gmsh never returns on some invalid geometries
+# (e.g. lines crossing an inclusion), so without a limit the caller would hang forever.
+gmsh_timeout = float(os.environ.get("EMUSTACK_GMSH_TIMEOUT", "600"))
+
+
+def _run_gmsh(args: List[str], geo: str) -> subprocess.CompletedProcess:
+    """Run gmsh with `args`; stop it and raise if it takes longer than `gmsh_timeout`."""
+    cmd = [_gmsh_binary()] + list(args)
+    try:
+        # on timeout, subprocess.run kills gmsh before raising
+        return subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                              timeout=gmsh_timeout)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(
+            "gmsh did not finish meshing %s within %g s and was stopped. The geometry is "
+            "probably invalid, e.g. inclusions that overlap or cross other lines: check the "
+            "template parameters. For a very fine mesh, raise the limit with "
+            "meshing.gmsh_timeout or EMUSTACK_GMSH_TIMEOUT." % (geo, gmsh_timeout)) from None
+
+
 def conv_gmsh(root: str) -> Tuple[int, int]:
     """Mesh `root`.geo with gmsh and write `root`.mail, as legacy EMUstack's conv_gmsh.f does.
 
@@ -825,9 +851,12 @@ def conv_gmsh(root: str) -> Tuple[int, int]:
     """
     geo, msh, mail = root + ".geo", root + ".msh", root + ".mail"
     tmp_msh = msh + ".%d.tmp" % os.getpid()
-    cmd = [_gmsh_binary(), "-0", "-2", "-order", "2", "-v", "0", "-format", "msh2",
-           "-o", tmp_msh, geo]
-    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        res = _run_gmsh(["-0", "-2", "-order", "2", "-v", "0", "-format", "msh2", "-o", tmp_msh, geo], geo)
+    except RuntimeError:
+        if os.path.exists(tmp_msh):
+            os.remove(tmp_msh)
+        raise
     if res.returncode != 0 or not os.path.exists(tmp_msh):
         raise RuntimeError("gmsh failed on %s (exit %d):\n%s" % (geo, res.returncode, res.stderr))
 
@@ -941,16 +970,7 @@ def mesh_from_geo(
     geo_text = geo_text.replace("Physical Surface(1) =", f'Physical Surface("{BACKGROUND_NAME}") =')
     geo_text = geo_text.replace("Physical Surface(2) =", f'Physical Surface("{inclusion_name(2)}") =')
 
-    gmsh_bin = (
-        os.environ.get("GMSH_BIN")
-        or shutil.which("gmsh")
-        or os.path.expanduser("~/.local/bin/gmsh")
-        or os.path.expanduser("~/bin/gmsh")
-    )
-    if not gmsh_bin or not os.path.exists(gmsh_bin):
-        raise EnvironmentError(
-            "Gmsh binary not found. Please install Gmsh or use a native Netgen .py geometry template."
-        )
+    _gmsh_binary()  # fail early with a clear message if gmsh is missing
 
     with tempfile.NamedTemporaryFile("w", suffix=".geo", delete=False) as f_geo:
         f_geo.write(geo_text)
@@ -958,9 +978,8 @@ def mesh_from_geo(
         tmp_geo = f_geo.name
 
     tmp_msh = tmp_geo.replace(".geo", ".msh")
-    cmd = [gmsh_bin, "-2", "-format", "msh2", "-order", "1", tmp_geo, "-o", tmp_msh]
     try:
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        res = _run_gmsh(["-2", "-format", "msh2", "-order", "1", tmp_geo, "-o", tmp_msh], geo_file)
         if res.returncode != 0:
             raise RuntimeError(f"Gmsh meshing failed with exit code {res.returncode}:\n{res.stderr}")
         mesh = import_gmsh_mesh(tmp_msh, curve_order=curve_order)

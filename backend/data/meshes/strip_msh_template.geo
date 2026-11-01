@@ -159,6 +159,11 @@ Plane Surface(72) = {71};
 Line Loop(73) = {26, 40, -56, -55};
 Plane Surface(74) = {73};
 
+Physical Line(67) = {21, 22, 23, 24};
+Physical Line(68) = {1, 2};
+Physical Line(69) = {29, 30, 31, 32};
+Physical Line(70) = {4, 3};
+
 Physical Surface(1) = {44, 46, 48, 50};
 Physical Surface(2) = {68, 70, 72, 74};
 Physical Surface(3) = {60, 62, 64, 66};

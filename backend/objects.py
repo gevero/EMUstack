@@ -66,6 +66,13 @@ class NanoStruct:
                 'dimer', 'square_dimer', 'strip_circle', 'strip_square',
                 'rectangle', 'rectangle_shell', 'square_dimer_shell',
                 'cross', 'cross_shell', 'L' .
+                'strip_circle' / 'strip_square': a circle or square of diameter1
+                (inclusion_a) inside a strip of width diameter2 > diameter1 along x
+                (inclusion_b). 'double_strip_circle' / 'double_strip_square' add a
+                band of total width diameter3 around the strip (inclusion_c).
+                'circle', 'ellipse' and 'square' with diameter2..diameter16 set give
+                supercells of 2, 3, 4, 9 or 16 inclusions (2x2, 3x3, 4x4 grids for
+                4, 9, 16), numbered row by row from the top left.
 
             is_hex  (bool): Simulating a hexagonal lattice, using a rect unitcell?
 
@@ -406,6 +413,24 @@ class NanoStruct:
             text = f.read()
         return meshing.fill_geo_template(text, params, fmt='%f', strict=False, template=template)
 
+    def _check_strip_params(self, double):
+        """Raise if the strip shapes cannot be meshed.
+
+        The strip templates put the inclusion (diameter1) inside a strip of width diameter2
+        that runs along x; the double strip adds a band of total width diameter3 around it.
+        Narrower strips would cross the inclusion outline, and gmsh never returns on that.
+        """
+        name = self.inc_shape
+        if not 0 < self.diameter1 < self.diameter2:
+            raise ValueError(
+                "%s: the strip width diameter2 (%g nm) must be larger than the inclusion "
+                "diameter1 (%g nm), which sits inside the strip." % (name, self.diameter2, self.diameter1))
+        total = self.diameter2 + (self.diameter3 if double else 0.0)
+        if total >= self.period_y:
+            raise ValueError(
+                "%s: the strip%s (%g nm in total) must be narrower than the cell, period_y = %g nm."
+                % (name, "s diameter2 + diameter3" if double else " width diameter2", total, self.period_y))
+
     def _legacy_custom_geo(self):
         """Text of a custom .geo template with geo_params filled in, as legacy EMUstack writes it."""
         import meshing
@@ -525,6 +550,10 @@ class NanoStruct:
                 else:
                     raise ValueError(
                         "must have at least one cylinder of nonzero diameter.")
+                if supercell > 5:
+                    # the name above holds diameters 1-5 only; the cached mesh must depend on all
+                    msh_name += '_%d_' % supercell + '_'.join(
+                        dec_float_str(getattr(self, 'diameter%d' % k)) for k in range(6, supercell + 1))
 
                 if self.ellipticity != 0:
                     msh_name = msh_name + '_e_%(e)s' % {
@@ -776,6 +805,7 @@ class NanoStruct:
                         'length': self.diameter1, 'width': self.diameter2, 'rounding': self.smooth,
                         'lc': self.lc, 'lc2': self.lc2})
             elif self.inc_shape == 'strip_circle':
+                self._check_strip_params(double=False)
                 msh_name = 'strip_circle_%(d)s_%(dy)s_%(d_one)s_%(d_two)s' % {
                     'd': dec_float_str(self.period),
                     'dy': dec_float_str(self.period_y),
@@ -790,6 +820,7 @@ class NanoStruct:
                         'lc': self.lc, 'lc2': self.lc2, 'lc3': self.lc3})
 
             elif self.inc_shape == 'strip_square':
+                self._check_strip_params(double=False)
                 msh_name = 'strip_square_%(d)s_%(dy)s_%(d_one)s_%(d_two)s' % {
                     'd': dec_float_str(self.period),
                     'dy': dec_float_str(self.period_y),
@@ -804,6 +835,7 @@ class NanoStruct:
                         'lc': self.lc, 'lc2': self.lc2, 'lc3': self.lc3, 'square': '1'})
 
             elif self.inc_shape == 'double_strip_circle':
+                self._check_strip_params(double=True)
                 msh_name = 'double_strip_circle_%(d)s_%(dy)s_%(d_one)s_%(d_two)s_%(d_three)s' % {
                     'd': dec_float_str(self.period),
                     'dy': dec_float_str(self.period_y),
@@ -819,6 +851,7 @@ class NanoStruct:
                         'lc': self.lc, 'lc2': self.lc2, 'lc3': self.lc3})
 
             elif self.inc_shape == 'double_strip_square':
+                self._check_strip_params(double=True)
                 msh_name = 'double_strip_square_%(d)s_%(dy)s_%(d_one)s_%(d_two)s_%(d_three)s' % {
                     'd': dec_float_str(self.period),
                     'dy': dec_float_str(self.period_y),
