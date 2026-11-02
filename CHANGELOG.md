@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.0.0 (unreleased)
+## 2.0.0rc1 (2026-11-02)
 
 A pure-Python port of EMUstack. Version 1 (Fortran backend) is tagged `v1-fortran` and lives at
 [bjornsturmberg/EMUstack](https://github.com/bjornsturmberg/EMUstack).
