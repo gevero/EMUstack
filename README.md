@@ -1,9 +1,8 @@
 # EMUstack: Finite-Element & Scattering-Matrix Electromagnetic Simulator
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/bjornsturmberg/EMUstack/blob/master/LICENSE.txt)
-[![Documentation Status](https://readthedocs.org/projects/emustack/badge/?version=latest)](https://emustack.readthedocs.io/)
-[![GitHub Pages](https://img.shields.io/badge/Docs-GitHub%20Pages-blue.svg)](https://bjornsturmberg.github.io/EMUstack/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/gevero/EMUstack/blob/master/LICENSE.txt)
+[![GitHub Pages](https://img.shields.io/badge/Docs-GitHub%20Pages-blue.svg)](https://gevero.github.io/EMUstack/)
 [![FEM Engine: NGSolve / Netgen](https://img.shields.io/badge/FEM%20Engine-NGSolve%20%2F%20Netgen-orange.svg)](https://ngsolve.org/)
 [![Pure Python 1D FEM](https://img.shields.io/badge/1D%20FEM-Pure%20Python%20%2F%20SciPy-brightgreen.svg)](#1d-and-2d-mode-solvers)
 
@@ -49,7 +48,19 @@ EMUstack v2.0 is a pure Python package. It requires **no Fortran compilers**, **
 * **Core Dependencies:** `numpy>=1.22`, `scipy>=1.9`, `matplotlib>=3.6`, `ngsolve>=6.2.2401`, `netgen-mesher>=6.2.2401`, `xarray>=2023.1`, `pyyaml>=6.0`, `gmsh>=4.11` (the default mesher).
 * **Optional (installed by `.[all]`):** Jupyter, `adaptive`, `loky`, pytest, Sphinx.
 
-The commands below install EMUstack **with all optional packages** (`.[all]`), so the mesher, the example notebooks, the tests and the docs build all work right away.
+### From PyPI
+```bash
+pip install emustack            # core: FEM solvers, gmsh and netgen meshers
+pip install "emustack[all]"     # + notebooks, tests, docs
+```
+
+### From Source
+The repository includes the example notebooks and the test suite:
+```bash
+git clone https://github.com/gevero/EMUstack.git
+cd EMUstack
+```
+The commands below install EMUstack from the clone **with all optional packages** (`.[all]`), so the mesher, the example notebooks, the tests and the docs build all work right away.
 
 ### Environment Setup & Installation
 
@@ -152,7 +163,7 @@ ellipse_layer = objects.NanoStruct(
 )
 ```
 
-For a complete, step-by-step guide comparing the Gmsh (`.geo`) and Netgen (`.py`) pipelines—with line-by-line walkthroughs of `ellipse_msh_template.geo`, `ellipse_msh_template.py`, and `chiral_qbic_gorkunov_msh_template.py`—see the **[2D Geometry & Meshing Guide](https://bjornsturmberg.github.io/EMUstack/meshing.html)** in the documentation.
+For a complete, step-by-step guide comparing the Gmsh (`.geo`) and Netgen (`.py`) pipelines—with line-by-line walkthroughs of `ellipse_msh_template.geo`, `ellipse_msh_template.py`, and `chiral_qbic_gorkunov_msh_template.py`—see the **[2D Geometry & Meshing Guide](https://gevero.github.io/EMUstack/meshing.html)** in the documentation.
 
 ### 3. Evaluating Electric & Magnetic Near-Fields, Poynting Vector, and Optical Chirality
 
@@ -187,29 +198,29 @@ EMUstack v2.0 provides **45 didactic Jupyter Notebooks** organized into two dedi
 
 | Notebook | Topic & Physical System | `examples/` (Gmsh) | `examples_netgen/` (Netgen) |
 | :--- | :--- | :---: | :---: |
-| `simo_010-single_interface.ipynb` | Analytical Fresnel equations & diffraction order setup | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/simo_010-single_interface.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/simo_010-single_interface.ipynb) |
-| `simo_011-single_interface-dispersive.ipynb` | Dispersive refractive index interpolation (materials.Si_c) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/simo_011-single_interface-dispersive.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/simo_011-single_interface-dispersive.ipynb) |
-| `simo_020-thin_film_multilayered_stack.ipynb` | Fabry–Pérot interference and layer-by-layer absorption | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/simo_020-thin_film_multilayered_stack.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/simo_020-thin_film_multilayered_stack.ipynb) |
-| `simo_021-thin_film_mirror.ipynb` | Metallic back-reflector and substrate loss handling | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/simo_021-thin_film_mirror.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/simo_021-thin_film_mirror.ipynb) |
-| `simo_030-1D_grating.ipynb` | 1D lamellar diffraction grating and polarization (TE/TM) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/simo_030-1D_grating.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/simo_030-1D_grating.ipynb) |
-| `simo_031-1D_grating-2_inclusions.ipynb` | 1D multi-inclusion unit cell with interleaved elements | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/simo_031-1D_grating-2_inclusions.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/simo_031-1D_grating-2_inclusions.ipynb) |
-| `simo_032-1D_grating-3_inclusions.ipynb` | 3-element 1D unit cell with complex spacing rules | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/simo_032-1D_grating-3_inclusions.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/simo_032-1D_grating-3_inclusions.ipynb) |
-| `simo_040-2D_array.ipynb` | 2D silicon nanowire array for photovoltaics ($J_{\text{sc}}$, $\eta$) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/simo_040-2D_array.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/simo_040-2D_array.ipynb) |
-| `simo_041-combining_1D_and_2D_array.ipynb` | Hybrid stack combining 1D lamellar grating and 2D array | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/simo_041-combining_1D_and_2D_array.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/simo_041-combining_1D_and_2D_array.ipynb) |
-| `simo_042-eliptical_holes-CD.ipynb` | Elliptical nanohole array and circular dichroism | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/simo_042-eliptical_holes-CD.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/simo_042-eliptical_holes-CD.ipynb) |
-| `simo_050-plotting_fields_1d.ipynb` | 1D Bloch mode profiles and vertical $(x, z)$ cross-sections | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/simo_050-plotting_fields_1d.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/simo_050-plotting_fields_1d.ipynb) |
-| `simo_051-plotting_fields_2d.ipynb` | 2D near-field visualization in $(x, y)$ and $(x, z)$ planes | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/simo_051-plotting_fields_2d.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/simo_051-plotting_fields_2d.ipynb) |
-| `simo_052-plotting_amplitudes.ipynb` | Modal amplitudes, plane-wave order coupling, evanescent FOM | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/simo_052-plotting_amplitudes.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/simo_052-plotting_amplitudes.ipynb) |
-| `simo_053-plotting_k_space_amps.ipynb` | In-plane momentum excitation spectrum ($k_\parallel / k_0$) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/simo_053-plotting_k_space_amps.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/simo_053-plotting_k_space_amps.ipynb) |
-| `simo_060-shear_transformations.ipynb` | Lateral unit-cell translation via shear operators | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/simo_060-shear_transformations.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/simo_060-shear_transformations.ipynb) |
-| `simo_070-ultrathin_limit.ipynb` | Fundamental 50% absorption limit in ultrathin coherent films | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/simo_070-ultrathin_limit.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/simo_070-ultrathin_limit.ipynb) |
-| `simo_071-many_substrates.ipynb` | Modal reuse across 100 substrates & thickness averaging | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/simo_071-many_substrates.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/simo_071-many_substrates.ipynb) |
-| `simo_080-convergence-stacked_gratings.ipynb` | Convergence benchmark of stacked gratings (Handmer et al.) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/simo_080-convergence-stacked_gratings.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/simo_080-convergence-stacked_gratings.ipynb) |
-| `simo_090-EOT.ipynb` | Extraordinary optical transmission through subwavelength holes | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/simo_090-EOT.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/simo_090-EOT.ipynb) |
-| `simo_091-slab_mode_finding.ipynb` | Guided slab mode dispersion finding via determinant zeros | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/simo_091-slab_mode_finding.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/simo_091-slab_mode_finding.ipynb) |
-| `Au Nanodisk Array with Interpolators.ipynb` | Plasmonic gold nanodisk array & 3-plane field maps (`xy`, `xz`, `yz`) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/Au%20Nanodisk%20Array%20with%20Interpolators.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/Au%20Nanodisk%20Array%20with%20Interpolators.ipynb) |
-| `Elliptical Nanohole Array (custom target interface).ipynb` | Custom geometry template tutorial & 3-plane maps (`xy`, `xz`, `yz`) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples/Elliptical%20Nanohole%20Array%20%28custom%20target%20interface%29.ipynb) | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/Elliptical%20Nanohole%20Array%20%28custom%20target%20interface%29.ipynb) |
-| `Chiral_qBIC_Optical_Chirality.ipynb` | BIC to quasi-BIC in a bar-dimer metasurface (Gorkunov et al., Fig. 3a, [520, 650] nm), field & optical chirality enhancement $\hat{C}$ at the q-BIC | — | [View](https://github.com/bjornsturmberg/EMUstack/blob/master/examples_netgen/Chiral_qBIC_Optical_Chirality.ipynb) |
+| `simo_010-single_interface.ipynb` | Analytical Fresnel equations & diffraction order setup | [View](https://github.com/gevero/EMUstack/blob/master/examples/simo_010-single_interface.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/simo_010-single_interface.ipynb) |
+| `simo_011-single_interface-dispersive.ipynb` | Dispersive refractive index interpolation (materials.Si_c) | [View](https://github.com/gevero/EMUstack/blob/master/examples/simo_011-single_interface-dispersive.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/simo_011-single_interface-dispersive.ipynb) |
+| `simo_020-thin_film_multilayered_stack.ipynb` | Fabry–Pérot interference and layer-by-layer absorption | [View](https://github.com/gevero/EMUstack/blob/master/examples/simo_020-thin_film_multilayered_stack.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/simo_020-thin_film_multilayered_stack.ipynb) |
+| `simo_021-thin_film_mirror.ipynb` | Metallic back-reflector and substrate loss handling | [View](https://github.com/gevero/EMUstack/blob/master/examples/simo_021-thin_film_mirror.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/simo_021-thin_film_mirror.ipynb) |
+| `simo_030-1D_grating.ipynb` | 1D lamellar diffraction grating and polarization (TE/TM) | [View](https://github.com/gevero/EMUstack/blob/master/examples/simo_030-1D_grating.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/simo_030-1D_grating.ipynb) |
+| `simo_031-1D_grating-2_inclusions.ipynb` | 1D multi-inclusion unit cell with interleaved elements | [View](https://github.com/gevero/EMUstack/blob/master/examples/simo_031-1D_grating-2_inclusions.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/simo_031-1D_grating-2_inclusions.ipynb) |
+| `simo_032-1D_grating-3_inclusions.ipynb` | 3-element 1D unit cell with complex spacing rules | [View](https://github.com/gevero/EMUstack/blob/master/examples/simo_032-1D_grating-3_inclusions.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/simo_032-1D_grating-3_inclusions.ipynb) |
+| `simo_040-2D_array.ipynb` | 2D silicon nanowire array for photovoltaics ($J_{\text{sc}}$, $\eta$) | [View](https://github.com/gevero/EMUstack/blob/master/examples/simo_040-2D_array.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/simo_040-2D_array.ipynb) |
+| `simo_041-combining_1D_and_2D_array.ipynb` | Hybrid stack combining 1D lamellar grating and 2D array | [View](https://github.com/gevero/EMUstack/blob/master/examples/simo_041-combining_1D_and_2D_array.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/simo_041-combining_1D_and_2D_array.ipynb) |
+| `simo_042-eliptical_holes-CD.ipynb` | Elliptical nanohole array and circular dichroism | [View](https://github.com/gevero/EMUstack/blob/master/examples/simo_042-eliptical_holes-CD.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/simo_042-eliptical_holes-CD.ipynb) |
+| `simo_050-plotting_fields_1d.ipynb` | 1D Bloch mode profiles and vertical $(x, z)$ cross-sections | [View](https://github.com/gevero/EMUstack/blob/master/examples/simo_050-plotting_fields_1d.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/simo_050-plotting_fields_1d.ipynb) |
+| `simo_051-plotting_fields_2d.ipynb` | 2D near-field visualization in $(x, y)$ and $(x, z)$ planes | [View](https://github.com/gevero/EMUstack/blob/master/examples/simo_051-plotting_fields_2d.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/simo_051-plotting_fields_2d.ipynb) |
+| `simo_052-plotting_amplitudes.ipynb` | Modal amplitudes, plane-wave order coupling, evanescent FOM | [View](https://github.com/gevero/EMUstack/blob/master/examples/simo_052-plotting_amplitudes.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/simo_052-plotting_amplitudes.ipynb) |
+| `simo_053-plotting_k_space_amps.ipynb` | In-plane momentum excitation spectrum ($k_\parallel / k_0$) | [View](https://github.com/gevero/EMUstack/blob/master/examples/simo_053-plotting_k_space_amps.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/simo_053-plotting_k_space_amps.ipynb) |
+| `simo_060-shear_transformations.ipynb` | Lateral unit-cell translation via shear operators | [View](https://github.com/gevero/EMUstack/blob/master/examples/simo_060-shear_transformations.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/simo_060-shear_transformations.ipynb) |
+| `simo_070-ultrathin_limit.ipynb` | Fundamental 50% absorption limit in ultrathin coherent films | [View](https://github.com/gevero/EMUstack/blob/master/examples/simo_070-ultrathin_limit.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/simo_070-ultrathin_limit.ipynb) |
+| `simo_071-many_substrates.ipynb` | Modal reuse across 100 substrates & thickness averaging | [View](https://github.com/gevero/EMUstack/blob/master/examples/simo_071-many_substrates.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/simo_071-many_substrates.ipynb) |
+| `simo_080-convergence-stacked_gratings.ipynb` | Convergence benchmark of stacked gratings (Handmer et al.) | [View](https://github.com/gevero/EMUstack/blob/master/examples/simo_080-convergence-stacked_gratings.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/simo_080-convergence-stacked_gratings.ipynb) |
+| `simo_090-EOT.ipynb` | Extraordinary optical transmission through subwavelength holes | [View](https://github.com/gevero/EMUstack/blob/master/examples/simo_090-EOT.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/simo_090-EOT.ipynb) |
+| `simo_091-slab_mode_finding.ipynb` | Guided slab mode dispersion finding via determinant zeros | [View](https://github.com/gevero/EMUstack/blob/master/examples/simo_091-slab_mode_finding.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/simo_091-slab_mode_finding.ipynb) |
+| `Au Nanodisk Array with Interpolators.ipynb` | Plasmonic gold nanodisk array & 3-plane field maps (`xy`, `xz`, `yz`) | [View](https://github.com/gevero/EMUstack/blob/master/examples/Au%20Nanodisk%20Array%20with%20Interpolators.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/Au%20Nanodisk%20Array%20with%20Interpolators.ipynb) |
+| `Elliptical Nanohole Array (custom target interface).ipynb` | Custom geometry template tutorial & 3-plane maps (`xy`, `xz`, `yz`) | [View](https://github.com/gevero/EMUstack/blob/master/examples/Elliptical%20Nanohole%20Array%20%28custom%20target%20interface%29.ipynb) | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/Elliptical%20Nanohole%20Array%20%28custom%20target%20interface%29.ipynb) |
+| `Chiral_qBIC_Optical_Chirality.ipynb` | BIC to quasi-BIC in a bar-dimer metasurface (Gorkunov et al., Fig. 3a, [520, 650] nm), field & optical chirality enhancement $\hat{C}$ at the q-BIC | — | [View](https://github.com/gevero/EMUstack/blob/master/examples_netgen/Chiral_qBIC_Optical_Chirality.ipynb) |
 
 ---
 
@@ -280,6 +291,14 @@ Legacy file dumps can be re-enabled at any time by explicitly passing `save_pdf=
 
 ---
 
+## History & Credits
+
+EMUstack was created by Björn Sturmberg, Kokou Dossou and Felix Lawrence (with Christopher Poulton, Ross McPhedran, Martijn de Sterke and Lindsay Botten) as a Fortran/Python package. Version 1, with its Fortran finite-element backend, lives at [bjornsturmberg/EMUstack](https://github.com/bjornsturmberg/EMUstack) ([v1 documentation](https://emustack.readthedocs.io/)). Version 2 is a pure-Python port maintained by Giovanni Pellegrini at [gevero/EMUstack](https://github.com/gevero/EMUstack); it reproduces version 1's results (see the parity tests) and keeps its scripts working.
+
+If you use EMUstack in published work, please cite the original paper: B. C. P. Sturmberg et al., "EMUstack: an open source route to insightful electromagnetic computation via the Bloch mode scattering matrix method", *Computer Physics Communications* **202**, 276–286 (2016), doi:[10.1016/j.cpc.2015.12.022](https://doi.org/10.1016/j.cpc.2015.12.022).
+
+---
+
 ## License
 
-EMUstack is licensed under the GNU General Public License v3.0 or later ([GPL-3.0-or-later](https://github.com/bjornsturmberg/EMUstack/blob/master/LICENSE.txt)).
+EMUstack is licensed under the GNU General Public License v3.0 or later ([GPL-3.0-or-later](https://github.com/gevero/EMUstack/blob/master/LICENSE.txt)).

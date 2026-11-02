@@ -103,7 +103,7 @@ install the core package and pick the groups you want (with pip or ``uv pip``):
      - Simulations with the default ``mesher='gmsh'`` or ``mesher='netgen'``
    * - ``gmsh``
      - Gmsh (kept as a backward-compatible alias; Gmsh is now a core dependency)
-     - Older scripts that install ``emustack-fem[gmsh]``
+     - Older scripts that install ``emustack[gmsh]``
    * - ``notebooks``
      - Jupyter, nbconvert, ipykernel, ``adaptive``, ``loky``
      - The example notebooks (adaptive sampling, parallel sweeps)
