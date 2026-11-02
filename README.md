@@ -265,7 +265,7 @@ All legacy mesh assets remain fully functional:
 - **Pre-generated `.mail` & `.msh` files:** Existing offline meshes load directly with zero conversion.
 
 ### 3. Configurable Compatibility Flags
-For users requiring exact numerical reproduction of legacy Fortran runs, EMUstack v2.0 provides fine-grained runtime switches. Set them on the modules, e.g. `from EMUstack.backend import fem_2d; fem_2d.eigensolver = 'ngsolve'`; they take effect everywhere, also in legacy scripts that import the modules by bare name:
+For users requiring exact numerical reproduction of legacy Fortran runs, EMUstack v2.0 provides fine-grained runtime switches. Set them on the modules, e.g. `from EMUstack.backend import fem_2d; fem_2d.eigensolver = 'ngsolve'`; they take effect everywhere:
 
 | Subsystem | Legacy Default | Modern Alternative | Configuration |
 |---|---|---|---|
