@@ -2442,6 +2442,8 @@ def fields_interpolator_in_plane(pstack, lay_interest=1, z_value=0.1, return_H=F
                 return ReEx, ImEx, ReEy, ImEy, ReEz, ImEz, AbsE
 
         except ValueError as e:
+            if meat.structure.periodicity == '2D_array':
+                raise  # a real error on a 2D layer; only the 1D case below returns None
             print(e)
             print("fields_in_plane cannot plot fields in 1D-arrays."\
                   "\nPlease select a different lay_interest.\n")

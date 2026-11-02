@@ -26,6 +26,9 @@ if ez_convention not in ('physical', 'legacy'):
 def ez_coefficient(prop_minus, k_z, physical=None):
     """Per-mode factor multiplying ez; prop_minus = c_down P_down - c_up P_up."""
     if physical is None:
+        if ez_convention not in ('physical', 'legacy'):
+            raise ValueError("field_eval.ez_convention must be 'physical' or 'legacy', got %r"
+                             % ez_convention)
         physical = ez_convention == 'physical'
     if physical:
         return prop_minus * (-1j * k_z)

@@ -42,6 +42,9 @@ A pure-Python port of EMUstack. Version 1 (Fortran backend) is tagged `v1-fortra
 - In-plane field interpolators take x and y from 0 to 1 (y up to `period_y/period`) for every
   mesher. Before, layers meshed by gmsh needed y from -1 to 0, so field maps drawn on 0..1
   came out blank.
+- `fields_interpolator_in_plane` returned `None` and printed a message on any `ValueError`
+  (inherited from version 1, meant for 1D layers); errors on 2D layers now surface. An invalid
+  `field_eval.ez_convention` set at run time raises instead of meaning 'legacy'.
 - The 16-inclusion supercell template meshed part of the cell twice; it is now a 4x4 grid
   (also broken in version 1).
 - The strip shapes hang gmsh when the inclusion is not narrower than the strip (as in
