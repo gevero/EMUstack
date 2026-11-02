@@ -228,19 +228,35 @@ EMUstack v2.0 provides **45 didactic Jupyter Notebooks** organized into two dedi
 
 EMUstack v2.0 is engineered with strict **backward compatibility** for existing user simulation scripts and geometry assets, allowing a seamless upgrade from legacy Fortran EMUstack (v1.x):
 
-### 1. 100% Script Syntax Compatibility
-Existing user scripts written for legacy EMUstack run unmodified. Core classes and methods preserve their familiar signatures and behaviors:
+### 1. Script Syntax Compatibility
+Scripts written for legacy EMUstack run with only their imports changed. Core classes and methods keep their signatures and behaviour. This is legacy `examples/simo_040-2D_array.py`, shortened:
 ```python
-from EMUstack.backend import objects, materials, stack, plotting
+import numpy as np
+from EMUstack.backend import objects, materials, plotting
+from EMUstack.backend.stack import Stack
 
-# Legacy script syntax works without changes:
-light = objects.Light(wl_nm=[500.0, 600.0, 700.0], theta=0.0, phi=0.0, max_order_PWs=3)
-sub = objects.ThinFilm(period=500.0, height_nm='semi_inf', material='glass')
-meta = objects.NanoStruct('2D_array', 500.0, 200.0, 'circle', loss=False)
-sup = objects.ThinFilm(period=500.0, height_nm='semi_inf', material='air')
+# One Light object per wavelength, as in legacy EMUstack
+wavelengths = np.linspace(310, 1127, 3)
+light_list = [objects.Light(wl, max_order_PWs=2, theta=0.0, phi=0.0) for wl in wavelengths]
 
-sim_stack = stack.Stack([sub.calc_modes(light), meta.calc_modes(light), sup.calc_modes(light)])
-sim_stack.calc_scat(pol='TE')
+period = 600
+superstrate = objects.ThinFilm(period, height_nm='semi_inf', material=materials.Air, loss=False)
+substrate = objects.ThinFilm(period, height_nm='semi_inf', material=materials.SiO2, loss=False)
+# Positional arguments: periodicity, period, diameter1
+NW_array = objects.NanoStruct('2D_array', period, 120, height_nm=2330,
+    inclusion_a=materials.Si_c, background=materials.Air, loss=True,
+    make_mesh_now=True, force_mesh=True, lc_bkg=0.1, lc2=2.0)
+
+def simulate_stack(light):
+    sim_superstrate = superstrate.calc_modes(light)
+    sim_substrate = substrate.calc_modes(light)
+    sim_NWs = NW_array.calc_modes(light, num_BMs=200)
+    stack = Stack((sim_substrate, sim_NWs, sim_superstrate))  # bottom to top
+    stack.calc_scat(pol='TE')
+    return stack
+
+stacks_list = [simulate_stack(light) for light in light_list]  # or multiprocessing Pool.map
+plotting.t_r_a_plots(stacks_list, active_layer_nu=1, J_sc=True)  # returns figures, writes no files
 ```
 
 ### 2. Legacy Mesh Assets & Formats
@@ -275,7 +291,7 @@ Legacy file dumps can be re-enabled at any time by explicitly passing `save_pdf=
 ## What Changed in v2.0 (Summary of Modernization)
 
 1. **Zero Fortran & Pure-Python Setup:**
-   - Complete elimination of compiled Fortran 90 binaries (`f90wrap`, `gfortran`, `ARPACK`, custom C wrappers). Installs effortlessly across Python 3.10–3.14 on Linux, macOS (Intel & Apple Silicon), and Windows (native / WSL).
+   - No compiled Fortran (`f2py`, `gfortran`, `ARPACK`) or C wrappers: every dependency installs from pip wheels for Python 3.10–3.14. Tested on Linux; the dependencies also ship wheels for macOS and Windows, where EMUstack has not been tested yet.
 2. **Modern Finite-Element Solvers:**
    - Pure-Python 1D FEM using high-order polynomial elements with coupled TE/TM states for conical incidence.
    - NGSolve 2D FEM utilizing mixed vector-scalar spaces ($H(\text{curl}) \times H^1$) with exact tangential continuity and zero spurious eigenmodes.

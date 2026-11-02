@@ -1,0 +1,82 @@
+name: Publish
+
+# Run by hand (Actions -> Publish -> Run workflow): upload to TestPyPI.
+# Push a tag vX.Y.Z matching the version in pyproject.toml: upload to PyPI.
+# Uploads use PyPI Trusted Publishing (no token); the `pypi` environment asks the
+# repository owner to approve before anything reaches PyPI.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    uses: ./.github/workflows/tests.yml
+
+  build:
+    needs: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check that the tag matches the package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match version ${version} in pyproject.toml"
+            exit 1
+          fi
+
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+          python -m twine check --strict dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  testpypi:
+    if: github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/emustack
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  pypi:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/emustack
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

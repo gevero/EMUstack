@@ -1,0 +1,41 @@
+cff-version: 1.2.0
+message: "If you use EMUstack in published work, please cite the paper below."
+title: EMUstack
+type: software
+version: 2.0.0
+license: GPL-3.0-or-later
+repository-code: "https://github.com/gevero/EMUstack"
+url: "https://gevero.github.io/EMUstack/"
+authors:
+  - family-names: Sturmberg
+    given-names: Björn C. P.
+  - family-names: Dossou
+    given-names: Kokou B.
+  - family-names: Lawrence
+    given-names: Felix J.
+  - family-names: Pellegrini
+    given-names: Giovanni
+preferred-citation:
+  type: article
+  title: "EMUstack: An open source route to insightful electromagnetic computation via the Bloch mode scattering matrix method"
+  authors:
+    - family-names: Sturmberg
+      given-names: Björn C. P.
+    - family-names: Dossou
+      given-names: Kokou B.
+    - family-names: Lawrence
+      given-names: Felix J.
+    - family-names: Poulton
+      given-names: Christopher G.
+    - family-names: McPhedran
+      given-names: Ross C.
+    - family-names: de Sterke
+      given-names: C. Martijn
+    - family-names: Botten
+      given-names: Lindsay C.
+  journal: Computer Physics Communications
+  volume: 202
+  start: 276
+  end: 286
+  year: 2016
+  doi: 10.1016/j.cpc.2015.12.022

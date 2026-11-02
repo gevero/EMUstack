@@ -74,3 +74,20 @@ def test_builtin_shape_geo_params():
     assert (b.period, b.diameter1, b.lc) == (400.0, 160.0, 0.15)
     with pytest.raises(ValueError, match="diamter1"):
         objects.NanoStruct('2D_array', geo_params={'period': 400.0, 'diamter1': 160.0}, **kw)
+
+
+def readme_legacy_example_code():
+    text = open(README).read()
+    text = text[text.index("### 1. Script Syntax Compatibility"):text.index("### 2. Legacy Mesh Assets")]
+    return "\n".join(re.findall(r"```python\n(.*?)```", text, re.S))
+
+
+@pytest.mark.skipif(not HAVE_GMSH, reason="gmsh not installed or cannot start")
+def test_readme_legacy_example_runs(tmp_path, monkeypatch):
+    import matplotlib
+    matplotlib.use("Agg")
+    monkeypatch.chdir(tmp_path)
+    ns = {}
+    exec(compile(readme_legacy_example_code(), README, "exec"), ns)
+    assert len(ns["stacks_list"]) == 3
+    assert not [f for f in os.listdir(tmp_path) if f.endswith((".pdf", ".txt"))]  # no file dumps
