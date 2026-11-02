@@ -47,6 +47,32 @@ print('\n##################################################################\n'\
       '##################################################################\n')
 
 
+# geo_params keys a built-in shape (no geo_file) accepts, and their legacy aliases.
+# Each one sets the NanoStruct argument of the same name; 'lc' sets lc_bkg.
+_BUILTIN_GEO_KEYS = ({'period', 'period_y', 'lc', 'lc2', 'lc3', 'lc4', 'lc5', 'lc6',
+                      'ellipticity', 'posx', 'posy', 'gap', 'smooth', 't',
+                      'len_vertical', 'len_horizontal', 'xshift'}
+                     | {'diameter%d' % k for k in range(1, 17)})
+_BUILTIN_GEO_ALIASES = dict({'d_in_nm': 'period', 'dy_in_nm': 'period_y', 'lc_bkg': 'lc',
+                             'thickness': 't'},
+                            **{'a%d' % k: 'diameter%d' % k for k in range(1, 17)})
+
+
+def _builtin_geo_params(geo_params):
+    """geo_params of a built-in shape with canonical keys; unknown keys raise ValueError."""
+    out = {}
+    for key, value in geo_params.items():
+        name = _BUILTIN_GEO_ALIASES.get(key, key)
+        if name not in _BUILTIN_GEO_KEYS:
+            raise ValueError(
+                "geo_params key %r is not a parameter of the built-in shapes. Accepted keys: %s "
+                "(and the legacy names %s). Template-specific parameters need geo_file."
+                % (key, ', '.join(sorted(_BUILTIN_GEO_KEYS, key=lambda s: (s.rstrip('0123456789'), len(s), s))),
+                   ', '.join(sorted(_BUILTIN_GEO_ALIASES))))
+        out[name] = value
+    return out
+
+
 class NanoStruct:
     """ Represents a structured layer.
 
@@ -197,6 +223,15 @@ class NanoStruct:
             plot_abs  (bool): Choose to plot absolute value of modal fields.
 
             plt_msh  (bool): Save a plot of the 1D array geometry (legacy default True).
+
+            geo_file  (str): Custom mesh template (``.geo`` for gmsh, ``.py`` for netgen),
+                looked up in the working directory, then in backend/data/meshes/.
+
+            geo_params  (dict): Parameters of the layer. With geo_file, they fill the
+                template's placeholders. Without it (built-in shapes), the keys period,
+                period_y, diameter1-16, lc (= lc_bkg), lc2-lc6, ellipticity, posx, posy, gap,
+                smooth, t, len_vertical, len_horizontal and xshift set the arguments of the
+                same name and take precedence over them; other keys raise ValueError.
     """
     def __init__(self,
                  periodicity,
@@ -266,6 +301,27 @@ class NanoStruct:
                  mesher=None):
         if geo_params is None:
             geo_params = {}
+        if geo_file is None and geo_params:
+            # Built-in shape: geo_params sets the matching arguments (and wins over them),
+            # so a layer can be described by geo_params alone.
+            p = _builtin_geo_params(geo_params)
+            period = p.get('period', period)
+            period_y = p.get('period_y', period_y)
+            lc_bkg = p.get('lc', lc_bkg)
+            lc2, lc3, lc4, lc5, lc6 = (p.get(k, v) for k, v in (
+                ('lc2', lc2), ('lc3', lc3), ('lc4', lc4), ('lc5', lc5), ('lc6', lc6)))
+            (diameter1, diameter2, diameter3, diameter4, diameter5, diameter6, diameter7,
+             diameter8, diameter9, diameter10, diameter11, diameter12, diameter13, diameter14,
+             diameter15, diameter16) = (p.get('diameter%d' % (k + 1), v) for k, v in enumerate((
+                 diameter1, diameter2, diameter3, diameter4, diameter5, diameter6, diameter7,
+                 diameter8, diameter9, diameter10, diameter11, diameter12, diameter13,
+                 diameter14, diameter15, diameter16)))
+            ellipticity = p.get('ellipticity', ellipticity)
+            posx, posy = p.get('posx', posx), p.get('posy', posy)
+            gap, smooth, t = p.get('gap', gap), p.get('smooth', smooth), p.get('t', t)
+            len_vertical = p.get('len_vertical', len_vertical)
+            len_horizontal = p.get('len_horizontal', len_horizontal)
+            xshift = p.get('xshift', xshift)
 
         if period is None:
             if 'period' in geo_params:

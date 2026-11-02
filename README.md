@@ -120,14 +120,15 @@ light = objects.Light(wl_nm=wl, max_order_PWs=1, theta=0.0, phi=0.0)
 substrate = objects.ThinFilm(period=period, material=materials.Material(1.5), height_nm='semi_inf')
 superstrate = objects.ThinFilm(period=period, material=materials.Material(1.0), height_nm='semi_inf')
 
+# Silicon cylinders, 160 nm in diameter and 150 nm tall. geo_params holds the geometry
+# (lengths in nm) and the mesh sizes: lc for the background, lc / lc2 at the cylinder edge.
 pillar_layer = objects.NanoStruct(
     '2D_array',
-    period=period,
-    diameter1=160.0,
+    geo_params={'period': period, 'diameter1': 160.0, 'lc': 0.15, 'lc2': 2.0},
     background=materials.Material(1.0),
     inclusion_a=materials.Si_c,
     height_nm=150.0,
-    geo_params={'period': period, 'diameter1': 160.0, 'lc': 0.15, 'lc2': 2.0}
+    plotting_fields=1,  # keep the mode fields for the field maps in example 3
 )
 
 # 3. Compute modes and build scattering stack
@@ -167,25 +168,24 @@ For a complete, step-by-step guide comparing the Gmsh (`.geo`) and Netgen (`.py`
 
 ### 3. Evaluating Electric & Magnetic Near-Fields, Poynting Vector, and Optical Chirality
 
-When computing modes with `plotting_fields=1`, EMUstack provides complete 3D electric and magnetic field interpolators via `FieldBundle`:
+When a layer is created with `plotting_fields=1` (as in example 1), EMUstack provides complete 3D electric and magnetic field interpolators via `FieldBundle`. They take in-plane coordinates normalized to the period (0 to 1):
 
 ```python
-# Evaluate fields at mid-height (z = 75 nm) in nanostructured layer (index 1)
+# Evaluate fields at mid-height (z = 75 nm) in the nanostructured layer (index 1)
 bundle = plotting.fields_interpolator_in_plane(sim_stack, lay_interest=1, z_value=75.0, return_H=True)
 
-# Grid evaluation
-x = np.linspace(-period/2, period/2, 50)
-y = np.linspace(-period/2, period/2, 50)
-X, Y = np.meshgrid(x, y)
+# Grid over one unit cell, in units of the period
+u = np.linspace(0.0, 1.0, 50)
+U, V = np.meshgrid(u, u)
 
 # Electric and magnetic fields, Poynting flux, and optical chirality enhancement
-abs_E = bundle.AbsE(X, Y)
-sz_flux = bundle.Sz(X, Y)
-chirality = bundle.chirality(X, Y)
-c_hat = bundle.chirality_enhancement(X, Y)
+abs_E = bundle.AbsE(U, V)
+sz_flux = bundle.Sz(U, V)
+chirality = bundle.chirality(U, V)
+c_hat = bundle.chirality_enhancement(U, V)
 
-# Export labeled dataset directly to xarray
-ds_field = bundle.to_xarray(x, y)
+# Export a labeled dataset (x, y in nm) directly to xarray
+ds_field = bundle.to_xarray(u, u, period=period)
 ```
 
 ---
