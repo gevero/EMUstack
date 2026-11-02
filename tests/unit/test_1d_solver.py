@@ -15,13 +15,9 @@ from scipy.sparse.linalg import splu, LinearOperator, eigs
 import sys
 from pathlib import Path
 
-# Add backend to sys.path
-backend_path = Path(__file__).resolve().parent.parent.parent / "backend"
-if str(backend_path) not in sys.path:
-    sys.path.insert(0, str(backend_path))
 
-import fem_1d
-from modes import BlochModes, FEMConvergenceError
+from EMUstack.backend import fem_1d
+from EMUstack.backend.modes import BlochModes, FEMConvergenceError
 
 
 def test_1d_bloch_phase_invariance():

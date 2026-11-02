@@ -12,13 +12,9 @@ import numpy as np
 import sys
 from pathlib import Path
 
-backend_dir = Path(__file__).resolve().parents[2] / "backend"
-sys.path.insert(0, str(backend_dir))
 
-import objects
-import materials
-from stack import Stack
-import mode_matching
+from EMUstack.backend import objects, materials, mode_matching
+from EMUstack.backend.stack import Stack
 
 
 def test_2d_fem_to_fem_interface_matrices():

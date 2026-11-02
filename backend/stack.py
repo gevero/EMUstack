@@ -19,9 +19,11 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 import numpy as np
-try:
+# Inside the EMUstack package, import the package modules (one copy of each).
+# Bare names are only for legacy scripts that put backend/ on sys.path.
+if __package__:
     from .mode_calcs import r_t_mat, Anallo
-except ImportError:
+else:
     from mode_calcs import r_t_mat, Anallo
 
 class Stack:

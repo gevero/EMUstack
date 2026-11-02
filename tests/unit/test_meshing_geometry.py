@@ -13,14 +13,11 @@ import numpy as np
 import ngsolve as ngs
 from pathlib import Path
 
-# Add backend to sys.path
-backend_path = Path(__file__).resolve().parent.parent.parent / "backend"
-import sys
-if str(backend_path) not in sys.path:
-    sys.path.insert(0, str(backend_path))
 
-import meshing
-from meshing import unit_cell, bloch_spaces, import_gmsh_mesh, read_mail_file
+from EMUstack.backend import meshing
+from EMUstack.backend.meshing import unit_cell, bloch_spaces, import_gmsh_mesh, read_mail_file
+
+backend_path = Path(meshing.__file__).resolve().parent
 
 
 def test_native_circle_area_and_perimeter():

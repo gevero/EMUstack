@@ -1,11 +1,10 @@
-"""EMUstack: Finite Element Method mode matching solver for nanophotonics."""
-import sys
-from pathlib import Path
+"""EMUstack: Finite Element Method mode matching solver for nanophotonics.
 
-_backend = Path(__file__).resolve().parent / "backend"
-if str(_backend) not in sys.path:
-    sys.path.insert(0, str(_backend))
-
+Import the modules from the package, for example
+``from EMUstack.backend import objects, materials, plotting``. Importing EMUstack does
+not change ``sys.path``, so each module exists once and module-level settings such as
+``fem_2d.eigensolver`` or ``objects.default_mesher`` apply everywhere.
+"""
 from .backend import objects, materials, plotting, stack, mode_calcs, paths, meshing, modes
 from .backend import fem_1d, fem_2d, mode_matching, field_eval
 from .backend.objects import *

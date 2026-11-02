@@ -22,9 +22,16 @@ import numpy as np
 import sys
 # from scipy import sqrt
 import os
-from EMUstack.backend import paths
-from EMUstack.backend.linalg import mat
-from EMUstack.backend.legacy_sort import legacy_argsort, grating_orders_2d
+# Inside the EMUstack package, import the package modules (one copy of each).
+# Bare names are only for legacy scripts that put backend/ on sys.path.
+if __package__:
+    from . import paths
+    from .linalg import mat
+    from .legacy_sort import legacy_argsort, grating_orders_2d
+else:
+    import paths
+    from linalg import mat
+    from legacy_sort import legacy_argsort, grating_orders_2d
 
 
 
@@ -323,7 +330,10 @@ class Simmo(Modes):
                 num_pw_per_pol_2d = pxs.size
 
             try:
-                import fem_1d
+                if __package__:
+                    from . import fem_1d
+                else:
+                    import fem_1d
                 modes = fem_1d.solve_bloch_modes_1d(
                     self.wl_norm(), self.num_BMs,
                     self.max_order_PWs, self.structure.nb_typ_el,
@@ -354,7 +364,10 @@ class Simmo(Modes):
 
         elif self.structure.periodicity == '2D_array':
             try:
-                import fem_2d
+                if __package__:
+                    from . import fem_2d
+                else:
+                    import fem_2d
                 modes = fem_2d.solve_bloch_modes_2d(
                     self.wl_norm(), self.num_BMs, self.max_order_PWs,
                     self.structure, self.n_effs,
@@ -433,7 +446,10 @@ def r_t_mat(lay1, lay2):
         R21, T21, R12, T12 = r_t_mat_tf_ns(lay2, lay1)
         ref_trans = R12, T12, R21, T21
     elif isinstance(lay1, Simmo) and isinstance(lay2, Simmo):
-        import mode_matching
+        if __package__:
+            from . import mode_matching
+        else:
+            import mode_matching
         ref_trans = mode_matching.r_t_mat_ns_ns(lay1, lay2)
 
     # Store its R and T matrices for later use

@@ -29,8 +29,19 @@ A pure-Python port of EMUstack. Version 1 (Fortran backend) is tagged `v1-fortra
   keys raise an error.
 - gmsh is stopped after `meshing.gmsh_timeout` seconds (600 by default) and, on Linux, when the
   Python process dies.
+- `meshing.list_templates()` and `meshing.copy_template()`: the 30 shipped templates are found by
+  file name from any directory; a copy in the working directory takes priority.
 
 ### Fixed
+- Module-level settings (`fem_2d.eigensolver`, `fem_2d.overlap_quadrature`,
+  `field_eval.ez_convention`, `meshing.gmsh_timeout`) were ignored when set through
+  `from EMUstack.backend import ...`, because the backend was loaded twice under two names.
+  Each module now exists once, whether imported from the package or by bare name from a legacy
+  script, and `import EMUstack` no longer changes `sys.path` (it hid users' own modules named
+  `plotting`, `stack`, ...).
+- In-plane field interpolators take x and y from 0 to 1 (y up to `period_y/period`) for every
+  mesher. Before, layers meshed by gmsh needed y from -1 to 0, so field maps drawn on 0..1
+  came out blank.
 - The 16-inclusion supercell template meshed part of the cell twice; it is now a 4x4 grid
   (also broken in version 1).
 - The strip shapes hang gmsh when the inclusion is not narrower than the strip (as in

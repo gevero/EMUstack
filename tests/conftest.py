@@ -7,6 +7,8 @@ _tests_dir = Path(__file__).resolve().parent
 _backend_dir = _tests_dir.parent / "backend"
 _root_dir = _tests_dir.parent
 
+# The test_case_*.py files are written like legacy scripts (bare module names, backend/ on
+# sys.path); the unit tests import the package (from EMUstack.backend import ...).
 if str(_backend_dir) not in sys.path:
     sys.path.insert(0, str(_backend_dir))
 if str(_root_dir) not in sys.path:

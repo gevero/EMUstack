@@ -14,12 +14,8 @@ import ngsolve as ngs
 import sys
 from pathlib import Path
 
-backend_dir = Path(__file__).resolve().parents[2] / "backend"
-sys.path.insert(0, str(backend_dir))
 
-import meshing
-import objects
-import materials
+from EMUstack.backend import meshing, objects, materials
 
 
 def test_mesh_from_geo_universal():

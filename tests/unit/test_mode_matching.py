@@ -10,7 +10,7 @@ Verifies:
 import numpy as np
 import pytest
 
-from mode_matching import solve_rt_from_PQ, interface_completeness
+from EMUstack.backend.mode_matching import solve_rt_from_PQ, interface_completeness
 
 
 def test_transparency_limit():

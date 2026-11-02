@@ -25,10 +25,12 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
-from EMUstack.backend import paths
-try:
-    from EMUstack.backend import objects, mode_calcs
-except ImportError:
+# Inside the EMUstack package, import the package modules (one copy of each).
+# Bare names are only for legacy scripts that put backend/ on sys.path.
+if __package__:
+    from . import paths, objects, mode_calcs
+else:
+    import paths
     import objects
     import mode_calcs
 
@@ -1718,7 +1720,10 @@ def fields_in_plane(stacks_list, lay_interest=1, z_values=[0.1, 3.6],
             save_pdf  (bool): If True, save plots to PDF. False by default.
             save_pos  (bool): If True, save Gmsh .pos files. False by default.
     """
-    import field_eval
+    if __package__:
+        from . import field_eval
+    else:
+        import field_eval
 
     dir_name = "in_plane_fields"
     if (save_pdf or save_pos) and not os.path.exists(dir_name):
@@ -1996,6 +2001,20 @@ class GridInterpolatorWrapper:
         return res
 
 
+def _cell_frame(x_arr):
+    """Mesh node coordinates (n, 2) with the unit cell at x in [0, 1], y in [0, period_y/period].
+
+    The gmsh templates (and legacy .mail meshes) place the cell at y in [-period_y/period, 0],
+    netgen meshes at y in [0, period_y/period]. The field interpolators use this common frame,
+    so the same coordinates work whatever the mesher.
+    """
+    xy = np.array(x_arr, dtype=float, copy=True)
+    y_min, y_max = xy[:, 1].min(), xy[:, 1].max()
+    if y_max <= 1e-9 and y_min < -1e-9:
+        xy[:, 1] -= y_min
+    return xy
+
+
 class FieldBundle:
     """Container for 2D electromagnetic field (E and H) interpolators.
 
@@ -2210,6 +2229,10 @@ def fields_interpolator_in_plane(pstack, lay_interest=1, z_value=0.1, return_H=F
     If return_H is True (or return_h is True):
         Returns FieldBundle containing 14 interpolators for E and H.
 
+    The interpolators take in-plane coordinates normalized to the period: x from 0 to 1
+    and y from 0 to period_y/period, whichever mesher (gmsh or netgen) built the layer.
+    Points outside the unit cell return masked values.
+
     Requires matplotlib v1.3.0 or later.
 
         Args:
@@ -2229,7 +2252,10 @@ def fields_interpolator_in_plane(pstack, lay_interest=1, z_value=0.1, return_H=F
             return_h (bool): Alias for return_H.
     """
     return_H = bool(return_H or return_h)
-    import field_eval
+    if __package__:
+        from . import field_eval
+    else:
+        import field_eval
 
     num_lays = len(pstack.layers)
     # If selected z location is within a NanoStruct layer
@@ -2274,7 +2300,7 @@ def fields_interpolator_in_plane(pstack, lay_interest=1, z_value=0.1, return_H=F
 
             # unrolling data for the interpolators
             table_nod = meat.table_nod.T
-            x_arr = meat.x_arr.T
+            x_arr = _cell_frame(meat.x_arr.T)
 
             has_6_nodes = bool((table_nod[:, 3] > 0).any()) if table_nod.shape[1] >= 4 else False
 
@@ -2463,7 +2489,10 @@ def fields_interpolator_cross_section(
         FieldBundle (if return_H=True) or 7-tuple (if return_H=False).
     """
     return_H = bool(return_H or return_h)
-    import field_eval
+    if __package__:
+        from . import field_eval
+    else:
+        import field_eval
     from scipy.interpolate import RegularGridInterpolator
 
     num_lays = len(pstack.layers)
@@ -2540,7 +2569,7 @@ def fields_interpolator_cross_section(
                 c_up = np.asarray(pstack.vec_coef_up[vec_index]).flatten()[:num_modes]
 
                 table_nod = layer.table_nod.T
-                x_arr = layer.x_arr.T
+                x_arr = _cell_frame(layer.x_arr.T)
                 n_msh_el = layer.n_msh_el
                 has_6_nodes = bool((table_nod[:, 3] > 0).any()) if table_nod.shape[1] >= 4 else False
 
@@ -2923,7 +2952,10 @@ def fields_vertically(stacks_list, factor_pts_vert=31, nu_pts_hori=41,
             save_png (bool): If True, save plots as PNG. False by default.
     """
 
-    import field_eval
+    if __package__:
+        from . import field_eval
+    else:
+        import field_eval
 
     dir_name = "fields_vertically"
     if (save_pdf or save_png) and not os.path.exists(dir_name):
@@ -3833,7 +3865,10 @@ def fields_3d(stacks_list, lay_interest=1):
             lay_interest  (int): the index of the layer considered within \
             the stack.
     """
-    import field_eval
+    if __package__:
+        from . import field_eval
+    else:
+        import field_eval
     import subprocess
 
     nnodes=6

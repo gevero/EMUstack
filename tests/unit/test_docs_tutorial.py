@@ -56,7 +56,8 @@ def test_readme_quickstart_runs(tmp_path, monkeypatch):
     assert (layer.period, layer.diameter1, layer.lc, layer.lc2) == (400.0, 160.0, 0.15, 2.0)
     T, R = float(ns["ds_spectra"]["T_total"].values[0]), float(ns["ds_spectra"]["R_total"].values[0])
     assert 0.0 < T < 1.0 and 0.0 < R < 1.0
-    assert ns["abs_E"].shape == (50, 50) and np.isfinite(ns["abs_E"]).all()
+    abs_E = np.ma.filled(np.ma.masked_invalid(ns["abs_E"]), np.nan)
+    assert abs_E.shape == (50, 50) and not np.isnan(abs_E).any()  # the whole grid is inside the cell
     assert ns["ellipse_layer"].mesh is not None
 
 
@@ -91,3 +92,27 @@ def test_readme_legacy_example_runs(tmp_path, monkeypatch):
     exec(compile(readme_legacy_example_code(), README, "exec"), ns)
     assert len(ns["stacks_list"]) == 3
     assert not [f for f in os.listdir(tmp_path) if f.endswith((".pdf", ".txt"))]  # no file dumps
+
+
+MESHING = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "source", "meshing.rst")
+
+
+def test_every_shipped_template_is_documented():
+    from EMUstack.backend import meshing
+    text = open(MESHING).read()
+    assert meshing.list_templates()
+    for name in meshing.list_templates():
+        assert "``%s``" % name in text, name
+
+
+@pytest.mark.skipif(not HAVE_GMSH, reason="gmsh not installed or cannot start")
+def test_shipped_templates_section_runs(tmp_path, monkeypatch):
+    text = open(MESHING).read()
+    text = text[text.index("Using the Shipped Templates"):text.index("Part I: General Presentation")]
+    blocks = re.findall(r"\.\. code-block:: python\n\n((?:(?: {4}.*)?\n)+)", text)
+    code = "\n".join("\n".join(line[4:] for line in b.splitlines()) for b in blocks)
+    monkeypatch.chdir(tmp_path)  # copy_template writes here
+    ns = {}
+    exec(compile(code, MESHING, "exec"), ns)
+    assert ns["layer"].mesh is not None
+    assert sorted(os.listdir(tmp_path)) == ["ellipse_msh_template.geo", "my_cell.geo"]

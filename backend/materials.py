@@ -22,9 +22,11 @@
 import numpy as np
 from scipy.interpolate import interp1d
 import matplotlib
-try:
-    from EMUstack.backend import paths
-except ImportError:
+# Inside the EMUstack package, import the package modules (one copy of each).
+# Bare names are only for legacy scripts that put backend/ on sys.path.
+if __package__:
+    from . import paths
+else:
     import paths
 import matplotlib.pyplot as plt
 

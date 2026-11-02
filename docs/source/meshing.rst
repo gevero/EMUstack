@@ -24,6 +24,181 @@ To support both legacy simulation scripts and pure-Python workflows, EMUstack pr
    * Passing a Gmsh script ``geo_file='... .geo'`` runs the Gmsh pipeline (unless overridden).
    * For built-in ``NanoStruct`` shapes without a ``geo_file`` (``inc_shape='circle'``, ``'ellipse'``, ``'square'``, ``'rectangle'``, ``'ring'``, ``'dimer'``), the pipeline is controlled either globally via ``objects.default_mesher = 'gmsh'`` (default) or ``'netgen'``, or per layer via ``NanoStruct(..., mesher='netgen')``.
 
+.. _shipped-templates:
+
+Using the Shipped Templates
+---------------------------
+
+EMUstack ships 30 mesh templates inside the package (``EMUstack/backend/data/meshes/`` in the
+repository, inside ``site-packages`` after ``pip install emustack``). You never need their path:
+pass the **file name** as ``geo_file`` and the parameters as ``geo_params``:
+
+.. code-block:: python
+
+    from EMUstack.backend import objects, materials, meshing
+
+    layer = objects.NanoStruct(
+        '2D_array', geo_file='ellipse_msh_template.geo',   # or the short name 'ellipse.geo'
+        geo_params={'period': 400.0, 'diameter1': 160.0, 'ellipticity': 0.3, 'angle': 0.5,
+                    'lc': 0.1, 'lc2': 2.0},
+        background=materials.Air, inclusion_a=materials.Si_c, height_nm=100.0)
+
+    meshing.list_templates()        # names of all shipped templates
+
+``geo_file`` is looked up in this order:
+
+1. **Your working directory** (or the path you give), so your own files always win.
+2. **The shipped templates**, by full name (``ellipse_msh_template.geo``), short name
+   (``ellipse.geo``, ``ellipse.py``) or old v1 name (``ring1_msh_template.geo``).
+
+The extension picks the mesher: ``.geo`` templates are meshed by gmsh, ``.py`` templates by
+netgen.
+
+**To start your own geometry from a shipped template**, copy it into your project and edit the
+copy:
+
+.. code-block:: python
+
+    meshing.copy_template('ellipse.geo')              # writes ./ellipse_msh_template.geo
+    meshing.copy_template('ellipse.geo', 'my_cell.geo')
+
+Because the working directory is searched first, ``geo_file='ellipse_msh_template.geo'`` then
+uses your edited copy. Give it a new name (``my_cell.geo``) to keep both. To read a shipped
+template without copying it, ``meshing.resolve_mesh_file_path('ellipse.geo')`` returns its path.
+
+Lengths are in nm and angles in radians unless the table says otherwise. Every template also
+takes the mesh sizes ``lc`` (background) and ``lc2``, ``lc3``, ... (finer sizes ``lc/lcN`` at
+the inclusions; see Concept 6).
+
+.. list-table:: Templates shipped with EMUstack (``meshing.list_templates()``)
+   :header-rows: 1
+   :widths: 28 8 34 30
+
+   * - Template
+     - Mesher
+     - Geometry
+     - Parameters
+   * - ``16_msh_template.geo``
+     - gmsh
+     - 4x4 grid of inclusions (circle, ellipse or square), numbered row by row from the top left.
+     - ``period``, ``period_y``, ``diameter1`` ... ``diameter16``, ``ellipticity``, ``square``, ``lc``, ``posx``, ``posy``, ``lc2``, ``lc3``
+   * - ``1_msh_template.geo``
+     - gmsh
+     - One inclusion: circle, ellipse (``ellipticity``) or square (``square = 1``).
+     - ``period``, ``period_y``, ``diameter1``, ``ellipticity``, ``square``, ``lc``, ``lc2``, ``lc3``, ``lc4``
+   * - ``2_msh_template.geo``
+     - gmsh
+     - Two circular inclusions per cell.
+     - ``period``, ``period_y``, ``diameter1``, ``diameter2``, ``lc``, ``posx``, ``posy``, ``lc2``, ``lc3``, ``lc4``
+   * - ``3_msh_template.geo``
+     - gmsh
+     - Three circular inclusions per cell.
+     - ``period``, ``period_y``, ``diameter1``, ``diameter2``, ``diameter3``, ``lc``, ``lc2``, ``lc3``, ``lc4``, ``lc5``
+   * - ``4_msh_template.geo``
+     - gmsh
+     - 2x2 grid of inclusions (circle, ellipse or square); ``posx``/``posy`` move them toward the centre.
+     - ``period``, ``period_y``, ``diameter1`` ... ``diameter4``, ``ellipticity``, ``square``, ``lc``, ``posx``, ``posy``, ``lc2``, ``lc3``, ``lc4``, ``lc5``, ``lc6``
+   * - ``9_msh_template.geo``
+     - gmsh
+     - 3x3 grid of circular inclusions.
+     - ``period``, ``period_y``, ``diameter1`` ... ``diameter9``, ``lc``, ``posx``, ``posy``, ``lc2``, ``lc3``
+   * - ``L_msh_template.geo``
+     - gmsh
+     - L-shaped inclusion with a rounded corner.
+     - ``period``, ``period_y``, ``length``, ``width``, ``rounding``, ``lc``, ``lc2``
+   * - ``SRR_msh_template.geo``
+     - gmsh
+     - Split-ring resonator with its open side at the top.
+     - ``period``, ``period_y``, ``len_vertical``, ``len_horizontal``, ``width``, ``lc``, ``lc2``, ``lc3``
+   * - ``chiral_qbic_gorkunov_c4_msh_template.py``
+     - netgen
+     - Four rotated bar dimers in a C4-symmetric cell (Gorkunov et al.).
+     - ``period``, ``period_y``, ``theta_deg``, ``length``, ``width``, ``gap``, ``include_bar1``, ``include_bar2``, ``lc``, ``lc2``
+   * - ``chiral_qbic_gorkunov_msh_template.py``
+     - netgen
+     - Bar dimer of Gorkunov et al.; ``theta_deg`` in degrees.
+     - ``period``, ``period_y``, ``theta_deg``, ``z_offset``, ``length``, ``width``, ``gap``, ``include_bar1``, ``include_bar2``, ``angle1``, ``angle2``, ``lc``, ``lc2``, ``lc3``
+   * - ``chiral_qbic_msh_template.py``
+     - netgen
+     - Chiral quasi-BIC cell; ``rx``, ``ry``, ``gap`` normalized, ``theta0`` in radians.
+     - ``period``, ``period_y``, ``alpha``, ``theta0``, ``rx``, ``ry``, ``gap``, ``lc``, ``lc2``, ``lc3``
+   * - ``chiral_slits_msh_template.geo``
+     - gmsh
+     - Chiral slit pattern, slits moved by ``offset_x``, ``offset_y``.
+     - ``period``, ``period_y``, ``width``, ``height``, ``smooth``, ``offset_x``, ``offset_y``, ``lc``, ``lc2``, ``lc3``
+   * - ``cross_msh_template.geo``
+     - gmsh
+     - Cross of size ``width`` x ``height``.
+     - ``period``, ``period_y``, ``width``, ``height``, ``smooth``, ``lc``, ``lc2``, ``lc3``
+   * - ``cross_shell_msh_template.geo``
+     - gmsh
+     - Cross-shaped shell of wall ``thickness``.
+     - ``period``, ``period_y``, ``width``, ``height``, ``smooth``, ``thickness``, ``lc``, ``lc2``, ``lc3``
+   * - ``dimer_msh_template.geo``
+     - gmsh
+     - Two circles separated by ``gap``.
+     - ``period``, ``period_y``, ``diameter1``, ``diameter2``, ``gap``, ``ellipticity``, ``lc``, ``lc2``, ``lc3``
+   * - ``double_strip_msh_template.geo``
+     - gmsh
+     - Inclusion inside two strips (``strip``, ``strip2``).
+     - ``period``, ``period_y``, ``diameter1``, ``ellipticity``, ``square``, ``strip``, ``strip2``, ``lc``, ``lc2``, ``lc3``
+   * - ``egg_inclusion_msh_template.geo``
+     - gmsh
+     - Egg-shaped inclusion containing a circular inclusion of radius ``r_inc`` (lengths in nm).
+     - ``period``, ``period_y``, ``r1``, ``r2``, ``r3``, ``angle``, ``shiftx``, ``shifty``, ``r_inc``, ``shift_inc_x``, ``shift_inc_y``, ``lc``, ``lc2``, ``lc3``, ``lc4``
+   * - ``egg_msh_template.geo``
+     - gmsh
+     - Egg-shaped inclusion made of arcs of radii ``r1``-``r3``, rotated by ``angle`` and moved by ``shiftx``/``shifty`` (lengths in nm).
+     - ``period``, ``period_y``, ``r1``, ``r2``, ``r3``, ``angle``, ``shiftx``, ``shifty``, ``lc``, ``lc2``, ``lc3``, ``lc4``
+   * - ``elle_msh_template.geo``
+     - gmsh
+     - ELLE shape (Zanotto et al., Nanophotonics 8, 2291 (2019)); ``L1``-``L4`` in units of the period.
+     - ``period``, ``period_y``, ``L1``, ``L2``, ``L3``, ``L4``
+   * - ``ellipse_msh_template.geo``
+     - gmsh
+     - Rotated ellipse (``angle`` in radians).
+     - ``period``, ``period_y``, ``diameter1``, ``ellipticity``, ``angle``, ``lc``, ``lc2``, ``lc3``, ``lc4``
+   * - ``ellipse_msh_template.py``
+     - netgen
+     - Rotated ellipse (``angle`` in radians), curved second-order netgen mesh.
+     - ``period``, ``period_y``, ``diameter1``, ``ellipticity``, ``angle``, ``lc``, ``lc2``, ``lc3``
+   * - ``hex_msh_template.geo``
+     - gmsh
+     - One inclusion in a hexagonal lattice.
+     - ``period``, ``period_y``, ``diameter1``, ``ellipticity``, ``square``, ``lc``, ``lc2``, ``lc3``, ``lc4``
+   * - ``rectangle_msh_template.geo``
+     - gmsh
+     - Rectangle ``width`` x ``height``, corners rounded by ``smooth``.
+     - ``period``, ``period_y``, ``width``, ``height``, ``smooth``, ``lc``, ``lc2``, ``lc3``
+   * - ``rectangle_shell_msh_template.geo``
+     - gmsh
+     - Rectangular shell of wall ``thickness``.
+     - ``period``, ``period_y``, ``width``, ``height``, ``thickness``, ``ellipticity``, ``smooth``, ``lc``, ``lc2``, ``lc3``
+   * - ``ring_msh_template.geo``
+     - gmsh
+     - Ring: outer ``diameter1``, inner ``diameter2``; ``xshift`` moves the hole.
+     - ``period``, ``period_y``, ``diameter1``, ``diameter2``, ``ellipticity``, ``square``, ``lc``, ``xshift``, ``lc2``, ``lc3``
+   * - ``row_2_msh_template.geo``
+     - gmsh
+     - Row of 2 inclusions; period, size and spacing are set inside the file (edit a copy).
+     - ``ellipticity``, ``square``, ``lc``, ``lc2``, ``lc3``, ``lc4``
+   * - ``row_5_msh_template.geo``
+     - gmsh
+     - Row of 5 inclusions; period, size and spacing are set inside the file (edit a copy).
+     - ``ellipticity``, ``square``, ``lc``, ``lc2``, ``lc3``, ``lc4``
+   * - ``square_dimer_msh_template.geo``
+     - gmsh
+     - Two squares (sides ``side1``, ``side2``) separated by ``gap``.
+     - ``period``, ``period_y``, ``side1``, ``side2``, ``gap``, ``ellipticity``, ``smooth``, ``lc``, ``lc2``, ``lc3``
+   * - ``square_shell_dimer_msh_template.geo``
+     - gmsh
+     - Two rectangular shells of wall ``thickness``, separated by ``gap``.
+     - ``period``, ``period_y``, ``width1``, ``width2``, ``height1``, ``height2``, ``gap``, ``thickness``, ``ellipticity``, ``smooth``, ``lc``, ``lc2``, ``lc3``
+   * - ``strip_msh_template.geo``
+     - gmsh
+     - Inclusion inside a strip of width ``strip`` (``diameter1 < strip < period_y``).
+     - ``period``, ``period_y``, ``diameter1``, ``ellipticity``, ``square``, ``strip``, ``lc``, ``lc2``, ``lc3``
+
 ---
 
 Part I: General Presentation & the 6 Core Concepts
@@ -67,7 +242,7 @@ Regardless of whether you use the **Gmsh pipeline (``.geo``)** or the **Netgen p
 Concept 1: Parameter Injection (``geo_file`` & ``geo_params``)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When you instantiate ``objects.NanoStruct('2D_array', geo_file=..., geo_params={...})``, **all** geometric and mesh refinement parameters (``period``, ``period_y``, ``diameter1``, ``ellipticity``, ``angle``, ``lc``, ``lc2``, ``lc3``; the names are the same for ``.geo`` and ``.py`` templates, see :ref:`template-naming`) can be passed directly inside the ``geo_params`` dictionary—without repeating legacy positional arguments like ``period``, ``diameter1``, ``ellipticity``, or ``inc_shape='custom'``. EMUstack locates ``geo_file`` (searching first in your current working directory and then in ``EMUstack/backend/data/meshes/``) and dispatches ``geo_params`` to the selected template:
+When you instantiate ``objects.NanoStruct('2D_array', geo_file=..., geo_params={...})``, **all** geometric and mesh refinement parameters (``period``, ``period_y``, ``diameter1``, ``ellipticity``, ``angle``, ``lc``, ``lc2``, ``lc3``; the names are the same for ``.geo`` and ``.py`` templates, see :ref:`template-naming`) can be passed directly inside the ``geo_params`` dictionary—without repeating legacy positional arguments like ``period``, ``diameter1``, ``ellipticity``, or ``inc_shape='custom'``. EMUstack locates ``geo_file`` (first in your working directory, then among the shipped templates; see :ref:`shipped-templates`) and dispatches ``geo_params`` to the selected template:
 
 * **In the Gmsh pipeline**, ``NanoStruct`` / :func:`meshing.mesh_from_geo` reads the ``.geo`` file as text and replaces placeholder assignments such as ``period = 0;``, ``period_y = 0;``, ``diameter1 = 0;``, ``ellipticity = 0;``, ``angle = 0;``, ``lc = 0;``, and ``lc2 = lc/1;`` with the numerical values from ``geo_params``. If a key in ``geo_params`` does not have a matching placeholder in the ``.geo`` file, a ``KeyError`` is raised immediately.
 * **In the Netgen pipeline (both Routes B1 and B2)**, :func:`meshing.mesh_from_py` dynamically imports the ``.py`` module, inspects the Python signature of ``build_unit_cell(...)`` using ``inspect.signature``, verifies that every key in ``geo_params`` is a valid parameter of ``build_unit_cell`` (or an old name of one) (raising a ``TypeError`` on typos), and calls ``build_unit_cell(**call_params)``.

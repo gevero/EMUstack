@@ -147,7 +147,7 @@ print(f"Total Reflection:   {float(ds_spectra['R_total'].values[0]):.4f}")
 
 ### 2. Custom 2D Geometries with Python & Gmsh Templates
 
-EMUstack supports both pure-Python Netgen geometry templates (`*.py`) and classic Gmsh scripts (`*.geo`) located in the working directory or `backend/data/meshes/` (e.g. `ellipse_msh_template.py`, `ellipse_msh_template.geo`, `chiral_qbic_gorkunov_msh_template.py`). Templates are named `<shape>_msh_template.<ext>`, and `.geo` and `.py` templates take the same parameter names (`period`, `period_y`, `diameter1`, `width`, `thickness`, ...; lengths in nm, angles in radians). Old file and parameter names such as `ring1_msh_template.geo`, `d_in_nm` or `a1` still work.
+EMUstack supports both pure-Python Netgen geometry templates (`*.py`) and classic Gmsh scripts (`*.geo`). It ships 30 of them (e.g. `ellipse_msh_template.py`, `ellipse_msh_template.geo`, `chiral_qbic_gorkunov_msh_template.py`); after `pip install emustack` you reference them by file name alone, from any directory. Your working directory is searched first, so `meshing.copy_template('ellipse.geo')` gives you an editable copy that then takes priority; `meshing.list_templates()` lists them all (see [Using the Shipped Templates](https://gevero.github.io/EMUstack/meshing.html#shipped-templates)). Templates are named `<shape>_msh_template.<ext>`, and `.geo` and `.py` templates take the same parameter names (`period`, `period_y`, `diameter1`, `width`, `thickness`, ...; lengths in nm, angles in radians). Old file and parameter names such as `ring1_msh_template.geo`, `d_in_nm` or `a1` still work.
 
 In a Python template, `build_unit_cell(...)` receives the parameters from `geo_params`, normalizes physical dimensions by `period` onto the dimensionless unit cell $[0, 1] \times [0, d_y]$, defines a list of `inclusions` (with `"tag": 2` mapped to `inclusion_a`, `"tag": 3` to `inclusion_b`, etc., and `"tag": 1` reserved for `background`), and calls `meshing.unit_cell()` to build a curved second-order periodic `ngsolve.Mesh` in memory:
 
@@ -261,11 +261,11 @@ plotting.t_r_a_plots(stacks_list, active_layer_nu=1, J_sc=True)  # returns figur
 
 ### 2. Legacy Mesh Assets & Formats
 All legacy mesh assets remain fully functional:
-- **Gmsh `.geo` scripts:** Parameterized `.geo` templates in `backend/data/meshes/` run via Gmsh whenever `objects.default_mesher = 'gmsh'` (the default).
+- **Gmsh `.geo` scripts:** the parameterized `.geo` templates ship with the package (old v1 file and parameter names still work) and run via Gmsh whenever `objects.default_mesher = 'gmsh'` (the default).
 - **Pre-generated `.mail` & `.msh` files:** Existing offline meshes load directly with zero conversion.
 
 ### 3. Configurable Compatibility Flags
-For users requiring exact numerical reproduction of legacy Fortran runs, EMUstack v2.0 provides fine-grained runtime switches:
+For users requiring exact numerical reproduction of legacy Fortran runs, EMUstack v2.0 provides fine-grained runtime switches. Set them on the modules, e.g. `from EMUstack.backend import fem_2d; fem_2d.eigensolver = 'ngsolve'`; they take effect everywhere, also in legacy scripts that import the modules by bare name:
 
 | Subsystem | Legacy Default | Modern Alternative | Configuration |
 |---|---|---|---|

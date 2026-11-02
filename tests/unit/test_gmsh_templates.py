@@ -188,11 +188,9 @@ def test_gmsh_dies_when_its_parent_python_is_killed(tmp_path):
         return bool(out.stdout.strip())
 
     script = (
-        "import sys\n"
-        "sys.path.insert(0, %r)\n"
-        "import meshing\n"
+        "from EMUstack.backend import meshing\n"
         "meshing.gmsh_timeout = 600.0\n"
-        "meshing.conv_gmsh(%r)\n" % (os.path.dirname(os.path.abspath(meshing.__file__)), root)
+        "meshing.conv_gmsh(%r)\n" % root
     )
     proc = subprocess.Popen([sys.executable, "-c", script],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

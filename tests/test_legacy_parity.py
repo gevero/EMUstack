@@ -158,7 +158,9 @@ def test_2d_fields_oblique_tc_f2do(monkeypatch):
     s.calc_scat(pol='TM')
     ref = check_stacks('tc_f2do', {'stack': s}, 1e-8)
     n = 61
-    xs, ys = np.linspace(0.005, 0.995, n), np.linspace(-0.995, -0.005, n)
+    # legacy evaluated the gmsh cell at y in [-1, 0]; the interpolators now use y in [0, 1]
+    # for every mesher, so the same physical points are at y + 1
+    xs, ys = np.linspace(0.005, 0.995, n), np.linspace(-0.995, -0.005, n) + 1.0
     vx, vy = np.repeat(xs, n), np.tile(ys, n)
     for z in (0.1, 50.0):
         ReEx, ImEx, ReEy, ImEy, ReEz, ImEz, AbsE = plotting.fields_interpolator_in_plane(s, lay_interest=1, z_value=z)

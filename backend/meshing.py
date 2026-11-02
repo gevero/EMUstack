@@ -962,27 +962,64 @@ def resolve_mesh_file_path(filename: str) -> str:
     """
     if os.path.exists(filename):
         return os.path.abspath(filename)
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    mesh_dir = os.path.join(base_dir, "data", "meshes")
     base = os.path.basename(filename)
-    candidate = os.path.join(mesh_dir, base)
+    candidate = os.path.join(TEMPLATE_DIR, base)
     if os.path.exists(candidate):
         return candidate
+    for name in _template_names(base)[1:]:
+        for path in (name, os.path.join(TEMPLATE_DIR, name)):
+            if os.path.exists(path):
+                return os.path.abspath(path)
+    raise FileNotFoundError(f"Geometry / mesh file not found: {filename}")
 
+
+# Folder of the mesh templates shipped with EMUstack (inside the installed package).
+TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "meshes")
+
+
+def _template_names(base: str) -> List[str]:
+    """`base` followed by the names it may stand for: long form and old (legacy) names."""
     stem, ext = os.path.splitext(base)
-    names = []
+    names = [base]
     if ext in (".geo", ".py") and not stem.endswith(TEMPLATE_SUFFIX):
         # short name: ring.geo -> ring_msh_template.geo; ring_msh.geo -> ring_msh_template.geo
         long_stem = stem + "_template" if stem.endswith("_msh") else stem + TEMPLATE_SUFFIX
         names.append(long_stem + ext)
-    for name in [base] + names:
+    for name in list(names):
         if name in LEGACY_TEMPLATE_NAMES:
             names.append(LEGACY_TEMPLATE_NAMES[name])
-    for name in names:
-        for path in (name, os.path.join(mesh_dir, name)):
-            if os.path.exists(path):
-                return os.path.abspath(path)
-    raise FileNotFoundError(f"Geometry / mesh file not found: {filename}")
+    return names
+
+
+def list_templates() -> List[str]:
+    """File names of the mesh templates shipped with EMUstack.
+
+    ``.geo`` templates are meshed with gmsh, ``.py`` templates with netgen. Pass a name
+    (or its short form, e.g. ``'ellipse.geo'``) as ``NanoStruct(geo_file=...)``.
+    """
+    return sorted(f for f in os.listdir(TEMPLATE_DIR)
+                  if f.endswith(TEMPLATE_SUFFIX + ".geo") or f.endswith(TEMPLATE_SUFFIX + ".py"))
+
+
+def copy_template(name: str, dest: str = ".", overwrite: bool = False) -> str:
+    """Copy a shipped template to `dest` (a folder or a file name) and return the new path.
+
+    Use it to start your own geometry from a shipped one. Files in the working directory are
+    found before the shipped templates, so after ``copy_template('ellipse.geo')``,
+    ``geo_file='ellipse_msh_template.geo'`` meshes your edited copy.
+    """
+    for candidate in _template_names(os.path.basename(name)):
+        src = os.path.join(TEMPLATE_DIR, candidate)
+        if os.path.exists(src):
+            break
+    else:
+        raise FileNotFoundError(
+            f"No shipped template named {name!r}; see meshing.list_templates().")
+    target = os.path.join(dest, os.path.basename(src)) if os.path.isdir(dest) else dest
+    if os.path.exists(target) and not overwrite:
+        raise FileExistsError(f"{target} exists; pass overwrite=True to replace it.")
+    shutil.copyfile(src, target)
+    return os.path.abspath(target)
 
 
 def mesh_from_geo(

@@ -14,8 +14,7 @@ import netgen.geom2d as g2
 import ngsolve as ngs
 from ngsolve import Mesh
 
-import fem_2d
-import meshing
+from EMUstack.backend import fem_2d, meshing
 
 
 @pytest.fixture(scope="module")

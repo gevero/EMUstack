@@ -16,10 +16,17 @@ import netgen.geom2d as g2
 import ngsolve as ngs
 from ngsolve import Mesh, HCurl, H1, GridFunction, BilinearForm
 
-from modes import BlochModes, FEMConvergenceError, warn_if_degenerate
-import meshing
-from legacy_sort import z_indexx, grating_orders_2d
-import paths
+# Inside the EMUstack package, import the package modules (one copy of each).
+# Bare names are only for legacy scripts that put backend/ on sys.path.
+if __package__:
+    from . import meshing, paths
+    from .modes import BlochModes, FEMConvergenceError, warn_if_degenerate
+    from .legacy_sort import z_indexx, grating_orders_2d
+else:
+    import meshing
+    import paths
+    from modes import BlochModes, FEMConvergenceError, warn_if_degenerate
+    from legacy_sort import z_indexx, grating_orders_2d
 
 
 def assemble_system_2d(

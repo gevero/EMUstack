@@ -22,10 +22,12 @@
 import os
 import numpy as np
 
-try:
+# Inside the EMUstack package, import the package modules (one copy of each).
+# Bare names are only for legacy scripts that put backend/ on sys.path.
+if __package__:
     from . import paths, materials
     from .mode_calcs import Simmo, Anallo
-except ImportError:
+else:
     import paths
     import materials
     from mode_calcs import Simmo, Anallo
@@ -464,7 +466,10 @@ class NanoStruct:
 
         Numbers are written with %f, and placeholders the template lacks are skipped.
         """
-        import meshing
+        if __package__:
+            from . import meshing
+        else:
+            import meshing
         with open(template_location + template, "r") as f:
             text = f.read()
         return meshing.fill_geo_template(text, params, fmt='%f', strict=False, template=template)
@@ -489,7 +494,10 @@ class NanoStruct:
 
     def _legacy_custom_geo(self):
         """Text of a custom .geo template with geo_params filled in, as legacy EMUstack writes it."""
-        import meshing
+        if __package__:
+            from . import meshing
+        else:
+            import meshing
         params = dict(self.geo_params or {})
         for key in ('period', 'period_y', 'd_in_nm', 'dy_in_nm'):
             params.pop(key, None)  # already used by the constructor
@@ -929,7 +937,10 @@ class NanoStruct:
                                           self.inc_shape)
 
             self.mesh_file = msh_name + '.mail'
-            import meshing
+            if __package__:
+                from . import meshing
+            else:
+                import meshing
             merged_geo_params = self.harvest_geo_params()
             mesher = self.mesher or default_mesher
             if mesher not in ('gmsh', 'netgen'):
@@ -1620,7 +1631,10 @@ class NanoStruct:
             params['lc6'] = self.lc6
 
         if hasattr(self, 'geo_params') and self.geo_params:
-            import meshing
+            if __package__:
+                from . import meshing
+            else:
+                import meshing
             # a geo_params key also replaces the other spellings of it (a1 -> diameter1)
             for key in self.geo_params:
                 for alt in meshing.param_equivalents(key):

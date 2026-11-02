@@ -7,7 +7,12 @@ Provides:
 """
 from typing import Tuple, Dict, Any, Optional
 import numpy as np
-from linalg import mat
+# Inside the EMUstack package, import the package modules (one copy of each).
+# Bare names are only for legacy scripts that put backend/ on sys.path.
+if __package__:
+    from .linalg import mat
+else:
+    from linalg import mat
 
 
 def _assert_fem_fem_compatible(sim1, sim2):
@@ -112,7 +117,10 @@ def r_t_mat_ns_ns(sim1, sim2, interface_mode: str = "air"):
 
     if interface_mode == "air":
         # Mediated through zero-thickness air reference (fallback)
-        import mode_calcs
+        if __package__:
+            from . import mode_calcs
+        else:
+            import mode_calcs
         air = sim1.air_ref()
 
         R1_air, T1_air, R_air_1, T_air_1 = mode_calcs.r_t_mat_tf_ns(air, sim1)

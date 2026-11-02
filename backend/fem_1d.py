@@ -8,8 +8,14 @@ NO NGSolve or Netgen dependency (enforced by DoD-3).
 import numpy as np
 from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import splu, LinearOperator, eigs
-from modes import BlochModes, FEMConvergenceError
-from legacy_sort import z_indexx
+# Inside the EMUstack package, import the package modules (one copy of each).
+# Bare names are only for legacy scripts that put backend/ on sys.path.
+if __package__:
+    from .modes import BlochModes, FEMConvergenceError
+    from .legacy_sort import z_indexx
+else:
+    from modes import BlochModes, FEMConvergenceError
+    from legacy_sort import z_indexx
 
 
 def elem_matrices(h):
