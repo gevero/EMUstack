@@ -99,11 +99,11 @@ install the core package and pick the groups you want (with pip or ``uv pip``):
      - Contents
      - Needed for
    * - *(core)*
-     - NumPy, SciPy, Matplotlib, xarray, NGSolve/Netgen
-     - Simulations with ``mesher='netgen'``
+     - NumPy, SciPy, Matplotlib, xarray, PyYAML, NGSolve/Netgen, Gmsh
+     - Simulations with the default ``mesher='gmsh'`` or ``mesher='netgen'``
    * - ``gmsh``
-     - Gmsh
-     - The default ``mesher='gmsh'`` and the ``.geo`` templates
+     - Gmsh (kept as a backward-compatible alias; Gmsh is now a core dependency)
+     - Older scripts that install ``emustack-fem[gmsh]``
    * - ``notebooks``
      - Jupyter, nbconvert, ipykernel, ``adaptive``, ``loky``
      - The example notebooks (adaptive sampling, parallel sweeps)
@@ -116,8 +116,8 @@ install the core package and pick the groups you want (with pip or ``uv pip``):
 
 .. code-block:: bash
 
-    pip install -e .                      # core only
-    pip install -e ".[gmsh,notebooks]"    # e.g. core + gmsh + notebooks
+    pip install -e .                      # core: gmsh mesher plus netgen
+    pip install -e ".[notebooks]"         # e.g. core + notebooks
 
 .. note::
 
@@ -125,6 +125,17 @@ install the core package and pick the groups you want (with pip or ``uv pip``):
    conda-forge gmsh``, or a binary from gmsh.info). EMUstack looks for it in this
    order: the ``GMSH_BIN`` environment variable, ``gmsh`` on your ``PATH``,
    ``~/.local/bin/gmsh``, ``~/bin/gmsh``.
+
+.. note::
+
+   On a minimal Linux system (a container, a headless server or an HPC node) the pip wheels
+   can fail with ``cannot open shared object file``: NGSolve links against the system
+   OpenBLAS, and gmsh against OpenGL and X11 client libraries. On Debian/Ubuntu install them
+   with::
+
+       sudo apt-get install libopenblas0 libglu1-mesa libgl1 libgomp1 libxcursor1 libxft2 libxinerama1
+
+   No display is needed. Without the gmsh libraries you can still use ``mesher='netgen'``.
 
 Verifying Installation
 ----------------------

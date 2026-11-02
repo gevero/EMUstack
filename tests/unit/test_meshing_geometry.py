@@ -1,10 +1,10 @@
-"""Unit tests for the Meshing and Geometry module (backend/meshing.py).
+"""Unit tests for the meshing and geometry module (backend/meshing.py).
 
-Verifies PORTING_PLAN §5:
-- §5.1 / §5.2: Mandatory assertions on periodic identifications, curvature, and area.
-- §5.3: Analytic inclusion area and perimeter tolerances for circle, ellipse, square, rectangle, ring, dimer.
-- §5.8: Gmsh MSH 2.2 import with Path IIA 1-based AddPointIdentification and MSH 4.x rejection.
-- §5.6: .mail file import for 4testing-600_120.mail and 4testing-940_266_sq.mail.
+Verifies:
+- Mandatory assertions on periodic identifications, curvature, and area.
+- Analytic inclusion area and perimeter tolerances for circle, ellipse, square, rectangle, ring, dimer.
+- Gmsh MSH 2.2 import with 1-based AddPointIdentification and MSH 4.x rejection.
+- .mail file import for 4testing-600_120.mail and 4testing-940_266_sq.mail.
 """
 import os
 import tempfile

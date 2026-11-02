@@ -1,4 +1,4 @@
-"""Unit tests for Mode Matching and Simmo-Simmo interfaces (PORTING_PLAN §8, §10).
+"""Unit tests for mode matching and Simmo-Simmo interfaces.
 
 Verifies:
 - Reduction proof 1: P=A, Q=B reproduces r_t_mat_tf_ns to <1e-12

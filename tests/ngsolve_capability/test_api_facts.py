@@ -1,4 +1,4 @@
-"""NGSolve API Ground Truth Capability Tests (PORTING_PLAN §2.2).
+"""NGSolve API ground-truth capability tests.
 
 Validates each verified API row against the pinned NGSolve version in this environment.
 """

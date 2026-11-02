@@ -1,13 +1,14 @@
-"""Unit tests for the 2D Finite Element Maxwell Bloch Solver (PORTING_PLAN §6, §10).
+"""Unit tests for the 2D finite-element Maxwell Bloch solver.
 
 Verifies:
-- G3.1: Homogeneous cell analytic eigenvalue spectrum
-- G1.4: Biorthogonality ||L - I|| <= 1e-10 after conjugate-pair repair
-- G3.3: Plane-wave overlap isometry J^dag J approx I on homogeneous medium
+- Homogeneous cell analytic eigenvalue spectrum
+- Biorthogonality ||L - I|| <= 1e-10 after conjugate-pair repair
+- Plane-wave overlap isometry J^dag J approx I on homogeneous medium
 - Mode flux matrix F properties
 """
 import numpy as np
 import pytest
+import warnings
 
 import netgen.geom2d as g2
 import ngsolve as ngs
@@ -111,6 +112,39 @@ def test_mode_flux_structure(homogeneous_mesh):
     assert np.all(np.isfinite(F))
     # Diagonal should be dominant for physical modes
     assert np.linalg.norm(np.diag(F)) > 1e-5
+
+
+def test_warn_if_degenerate_warns_when_cut_splits_a_group():
+    """A num_BMs cut between two (near-)degenerate modes must warn."""
+    zeta = np.array([0.5 + 0.0j, 2.0 + 0.0j, 2.0 + 1e-12j, 3.0 + 0.0j])
+    with pytest.warns(UserWarning, match="degenerate Bloch-mode group"):
+        fem_2d.warn_if_degenerate(zeta, 2)
+
+
+def test_warn_if_degenerate_is_silent_when_the_group_is_fully_kept():
+    """No warning when the last kept and first dropped modes are well separated."""
+    zeta = np.array([1.0 + 0.0j, 2.0 + 0.0j, 3.0 + 0.0j])
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        fem_2d.warn_if_degenerate(zeta, 2)
+    assert caught == []
+
+
+def test_warn_if_degenerate_is_silent_without_a_dropped_mode():
+    """No warning when the eigensolver returned exactly num_BMs modes."""
+    zeta = np.array([1.0 + 0.0j, 1.0 + 1e-12j])
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        fem_2d.warn_if_degenerate(zeta, 2)
+    assert caught == []
+
+
+def test_degenerate_warning_fires_from_the_2d_solver(homogeneous_mesh):
+    """At normal incidence an odd num_BMs splits a degenerate pair; the solver warns."""
+    with pytest.warns(UserWarning, match="degenerate Bloch-mode group"):
+        fem_2d.solve_bloch_modes_2d(
+            wl_norm=1.2, num_BMs=5, max_order_PWs=2, structure_or_mesh=homogeneous_mesh,
+            n_effs=[1.5], k_pll=(0.0, 0.0), order=2, dy=1.0)
 
 
 def test_overlap_shapes(homogeneous_mesh):

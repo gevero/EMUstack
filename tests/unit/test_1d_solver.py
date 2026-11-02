@@ -1,12 +1,12 @@
 """Unit tests for the pure Python 1D FEM Maxwell solver (fem_1d.py).
 
-Covers PORTING_PLAN_EMUSTACK_FEM.md:
-- G1.1: Phase periodicity under kx -> kx + 2*pi
-- G1.3: Determinism with explicit seed v0
-- G1.4: Biorthogonality residual ||L - I|| < 1e-10
-- G2.2 / §3.6: Mode self-flux F structure
-- G3.1 / G3.5: Analytic homogeneous slab comparison
-- G3.4: TE/TM decoupling at ky = 0 exactly
+Verifies:
+- Phase periodicity under kx -> kx + 2*pi
+- Determinism with explicit seed v0
+- Biorthogonality residual ||L - I|| < 1e-10
+- Mode self-flux F structure
+- Analytic homogeneous slab comparison
+- TE/TM decoupling at ky = 0 exactly
 - Negative control: K_zx sign alteration breaks spectrum
 """
 import pytest

@@ -5,12 +5,42 @@ eigenvalues, overlap matrices, self-flux, and diagnostic metadata.
 """
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any
+import warnings
 import numpy as np
 
 
 class FEMConvergenceError(RuntimeError):
     """Raised when eigensolver fails to converge sufficient physical modes."""
     pass
+
+
+def warn_if_degenerate(zeta, num_BMs, rtol=1e-6):
+    """Warn when the num_BMs cut falls inside a degenerate group of Bloch modes.
+
+    At high symmetry, modes come in (near-)degenerate pairs or groups. Keeping only
+    part of a group breaks the lattice symmetry and can change symmetry-protected
+    quantities (e.g. |T_RCP - T_LCP|). Needs the first dropped eigenvalue, so the
+    solvers request one eigenpair more than num_BMs before truncating.
+    """
+    if num_BMs < 1 or len(zeta) <= num_BMs:
+        return
+    kept, dropped = zeta[num_BMs - 1], zeta[num_BMs]
+    diff = abs(kept - dropped)
+    scale = max(abs(kept), abs(dropped))
+    if scale == 0.0:
+        degenerate = diff == 0.0
+    else:
+        degenerate = diff <= rtol * scale
+    if degenerate:
+        warnings.warn(
+            "num_BMs=%d cuts through a degenerate Bloch-mode group: the last kept mode "
+            "(zeta=%s) and the first dropped mode (zeta=%s) differ by %.3g (relative %.1e). "
+            "Increase num_BMs so the whole group is kept; otherwise symmetry-protected "
+            "quantities such as |T_RCP - T_LCP| can change."
+            % (num_BMs, format(kept, '.6g'), format(dropped, '.6g'), diff,
+               diff / scale if scale else 0.0),
+            stacklevel=3,
+        )
 
 
 @dataclass

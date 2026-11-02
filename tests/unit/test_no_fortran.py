@@ -1,10 +1,10 @@
-"""Verification of DoD gates and zero Fortran backend invariants (PORTING_PLAN §1.2, §12).
+"""Zero-Fortran backend invariants.
 
 Checks:
-- DoD-1: Zero active Fortran imports or calls in backend
-- DoD-2: fem_2d imports only ngsolve, netgen, numpy, scipy, and internal backend modules
-- DoD-3: fem_1d has zero ngsolve/netgen imports
-- DoD-8: Zero active os.system calls in backend
+- Zero active Fortran imports or calls in backend
+- fem_2d imports only ngsolve, netgen, numpy, scipy, and internal backend modules
+- fem_1d has zero ngsolve/netgen imports
+- Zero active os.system calls in backend
 - Ban on IdentifyPeriodicBoundaries (buggy in Netgen 6.2.2608)
 - .mail files are read-only input
 """
@@ -32,7 +32,7 @@ def test_dod2_fem2d_allowed_imports():
     tree = ast.parse(fem2d_path.read_text())
 
     allowed_modules = {
-        "os", "time", "typing", "sys", "math",
+        "os", "time", "typing", "sys", "math", "warnings",
         "numpy", "scipy", "netgen", "ngsolve",
         "modes", "meshing", "paths", "linalg", "legacy_sort"
     }

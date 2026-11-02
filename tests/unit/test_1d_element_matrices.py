@@ -1,4 +1,4 @@
-"""Exact rational element matrix verification (PORTING_PLAN §7.2).
+"""Exact rational element matrix verification.
 
 Proves that Mxx, Myy, Kxy, Kyx, Kyy closed-form rational matrices match
 independent high-order Gauss-Legendre numerical quadrature to machine precision.

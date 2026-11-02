@@ -15,25 +15,22 @@ EMUstack v2.0 provides an interactive, notebook-first workflow. All examples are
 Simulation Workflow
 -------------------
 
-Simulations in EMUstack follow a concise, 5-step pattern:
+Simulations in EMUstack follow a concise, 5-step pattern. The code blocks below form one
+script that runs as written (``tests/unit/test_docs_tutorial.py`` executes it).
 
 1. Define Illumination
 ~~~~~~~~~~~~~~~~~~~~~~
 
-Configure the incident wavelength range, polarization, and angle of incidence:
+A ``Light`` object holds one wavelength, the angle of incidence and the number of plane-wave
+diffraction orders (``max_order_PWs``). Spectra are computed by looping over wavelengths
+(see *Wavelength sweeps* below).
 
 .. code-block:: python
 
     import numpy as np
     from EMUstack.backend import objects, materials, stack, plotting
 
-    # Wavelength sweep (e.g. 500 nm to 800 nm, 61 points)
-    light = objects.Light(
-        wl_nm=np.linspace(500.0, 800.0, 61),
-        theta=0.0,
-        phi=0.0,
-        max_order_PWs=3,
-    )
+    light = objects.Light(650.0, theta=0.0, phi=0.0, max_order_PWs=3)
 
 2. Define Materials and Layers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -46,14 +43,12 @@ Create homogeneous thin films and periodic nanostructures:
     glass = materials.Material(1.52)
     sub = objects.ThinFilm(period=600.0, material=glass, loss=False)
 
-    # 2D Periodic nanostructure (Silicon nanopillars)
-    # Native Netgen workflow (examples_netgen):
+    # 2D periodic nanostructure: silicon nanopillars, 240 nm diameter, 200 nm tall.
+    # plotting_fields=1 keeps the mode fields, which the field maps in step 5 need.
     meta = objects.NanoStruct(
-        period=600.0,
-        background=materials.Air,
-        inclusion_a=materials.Si_c,
-        thickness=200.0,
-        geo_params={'period': 600.0, 'diameter1': 240.0, 'lc': 0.1, 'lc2': 2.0},
+        '2D_array', 600.0, diameter1=240.0,
+        background=materials.Air, inclusion_a=materials.Si_c, height_nm=200.0,
+        lc_bkg=0.1, lc2=2.0, plotting_fields=1,
     )
 
     # Superstrate (semi-infinite air)
@@ -62,12 +57,14 @@ Create homogeneous thin films and periodic nanostructures:
 3. Compute Eigenmodes
 ~~~~~~~~~~~~~~~~~~~~~
 
-Solve for the electromagnetic modes of each layer across all wavelengths:
+Solve for the modes of each layer at this wavelength. ``num_BMs`` (the number of Bloch modes
+kept in the nanostructured layer) must exceed the number of plane waves, 58 for
+``max_order_PWs=3``; its default is twice the number of plane waves plus 20.
 
 .. code-block:: python
 
     modes_sub = sub.calc_modes(light)
-    modes_meta = meta.calc_modes(light, num_BMs=30)
+    modes_meta = meta.calc_modes(light, num_BMs=100)
     modes_sup = sup.calc_modes(light)
 
 4. Stack and Calculate Scattering
@@ -79,27 +76,49 @@ Assemble the stack and cascade the layers using scattering matrices:
 
     sim_stack = stack.Stack((modes_sub, modes_meta, modes_sup))
     sim_stack.calc_scat(pol='TE')
+    print("T = %.4f, R = %.4f" % (sim_stack.t_list[-1], sim_stack.r_list[-1]))
 
 5. Visualize and Export Data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Plot spectra or inspect local fields inline without disk side effects:
+Plot spectra or inspect local fields inline without disk side effects. The in-plane field
+interpolators take coordinates normalized to the period (0 to 1).
 
 .. code-block:: python
 
     # Export spectra to xarray Dataset
     ds = plotting.spectra_to_xarray([sim_stack])
 
-    # Evaluate 3D electromagnetic near-fields on an in-plane slice (xy)
+    # Evaluate 3D electromagnetic near-fields on an in-plane slice (xy), mid-height of the pillars
     bundle = plotting.fields_interpolator_in_plane(
         sim_stack, lay_interest=1, z_value=100.0, return_H=True
     )
+    u = np.linspace(0.0, 1.0, 101)
+    X, Y = np.meshgrid(u, u)
     Ex, Ey, Ez = bundle.Ex(X, Y), bundle.Ey(X, Y), bundle.Ez(X, Y)
 
     # Evaluate vertical cross-sections (xz or yz) across the full stack
     cross_bundle = plotting.fields_interpolator_cross_section(
         sim_stack, plane="xz", slice_coord=300.0
     )
+
+Wavelength sweeps
+~~~~~~~~~~~~~~~~~
+
+Repeat steps 1, 3 and 4 for each wavelength; the layer objects are reused. The notebooks run
+the wavelengths in parallel and choose them adaptively.
+
+.. code-block:: python
+
+    stacks = []
+    for wl in np.linspace(600.0, 700.0, 3):
+        light = objects.Light(wl, theta=0.0, phi=0.0, max_order_PWs=3)
+        modes = [sub.calc_modes(light), meta.calc_modes(light, num_BMs=100),
+                 sup.calc_modes(light)]
+        s = stack.Stack(modes)
+        s.calc_scat(pol='TE')
+        stacks.append(s)
+    spectra = plotting.spectra_to_xarray(stacks)
 
 Available Tutorial Notebooks
 ----------------------------

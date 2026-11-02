@@ -35,24 +35,15 @@ jobs:
       - name: Install documentation dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f "EMUstack/docs/requirements.txt" ]; then
-            pip install -r EMUstack/docs/requirements.txt
-          elif [ -f "docs/requirements.txt" ]; then
-            pip install -r docs/requirements.txt
-          fi
+          pip install -r docs/requirements.txt
 
       - name: Build Sphinx HTML documentation
-        run: |
-          if [ -d "EMUstack/docs" ]; then
-            make -C EMUstack/docs html
-          elif [ -d "docs" ]; then
-            make -C docs html
-          fi
+        run: make -C docs html
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ${{ (hashFiles('EMUstack/docs/build/html/index.html') != '' && 'EMUstack/docs/build/html') || 'docs/build/html' }}
+          path: docs/build/html
 
   deploy:
     needs: build

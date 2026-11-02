@@ -429,3 +429,30 @@ def test_spectra_to_xarray():
     assert np.isclose(float(ds["T_total"][0]) + float(ds["R_total"][0]), 1.0, atol=1e-6)
 
 
+
+
+def test_fieldbundle_to_xarray_matches_direct_evaluation():
+    """to_xarray must derive Poynting and chirality from the same fields as the methods."""
+    def const(c):
+        return lambda x, y: np.full(np.broadcast(np.asarray(x), np.asarray(y)).shape, c)
+
+    bundle = plotting.FieldBundle(
+        const(1.0), const(2.0), const(3.0), const(4.0), const(5.0), const(6.0), const(7.0),
+        const(8.0), const(9.0), const(10.0), const(11.0), const(12.0), const(13.0), const(14.0),
+        k0=1.0,
+    )
+    x = np.linspace(0.0, 1.0, 3)
+    y = np.linspace(0.0, 1.0, 4)
+    ds = bundle.to_xarray(x, y, period=1.0)
+
+    U, V = np.meshgrid(x, y)
+    sx, sy, sz = bundle.Poynting(U, V)
+    np.testing.assert_allclose(ds["Sx"].values, sx)
+    np.testing.assert_allclose(ds["Sy"].values, sy)
+    np.testing.assert_allclose(ds["Sz"].values, sz)
+    np.testing.assert_allclose(ds["chirality_enhancement"].values,
+                               bundle.chirality_enhancement(U, V))
+    np.testing.assert_allclose(ds["chirality"].values, bundle.chirality(U, V))
+    np.testing.assert_allclose(ds["AbsE"].values,
+                               np.sqrt(np.abs(bundle.Ex(U, V))**2 + np.abs(bundle.Ey(U, V))**2
+                                       + np.abs(bundle.Ez(U, V))**2))

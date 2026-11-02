@@ -2,18 +2,16 @@
 import collections
 import os
 import subprocess
+import sys
+import time
 
 import numpy as np
 import pytest
 
 from EMUstack.backend import materials, meshing, objects
 
-try:
-    meshing._gmsh_binary()
-    HAVE_GMSH = True
-except EnvironmentError:
-    HAVE_GMSH = False
-needs_gmsh = pytest.mark.skipif(not HAVE_GMSH, reason="gmsh binary not found")
+HAVE_GMSH = meshing.gmsh_available()
+needs_gmsh = pytest.mark.skipif(not HAVE_GMSH, reason="gmsh not installed or cannot start")
 
 
 def _mesh(tmp_path, template, params, name="cell"):
@@ -155,3 +153,74 @@ $EndElements
     path.write_text(msh)
     with pytest.raises(AssertionError, match="do not match"):
         meshing.import_gmsh_mesh(str(path))
+
+
+@needs_gmsh
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="PR_SET_PDEATHSIG is Linux-only")
+def test_gmsh_command_uses_a_parent_death_launcher():
+    cmd = meshing._gmsh_command(["-version"])
+    assert cmd[:2] == [sys.executable, "-c"]
+    assert "prctl" in cmd[2]
+    assert cmd[3] == str(os.getpid())
+    assert cmd[4] == meshing._gmsh_binary()
+
+
+@needs_gmsh
+def test_gmsh_runs_through_the_launcher():
+    res = meshing._run_gmsh(["-version"], "version")
+    assert res.returncode == 0
+    assert res.stdout.strip()
+
+
+@needs_gmsh
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="PR_SET_PDEATHSIG is Linux-only")
+def test_gmsh_dies_when_its_parent_python_is_killed(tmp_path):
+    """SIGKILL of the Python process must take a running gmsh with it."""
+    text = open(meshing.resolve_mesh_file_path("strip_msh_template.geo")).read()
+    root = str(tmp_path / "orphan")
+    with open(root + ".geo", "w") as f:
+        f.write(meshing.fill_geo_template(
+            text, dict(period=600, period_y=600, diameter1=200, strip=60, lc=0.1, lc2=2, lc3=2),
+            fmt="%f", strict=False))
+
+    def running():
+        out = subprocess.run(["pgrep", "-f", root + ".geo"], capture_output=True, text=True)
+        return bool(out.stdout.strip())
+
+    script = (
+        "import sys\n"
+        "sys.path.insert(0, %r)\n"
+        "import meshing\n"
+        "meshing.gmsh_timeout = 600.0\n"
+        "meshing.conv_gmsh(%r)\n" % (os.path.dirname(os.path.abspath(meshing.__file__)), root)
+    )
+    proc = subprocess.Popen([sys.executable, "-c", script],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        for _ in range(100):
+            if running():
+                break
+            time.sleep(0.1)
+        assert running(), "gmsh did not start"
+        proc.kill()  # SIGKILL the parent Python, as a user or the OOM killer would
+        proc.wait(timeout=10)
+        for _ in range(100):
+            if not running():
+                break
+            time.sleep(0.1)
+        assert not running(), "gmsh survived its parent (PR_SET_PDEATHSIG failed)"
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+        subprocess.run(["pkill", "-f", root + ".geo"], capture_output=True)
+
+
+def test_missing_system_library_gives_an_install_hint(monkeypatch):
+    """A gmsh that cannot load its shared libraries must say which packages to install."""
+    fake = [sys.executable, "-c",
+            "import sys; sys.stderr.write('OSError: libGLU.so.1: cannot open shared object "
+            "file: No such file or directory\\n'); sys.exit(1)"]
+    monkeypatch.setattr(meshing, "_gmsh_command", lambda args: fake)
+    with pytest.raises(RuntimeError, match="apt-get install libglu1-mesa"):
+        meshing._run_gmsh(["-version"], "cell.geo")

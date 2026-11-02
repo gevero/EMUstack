@@ -88,24 +88,24 @@ def field_value_plane(
     has_H = (sol1.shape[0] >= 6)
     ez_coef = ez_coefficient(prop_minus, k_z_arr, physical=True if return_H else None)
 
-    for iel in range(n_msh_el):
-        for inod in range(min(6, sol1.shape[1])):
-            ex_modes = np.asarray(sol1[0, inod, :num_modes, iel]).flatten()
-            ey_modes = np.asarray(sol1[1, inod, :num_modes, iel]).flatten()
-            ez_modes = np.asarray(sol1[2, inod, :num_modes, iel]).flatten()
+    # Sum over modes for every element node at once: sol1[comp, node, mode, element].
+    # The explicit node/element loop this replaces dominated the cost of 500-mode
+    # field maps (tens of thousands of small np.sum calls).
+    nnodes = min(6, sol1.shape[1])
+    n_el = min(n_msh_el, sol1.shape[3]) if sol1.ndim == 4 else n_msh_el
+    if num_modes and nnodes and n_el:
+        def _modes_sum(comp, weights):
+            return np.einsum('nme,m->en', sol1[comp, :nnodes, :num_modes, :n_el], weights)
 
-            m_E[iel, inod, 0] = np.sum(prop_plus * ex_modes)
-            m_E[iel, inod, 1] = np.sum(prop_plus * ey_modes)
-            m_E[iel, inod, 2] = np.sum(ez_coef * ez_modes)
+        m_E[:n_el, :nnodes, 0] = _modes_sum(0, prop_plus)
+        m_E[:n_el, :nnodes, 1] = _modes_sum(1, prop_plus)
+        m_E[:n_el, :nnodes, 2] = _modes_sum(2, ez_coef)
 
-            if has_H:
-                hx_modes = np.asarray(sol1[3, inod, :num_modes, iel]).flatten()
-                hy_modes = np.asarray(sol1[4, inod, :num_modes, iel]).flatten()
-                hz_modes = np.asarray(sol1[5, inod, :num_modes, iel]).flatten()
-
-                m_H[iel, inod, 0] = np.sum(prop_minus * (k_z_arr / k0) * hx_modes)
-                m_H[iel, inod, 1] = np.sum(prop_minus * (k_z_arr / k0) * hy_modes)
-                m_H[iel, inod, 2] = np.sum(prop_plus * (1.0 / (1j * k0)) * hz_modes)
+        if has_H:
+            prop_h = prop_minus * (k_z_arr / k0)
+            m_H[:n_el, :nnodes, 0] = _modes_sum(3, prop_h)
+            m_H[:n_el, :nnodes, 1] = _modes_sum(4, prop_h)
+            m_H[:n_el, :nnodes, 2] = _modes_sum(5, prop_plus * (1.0 / (1j * k0)))
 
     if return_H:
         return m_E, m_H

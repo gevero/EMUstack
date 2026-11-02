@@ -2144,7 +2144,12 @@ class FieldBundle:
             hy = self.Hy(U, V)
             hz = self.Hz(U, V)
             abs_h = np.sqrt(np.abs(hx)**2 + np.abs(hy)**2 + np.abs(hz)**2)
-            sx, sy, sz = self.Poynting(U, V)
+            # Derive Poynting and chirality from the fields evaluated above instead of
+            # calling the interpolators again for each derived quantity (6 extra grid
+            # evaluations on a 500x500 map).
+            sx = 0.5 * np.real(ey * np.conj(hz) - ez * np.conj(hy))
+            sy = 0.5 * np.real(ez * np.conj(hx) - ex * np.conj(hz))
+            sz = 0.5 * np.real(ex * np.conj(hy) - ey * np.conj(hx))
             data_vars.update({
                 "Hx": (dims, hx),
                 "Hy": (dims, hy),
@@ -2156,10 +2161,15 @@ class FieldBundle:
             })
 
             if include_chirality:
-                c_enh = self.chirality_enhancement(U, V)
+                edotH = np.conj(ex) * hx + np.conj(ey) * hy + np.conj(ez) * hz
+                c_enh = -np.imag(edotH)
+                if isinstance(c_enh, np.ma.MaskedArray):
+                    c_enh = c_enh.filled(np.nan)
                 data_vars["chirality_enhancement"] = (dims, c_enh)
                 if self.k0 is not None:
-                    c_dens = self.chirality(U, V)
+                    c_dens = -0.5 * float(self.k0) * np.imag(edotH)
+                    if isinstance(c_dens, np.ma.MaskedArray):
+                        c_dens = c_dens.filled(np.nan)
                     data_vars["chirality"] = (dims, c_dens)
 
         coords = {

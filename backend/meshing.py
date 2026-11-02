@@ -22,6 +22,7 @@ alias tables below.
 """
 import os
 import re
+import sys
 import tempfile
 import shutil
 import subprocess
@@ -825,19 +826,73 @@ def _gmsh_binary() -> str:
 gmsh_timeout = float(os.environ.get("EMUSTACK_GMSH_TIMEOUT", "600"))
 
 
+# gmsh is a plain child process: if the Python process is killed (SIGKILL/SIGTERM),
+# gmsh would keep running (forever on invalid geometry). On Linux, start gmsh through
+# a tiny launcher that sets PR_SET_PDEATHSIG, so the kernel kills gmsh when its parent
+# dies. A preexec_fn would do the same but is unsafe in threaded programs, so the
+# launcher runs in a fresh interpreter and then execs gmsh.
+_PDEATHSIG_LAUNCHER = (
+    "import ctypes, os, signal, sys\n"
+    "try:\n"
+    "    ctypes.CDLL(None).prctl(1, signal.SIGKILL)  # PR_SET_PDEATHSIG, SIGKILL\n"
+    "except Exception:\n"
+    "    pass\n"
+    "# Exit if the parent died before prctl took effect; a legitimate parent may be PID 1.\n"
+    "if os.getppid() != int(sys.argv[1]):\n"
+    "    sys.exit(1)\n"
+    "os.execv(sys.argv[2], sys.argv[2:])\n"
+)
+
+
+def _gmsh_command(args: List[str]) -> List[str]:
+    """gmsh command line, with a parent-death-signal launcher on Linux."""
+    binary = _gmsh_binary()
+    if sys.platform.startswith("linux") and sys.executable and os.path.exists(sys.executable):
+        return [sys.executable, "-c", _PDEATHSIG_LAUNCHER, str(os.getpid()), binary] + list(args)
+    return [binary] + list(args)
+
+
 def _run_gmsh(args: List[str], geo: str) -> subprocess.CompletedProcess:
     """Run gmsh with `args`; stop it and raise if it takes longer than `gmsh_timeout`."""
-    cmd = [_gmsh_binary()] + list(args)
+    cmd = _gmsh_command(args)
     try:
         # on timeout, subprocess.run kills gmsh before raising
-        return subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-                              timeout=gmsh_timeout)
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                             timeout=gmsh_timeout)
     except subprocess.TimeoutExpired:
         raise RuntimeError(
             "gmsh did not finish meshing %s within %g s and was stopped. The geometry is "
             "probably invalid, e.g. inclusions that overlap or cross other lines: check the "
             "template parameters. For a very fine mesh, raise the limit with "
             "meshing.gmsh_timeout or EMUSTACK_GMSH_TIMEOUT." % (geo, gmsh_timeout)) from None
+    if res.returncode != 0 and "cannot open shared object file" in res.stderr:
+        raise RuntimeError(
+            "gmsh could not start: a system library is missing.\n%s\n"
+            "The gmsh pip package needs OpenGL and X11 client libraries, which minimal Linux "
+            "systems (containers, headless servers) lack. On Debian/Ubuntu:\n"
+            "    sudo apt-get install %s\n"
+            "or use mesher='netgen'." % (res.stderr.strip().splitlines()[-1], GMSH_SYSTEM_LIBS))
+    return res
+
+
+# Debian/Ubuntu packages the gmsh pip wheel needs on a minimal Linux system.
+GMSH_SYSTEM_LIBS = "libglu1-mesa libgl1 libgomp1 libxcursor1 libxft2 libxinerama1"
+
+
+_gmsh_works = None
+
+
+def gmsh_available() -> bool:
+    """True if a gmsh binary is found and starts (checked once per process)."""
+    global _gmsh_works
+    if _gmsh_works is None:
+        try:
+            res = subprocess.run([_gmsh_binary(), "-version"], stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE, timeout=60)
+            _gmsh_works = res.returncode == 0
+        except (EnvironmentError, subprocess.TimeoutExpired):
+            _gmsh_works = False
+    return _gmsh_works
 
 
 def conv_gmsh(root: str) -> Tuple[int, int]:

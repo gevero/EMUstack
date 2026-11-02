@@ -16,7 +16,7 @@ import netgen.geom2d as g2
 import ngsolve as ngs
 from ngsolve import Mesh, HCurl, H1, GridFunction, BilinearForm
 
-from modes import BlochModes, FEMConvergenceError
+from modes import BlochModes, FEMConvergenceError, warn_if_degenerate
 import meshing
 from legacy_sort import z_indexx, grating_orders_2d
 import paths
@@ -119,9 +119,11 @@ def solve_system_modes_arpack(
     num_BMs: int,
     maxiter: int = 1000
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """The num_BMs eigenpairs of K u = lambda M u nearest sigma, by ARPACK shift-invert.
+    """The num_BMs+1 eigenpairs of K u = lambda M u nearest sigma, by ARPACK shift-invert.
 
-    Same return convention as solve_system_modes: nearest first, legacy branch for zeta.
+    The extra eigenpair is the first one select_modes drops; warn_if_degenerate uses it
+    to detect a cut through a degenerate mode group. Same return convention as
+    solve_system_modes: nearest first, legacy branch for zeta.
     Raises FEMConvergenceError if ARPACK does not converge all of them.
     """
     from scipy.sparse.linalg import splu, LinearOperator, eigs, ArpackNoConvergence
@@ -141,10 +143,10 @@ def solve_system_modes_arpack(
     rng = np.random.default_rng(42)
     v0 = rng.standard_normal(n) + 1j * rng.standard_normal(n)
     try:
-        mu, vecs = eigs(OP, k=num_BMs, which='LM', ncv=ncv, tol=0.0, maxiter=maxiter, v0=v0)
+        mu, vecs = eigs(OP, k=num_BMs + 1, which='LM', ncv=ncv, tol=0.0, maxiter=maxiter, v0=v0)
     except ArpackNoConvergence as e:
         raise FEMConvergenceError(
-            f"ARPACK converged {len(e.eigenvalues)} of {num_BMs} Bloch modes") from e
+            f"ARPACK converged {len(e.eigenvalues)} of {num_BMs + 1} Bloch modes") from e
     lam = sigma + 1.0 / mu
 
     zetas, coeffs, residuals = [], [], []
@@ -556,16 +558,23 @@ def solve_bloch_modes_2d(
 
     # 4. Eigen-solve around the shift; keep the num_BMs modes nearest to it (legacy)
     t_arnoldi = time.perf_counter()
+    zeta_pri_all = None
     if eigensolver == 'arpack':
-        pri = select_modes(*solve_system_modes_arpack(K_pri, M_pri, space_pri, sigma, num_BMs), num_BMs)
-        adj = select_modes(*solve_system_modes_arpack(K_adj, M_adj, space_adj, sigma, num_BMs), num_BMs)
+        zeta_pri_all, phi_pri, res_pri = solve_system_modes_arpack(
+            K_pri, M_pri, space_pri, sigma, num_BMs)
+        zeta_adj_all, phi_adj, res_adj = solve_system_modes_arpack(
+            K_adj, M_adj, space_adj, sigma, num_BMs)
+        pri = select_modes(zeta_pri_all, phi_pri, res_pri, num_BMs)
+        adj = select_modes(zeta_adj_all, phi_adj, res_adj, num_BMs)
     elif eigensolver == 'ngsolve':
         numeig = max(num_BMs * 3, num_BMs + 40)
         for attempt in range(2):
-            pri = select_modes(*solve_system_modes(
-                K_pri, M_pri, space_pri, sigma, numeig, k0, max_order_PWs, n_max), num_BMs)
-            adj = select_modes(*solve_system_modes(
-                K_adj, M_adj, space_adj, sigma, numeig, k0, max_order_PWs, n_max), num_BMs)
+            zeta_pri_all, phi_pri, res_pri = solve_system_modes(
+                K_pri, M_pri, space_pri, sigma, numeig, k0, max_order_PWs, n_max)
+            zeta_adj_all, phi_adj, res_adj = solve_system_modes(
+                K_adj, M_adj, space_adj, sigma, numeig, k0, max_order_PWs, n_max)
+            pri = select_modes(zeta_pri_all, phi_pri, res_pri, num_BMs)
+            adj = select_modes(zeta_adj_all, phi_adj, res_adj, num_BMs)
             if pri is not None and adj is not None:
                 break
             numeig = int(numeig * 1.5)  # retry once with a larger Krylov space
@@ -577,6 +586,8 @@ def solve_bloch_modes_2d(
             f"(primal {'ok' if pri is not None else 'failed'}, "
             f"adjoint {'ok' if adj is not None else 'failed'})"
         )
+    if zeta_pri_all is not None:
+        warn_if_degenerate(zeta_pri_all, num_BMs)
     zeta_pri, Phi_pri, res_pri = pri
     zeta_adj, Phi_adj, res_adj = adj
 

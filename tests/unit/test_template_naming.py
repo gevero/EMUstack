@@ -13,15 +13,7 @@ import pytest
 from EMUstack.backend import meshing, objects, paths
 
 
-def _have_gmsh():
-    try:
-        meshing._gmsh_binary()
-        return True
-    except EnvironmentError:
-        return False
-
-
-needs_gmsh = pytest.mark.skipif(not _have_gmsh(), reason="gmsh not installed")
+needs_gmsh = pytest.mark.skipif(not meshing.gmsh_available(), reason="gmsh not installed or cannot start")
 
 
 def _same_mesh(m1, m2):
