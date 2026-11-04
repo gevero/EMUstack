@@ -25,8 +25,8 @@ def same(a, b):
 
 @pytest.mark.parametrize("period, max_order", [(480.0, 5), (217.0, 3), (480.0, 10)])
 def test_nm_and_normalized_units_agree(period, max_order):
-    # Legacy kept different orders in the two unit systems for these cases.
-    assert not same(legacy_orders(max_order, period, period), legacy_orders(max_order, 1.0, 1.0))
+    # Legacy kept different orders in the two unit systems for these cases (on Linux; the
+    # cut falls on the boundary, so it depends on the last bit of floating-point division).
     assert same(grating_orders_2d(max_order, period, period), grating_orders_2d(max_order, 1.0, 1.0))
 
 

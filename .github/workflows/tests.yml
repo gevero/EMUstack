@@ -12,6 +12,7 @@ permissions:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
     # macOS and Windows are new: their failures are reported but do not block a release yet.
     continue-on-error: ${{ matrix.os != 'ubuntu-latest' }}
     strategy:
@@ -45,5 +46,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[all]"
 
+      # -v prints one line per test, so the log shows progress; a test running longer
+      # than 20 minutes dumps the traceback of where it is stuck.
       - name: Run the test suite
-        run: python -m pytest -q
+        run: python -m pytest -v --durations=15 -o faulthandler_timeout=1200
