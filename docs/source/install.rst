@@ -14,74 +14,69 @@ Prerequisites:
 * **Mesher for the .geo templates:** Gmsh (>= 4.11), installed from PyPI by the full install below.
 
 All of these are installed by pip; nothing has to be compiled.
+Everything installs from pip wheels on Linux, macOS and Windows; the test suite runs on all
+three.
 
-Installation via Pip
---------------------
+Step 1: Create an Environment and Install EMUstack
+--------------------------------------------------
 
-From the repository root, install EMUstack together with all optional packages:
+We strongly recommend installing EMUstack inside its own environment. Pick one of the three
+workflows below. Each installs ``emustack[all]`` from PyPI: the package with everything the
+example notebooks need (Jupyter, ``adaptive``, ``loky``), plus the test and docs tools. The 30
+mesh templates ship with the package. See :ref:`install-extras` for a smaller install.
 
-.. code-block:: bash
-
-    pip install -e ".[all]"
-
-This is the recommended install: everything in the repository then works out of the
-box, i.e. the gmsh mesher, the example notebooks (Jupyter, ``adaptive``, ``loky``), the
-test suite and the documentation build. See :ref:`install-extras` for a smaller install.
-
-Setting Up a Dedicated Environment
------------------------------------
-
-We strongly recommend installing EMUstack inside an isolated environment. Below are instructions for three standard workflows:
-
-Option A: Dedicated Conda Environment + Pip
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Create and activate a clean Conda environment, then install EMUstack and its dependencies via pip:
+Option A: Conda Environment + Pip
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-    # 1. Create a dedicated environment (Python 3.11 or 3.12 recommended)
     conda create -n emustack python=3.12 -y
-
-    # 2. Activate the environment
     conda activate emustack
+    pip install "emustack[all]"
 
-    # 3. Upgrade pip and install EMUstack in editable mode
-    pip install --upgrade pip
-    pip install -e ".[all]"
-
-Option B: Dedicated Python Virtual Environment (venv) + Pip
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Create a lightweight virtual environment using Python's built-in ``venv`` module:
+Option B: Python Virtual Environment (venv) + Pip
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-    # 1. Create a virtual environment in the repository folder
     python3 -m venv .venv
-
-    # 2. Activate the environment
     source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-    # 3. Upgrade pip and install EMUstack with all optional packages
     pip install --upgrade pip
-    pip install -e ".[all]"
+    pip install "emustack[all]"
 
-Option C: Dedicated Virtual Environment with uv
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Option C: Virtual Environment with uv
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you use `uv <https://docs.astral.sh/uv/>`_ for extremely fast environment management:
+If you use `uv <https://docs.astral.sh/uv/>`_:
 
 .. code-block:: bash
 
-    # 1. Create a virtual environment with uv
     uv venv .venv --python 3.12
-
-    # 2. Activate the environment
     source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+    uv pip install "emustack[all]"
 
-    # 3. Install EMUstack with all optional packages
-    uv pip install -e ".[all]"
+Step 2 (Optional): Get the Example Notebooks
+--------------------------------------------
+
+The 45 example notebooks are in the GitHub repository, in ``examples/`` (gmsh meshes) and
+``examples_netgen/`` (Netgen meshes). Clone it and open them with the environment from
+step 1; nothing else needs installing:
+
+.. code-block:: bash
+
+    git clone https://github.com/gevero/EMUstack.git
+    cd EMUstack
+    jupyter lab examples/
+
+Step 3 (Optional): Development Install
+--------------------------------------
+
+To change EMUstack itself, run the test suite or build this documentation, install the
+clone in editable mode instead (from the repository root):
+
+.. code-block:: bash
+
+    pip install -e ".[all]"
 
 .. _install-extras:
 
@@ -116,8 +111,8 @@ install the core package and pick the groups you want (with pip or ``uv pip``):
 
 .. code-block:: bash
 
-    pip install -e .                      # core: gmsh mesher plus netgen
-    pip install -e ".[notebooks]"         # e.g. core + notebooks
+    pip install emustack                  # core: gmsh mesher plus netgen
+    pip install "emustack[notebooks]"     # e.g. core + notebooks
 
 .. note::
 
@@ -140,10 +135,17 @@ install the core package and pick the groups you want (with pip or ``uv pip``):
 Verifying Installation
 ----------------------
 
-Verify your installation by running the test suite with pytest:
+Check that EMUstack imports and finds gmsh:
 
 .. code-block:: bash
 
-    pytest -v
+    python -c "from EMUstack.backend import meshing; print(meshing.gmsh_available())"
 
-All unit and integration tests should pass without errors or leftover files.
+This prints ``True``. With a development install (step 3), also run the test suite from the
+repository root:
+
+.. code-block:: bash
+
+    pytest -q
+
+All tests should pass without errors or leftover files.

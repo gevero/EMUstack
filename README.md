@@ -8,6 +8,8 @@
 
 **EMUstack** is an open-source simulation package for calculating electromagnetic wave propagation, transmission, reflection, and absorption in multilayered nanostructured optical media. It combines high-order finite-element eigenmode solvers with generalized scattering-matrix (S-matrix) methods, bringing the physical intuition and computational speed of thin-film optics to complex periodic nanostructures.
 
+**Documentation:** https://gevero.github.io/EMUstack/ · **Install:** `pip install emustack` · **Source:** https://github.com/gevero/EMUstack
+
 ---
 
 ## What EMUstack Is & How It Works
@@ -41,65 +43,67 @@ Transmitted, Reflected, & Absorbed Flux + 3D Near-Fields
 
 ## Installation
 
-EMUstack v2.0 is a pure Python package. It requires **no Fortran compilers**, **no C++ build tools**, and **no SuiteSparse compilation**.
+EMUstack v2.0 is a pure Python package. It requires **no Fortran compilers**, **no C++ build tools**, and **no SuiteSparse compilation**: everything installs from pip wheels on Linux, macOS and Windows, with Python 3.10 to 3.14.
 
-### Prerequisites
-* **Python:** 3.10, 3.11, 3.12, 3.13, or 3.14.
-* **Core Dependencies:** `numpy>=1.22`, `scipy>=1.9`, `matplotlib>=3.6`, `ngsolve>=6.2.2401`, `netgen-mesher>=6.2.2401`, `xarray>=2023.1`, `pyyaml>=6.0`, `gmsh>=4.11` (the default mesher).
-* **Optional (installed by `.[all]`):** Jupyter, `adaptive`, `loky`, pytest, Sphinx.
+### 1. Create an Environment and Install EMUstack
 
-### From PyPI
-```bash
-pip install emustack            # core: FEM solvers, gmsh and netgen meshers
-pip install "emustack[all]"     # + notebooks, tests, docs
-```
+We recommend installing EMUstack into its own environment, with Conda, `venv` or `uv`. `emustack[all]` adds everything the example notebooks need (Jupyter, `adaptive`, `loky`), plus the test and docs tools.
 
-### From Source
-The repository includes the example notebooks and the test suite:
-```bash
-git clone https://github.com/gevero/EMUstack.git
-cd EMUstack
-```
-The commands below install EMUstack from the clone **with all optional packages** (`.[all]`), so the mesher, the example notebooks, the tests and the docs build all work right away.
-
-### Environment Setup & Installation
-
-We recommend installing EMUstack into an isolated environment using Conda, standard `venv`, or `uv`:
-
-#### Option 1: Dedicated Conda Environment + Pip
+**Conda:**
 ```bash
 conda create -n emustack python=3.12 -y
 conda activate emustack
-pip install --upgrade pip
-pip install -e ".[all]"
+pip install "emustack[all]"
 ```
 
-#### Option 2: Dedicated Virtual Environment (`venv`) + Pip
+**`venv`:**
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install --upgrade pip
-pip install -e ".[all]"
+pip install "emustack[all]"
 ```
 
-#### Option 3: Dedicated Virtual Environment with `uv`
+**`uv`:**
 ```bash
 uv venv .venv --python 3.12
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install -e ".[all]"
+uv pip install "emustack[all]"
+```
+
+The core dependencies are `numpy`, `scipy`, `matplotlib`, `ngsolve`/`netgen-mesher`, `gmsh` (the default mesher), `xarray` and `pyyaml`. The 30 mesh templates ship with the package.
+
+### 2. Get the Example Notebooks (Optional)
+
+The 45 example notebooks live in the GitHub repository. Clone it and open them with the environment above; nothing else needs installing:
+```bash
+git clone https://github.com/gevero/EMUstack.git
+cd EMUstack
+jupyter lab examples/          # or examples_netgen/
+```
+
+### 3. Development Install (Optional)
+
+To change EMUstack itself, run the tests or build the docs, install the clone in editable mode instead:
+```bash
+cd EMUstack
+pip install -e ".[all]"
+pytest -q
 ```
 
 ### Smaller Installs
 `[all]` is a shortcut for every optional group. To install only part of it:
 ```bash
-pip install -e .                    # core: gmsh mesher plus netgen
-pip install -e ".[notebooks]"       # + Jupyter, nbconvert, adaptive, loky
-pip install -e ".[dev]"             # + pytest, ruff
-pip install -e ".[docs]"            # + Sphinx, sphinx-rtd-theme, nbsphinx
+pip install emustack                  # core: gmsh mesher plus netgen
+pip install "emustack[notebooks]"     # + Jupyter, nbconvert, adaptive, loky
+pip install "emustack[dev]"           # + pytest, ruff
+pip install "emustack[docs]"          # + Sphinx, sphinx-rtd-theme, nbsphinx
 ```
 (Use `uv pip install` in place of `pip install` with uv.) A system Gmsh also works: EMUstack checks `GMSH_BIN`, then `gmsh` on your `PATH`.
 
 On a minimal Linux system (container, headless server) the NGSolve and gmsh wheels need a few system libraries (no display): `sudo apt-get install libopenblas0 libglu1-mesa libgl1 libgomp1 libxcursor1 libxft2 libxinerama1`. Without the gmsh ones, use `mesher='netgen'`.
+
+See the [Installation page](https://gevero.github.io/EMUstack/install.html) of the documentation for more details.
 
 ---
 
