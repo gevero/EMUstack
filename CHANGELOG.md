@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.0.0rc2.post1 (2026-11-05)
+## 2.0.0rc2.post3 (2026-11-05)
 
 Documentation only; the code is the same as 2.0.0rc2.
 
