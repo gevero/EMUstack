@@ -13,8 +13,6 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
-    # macOS and Windows are new: their failures are reported but do not block a release yet.
-    continue-on-error: ${{ matrix.os != 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:

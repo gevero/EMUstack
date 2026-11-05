@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 2.0.0rc2 (2026-11-05)
+
+Fixes found by running the test suite on macOS and Windows.
 
 ### Fixed
 - On Windows, a gmsh run that hit `meshing.gmsh_timeout` hung instead of stopping: the pip
@@ -8,7 +10,18 @@
   and the whole process tree is killed on timeout.
 - Template, mesh and field files are read and written as UTF-8 on every system. On Windows, a
   `.geo` file with non-ASCII comments (for example `µm`) could fail to load.
-- The test suite runs on macOS and Windows in CI.
+
+### Changed
+- The test suite runs on Linux (Python 3.10 and 3.12), macOS (Apple Silicon) and Windows
+  (Python 3.12), and a failure on any of them stops a release.
+- Two tests compared rounding-level details that differ on macOS; they now allow for it.
+
+### Known issues
+- On a minimal Linux system the NGSolve and gmsh wheels need
+  `libopenblas0 libglu1-mesa libgl1 libgomp1 libxcursor1 libxft2 libxinerama1`.
+- Too few Bloch modes (`num_BMs`) can break the symmetry of highly symmetric cells; check a
+  symmetry-protected quantity (for example |T_RCP - T_LCP| in an achiral C4 cell) when you change
+  it.
 
 ## 2.0.0rc1 (2026-11-04)
 

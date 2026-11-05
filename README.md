@@ -291,7 +291,7 @@ Legacy file dumps can be re-enabled at any time by explicitly passing `save_pdf=
 ## What Changed in v2.0 (Summary of Modernization)
 
 1. **Zero Fortran & Pure-Python Setup:**
-   - No compiled Fortran (`f2py`, `gfortran`, `ARPACK`) or C wrappers: every dependency installs from pip wheels for Python 3.10–3.14. Tested on Linux; the dependencies also ship wheels for macOS and Windows, where EMUstack has not been tested yet.
+   - No compiled Fortran (`f2py`, `gfortran`, `ARPACK`) or C wrappers: every dependency installs from pip wheels for Python 3.10–3.14. The test suite runs on Linux, macOS (Apple Silicon) and Windows.
 2. **Modern Finite-Element Solvers:**
    - Pure-Python 1D FEM using high-order polynomial elements with coupled TE/TM states for conical incidence.
    - NGSolve 2D FEM utilizing mixed vector-scalar spaces ($H(\text{curl}) \times H^1$) with exact tangential continuity and zero spurious eigenmodes.
