@@ -106,8 +106,9 @@ def test_gmsh_is_stopped_after_the_timeout(tmp_path, monkeypatch):
     monkeypatch.setattr(meshing, "gmsh_timeout", 2.0)
     with pytest.raises(RuntimeError, match="did not finish"):
         meshing.conv_gmsh(root)
-    left = subprocess.run(["pgrep", "-f", root + ".geo"], capture_output=True, text=True).stdout
-    assert left.strip() == ""
+    if sys.platform != "win32":  # no pgrep on Windows
+        left = subprocess.run(["pgrep", "-f", root + ".geo"], capture_output=True, text=True).stdout
+        assert left.strip() == ""
     assert not [f for f in os.listdir(tmp_path) if f.endswith(".tmp")]
 
 

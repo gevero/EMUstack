@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- On Windows, a gmsh run that hit `meshing.gmsh_timeout` hung instead of stopping: the pip
+  `gmsh.bat` wrapper started a second process that kept running. gmsh now runs as one process,
+  and the whole process tree is killed on timeout.
+- The test suite runs on macOS and Windows in CI.
+
 ## 2.0.0rc1 (2026-11-04)
 
 A pure-Python port of EMUstack. Version 1 (Fortran backend) is tagged `v1-fortran` and lives at

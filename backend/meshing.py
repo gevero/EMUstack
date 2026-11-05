@@ -849,22 +849,44 @@ def _gmsh_command(args: List[str]) -> List[str]:
     binary = _gmsh_binary()
     if sys.platform.startswith("linux") and sys.executable and os.path.exists(sys.executable):
         return [sys.executable, "-c", _PDEATHSIG_LAUNCHER, str(os.getpid()), binary] + list(args)
+    if sys.platform == "win32" and binary.lower().endswith((".bat", ".cmd")):
+        # The gmsh pip wheel installs gmsh.bat, which runs `python gmsh` through cmd.exe.
+        # Killing cmd.exe on timeout would leave that python running and holding our pipes,
+        # so run the script next to it with this interpreter, as one process.
+        script = os.path.splitext(binary)[0]
+        if os.path.isfile(script) and sys.executable:
+            return [sys.executable, script] + list(args)
     return [binary] + list(args)
+
+
+def _kill_tree(proc: subprocess.Popen) -> None:
+    """Kill `proc` and, on Windows, every process it started."""
+    if sys.platform == "win32":
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    proc.kill()
 
 
 def _run_gmsh(args: List[str], geo: str) -> subprocess.CompletedProcess:
     """Run gmsh with `args`; stop it and raise if it takes longer than `gmsh_timeout`."""
     cmd = _gmsh_command(args)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     try:
-        # on timeout, subprocess.run kills gmsh before raising
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-                             timeout=gmsh_timeout)
-    except subprocess.TimeoutExpired:
+        out, err = proc.communicate(timeout=gmsh_timeout)
+    except BaseException as exc:  # timeout, Ctrl-C, ...: never leave gmsh running
+        _kill_tree(proc)
+        try:
+            proc.communicate(timeout=30)
+        except subprocess.TimeoutExpired:
+            pass  # a grandchild still holds the pipes; gmsh itself is dead
+        if not isinstance(exc, subprocess.TimeoutExpired):
+            raise
         raise RuntimeError(
             "gmsh did not finish meshing %s within %g s and was stopped. The geometry is "
             "probably invalid, e.g. inclusions that overlap or cross other lines: check the "
             "template parameters. For a very fine mesh, raise the limit with "
             "meshing.gmsh_timeout or EMUSTACK_GMSH_TIMEOUT." % (geo, gmsh_timeout)) from None
+    res = subprocess.CompletedProcess(cmd, proc.returncode, out, err)
     if res.returncode != 0 and "cannot open shared object file" in res.stderr:
         raise RuntimeError(
             "gmsh could not start: a system library is missing.\n%s\n"
@@ -887,7 +909,7 @@ def gmsh_available() -> bool:
     global _gmsh_works
     if _gmsh_works is None:
         try:
-            res = subprocess.run([_gmsh_binary(), "-version"], stdout=subprocess.PIPE,
+            res = subprocess.run(_gmsh_command(["-version"]), stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE, timeout=60)
             _gmsh_works = res.returncode == 0
         except (EnvironmentError, subprocess.TimeoutExpired):
