@@ -111,7 +111,7 @@ install the core package and pick the groups you want (with pip or ``uv pip``):
 
 .. code-block:: bash
 
-    pip install emustack                  # core: gmsh mesher plus netgen
+    pip install emustack                  # core only: solvers, gmsh and netgen meshers
     pip install "emustack[notebooks]"     # e.g. core + notebooks
 
 .. note::

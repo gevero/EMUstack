@@ -30,7 +30,7 @@ Using the Shipped Templates
 ---------------------------
 
 EMUstack ships 30 mesh templates inside the package (``EMUstack/backend/data/meshes/`` in the
-repository, inside ``site-packages`` after ``pip install emustack``). You never need their path:
+repository, inside ``site-packages`` once EMUstack is installed). You never need their path:
 pass the **file name** as ``geo_file`` and the parameters as ``geo_params``:
 
 .. code-block:: python

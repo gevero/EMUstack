@@ -8,7 +8,7 @@
 
 **EMUstack** is an open-source simulation package for calculating electromagnetic wave propagation, transmission, reflection, and absorption in multilayered nanostructured optical media. It combines high-order finite-element eigenmode solvers with generalized scattering-matrix (S-matrix) methods, bringing the physical intuition and computational speed of thin-film optics to complex periodic nanostructures.
 
-**Documentation:** https://gevero.github.io/EMUstack/ · **Install:** `pip install emustack` · **Source:** https://github.com/gevero/EMUstack
+**Documentation:** https://gevero.github.io/EMUstack/ · **Install:** `pip install "emustack[all]"` · **Source:** https://github.com/gevero/EMUstack
 
 ---
 
@@ -92,9 +92,9 @@ pytest -q
 ```
 
 ### Smaller Installs
-`[all]` is a shortcut for every optional group. To install only part of it:
+`[all]` is the recommended install and a shortcut for every optional group. To install only part of it:
 ```bash
-pip install emustack                  # core: gmsh mesher plus netgen
+pip install emustack                  # core only: solvers, gmsh and netgen meshers
 pip install "emustack[notebooks]"     # + Jupyter, nbconvert, adaptive, loky
 pip install "emustack[dev]"           # + pytest, ruff
 pip install "emustack[docs]"          # + Sphinx, sphinx-rtd-theme, nbsphinx
@@ -151,7 +151,7 @@ print(f"Total Reflection:   {float(ds_spectra['R_total'].values[0]):.4f}")
 
 ### 2. Custom 2D Geometries with Python & Gmsh Templates
 
-EMUstack supports both pure-Python Netgen geometry templates (`*.py`) and classic Gmsh scripts (`*.geo`). It ships 30 of them (e.g. `ellipse_msh_template.py`, `ellipse_msh_template.geo`, `chiral_qbic_gorkunov_msh_template.py`); after `pip install emustack` you reference them by file name alone, from any directory. Your working directory is searched first, so `meshing.copy_template('ellipse.geo')` gives you an editable copy that then takes priority; `meshing.list_templates()` lists them all (see [Using the Shipped Templates](https://gevero.github.io/EMUstack/meshing.html#shipped-templates)). Templates are named `<shape>_msh_template.<ext>`, and `.geo` and `.py` templates take the same parameter names (`period`, `period_y`, `diameter1`, `width`, `thickness`, ...; lengths in nm, angles in radians). Old file and parameter names such as `ring1_msh_template.geo`, `d_in_nm` or `a1` still work.
+EMUstack supports both pure-Python Netgen geometry templates (`*.py`) and classic Gmsh scripts (`*.geo`). It ships 30 of them (e.g. `ellipse_msh_template.py`, `ellipse_msh_template.geo`, `chiral_qbic_gorkunov_msh_template.py`); once EMUstack is installed you reference them by file name alone, from any directory. Your working directory is searched first, so `meshing.copy_template('ellipse.geo')` gives you an editable copy that then takes priority; `meshing.list_templates()` lists them all (see [Using the Shipped Templates](https://gevero.github.io/EMUstack/meshing.html#shipped-templates)). Templates are named `<shape>_msh_template.<ext>`, and `.geo` and `.py` templates take the same parameter names (`period`, `period_y`, `diameter1`, `width`, `thickness`, ...; lengths in nm, angles in radians). Old file and parameter names such as `ring1_msh_template.geo`, `d_in_nm` or `a1` still work.
 
 In a Python template, `build_unit_cell(...)` receives the parameters from `geo_params`, normalizes physical dimensions by `period` onto the dimensionless unit cell $[0, 1] \times [0, d_y]$, defines a list of `inclusions` (with `"tag": 2` mapped to `inclusion_a`, `"tag": 3` to `inclusion_b`, etc., and `"tag": 1` reserved for `background`), and calls `meshing.unit_cell()` to build a curved second-order periodic `ngsolve.Mesh` in memory:
 
