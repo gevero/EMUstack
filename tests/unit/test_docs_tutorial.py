@@ -13,7 +13,7 @@ HAVE_GMSH = meshing.gmsh_available()
 
 
 def tutorial_code():
-    text = open(TUTORIAL).read()
+    text = open(TUTORIAL, encoding="utf-8").read()
     blocks = re.findall(r"\.\. code-block:: python\n\n((?:(?: {4}.*)?\n)+)", text)
     return "\n".join("\n".join(line[4:] for line in b.splitlines()) for b in blocks)
 
@@ -37,7 +37,7 @@ README = os.path.join(os.path.dirname(__file__), "..", "..", "README.md")
 
 
 def readme_quickstart_code():
-    text = open(README).read()
+    text = open(README, encoding="utf-8").read()
     text = text[text.index("## Quickstart Tutorials"):text.index("## Interactive Tutorial Notebooks")]
     return "\n".join(re.findall(r"```python\n(.*?)```", text, re.S))
 
@@ -78,7 +78,7 @@ def test_builtin_shape_geo_params():
 
 
 def readme_legacy_example_code():
-    text = open(README).read()
+    text = open(README, encoding="utf-8").read()
     text = text[text.index("### 1. Script Syntax Compatibility"):text.index("### 2. Legacy Mesh Assets")]
     return "\n".join(re.findall(r"```python\n(.*?)```", text, re.S))
 
@@ -99,7 +99,7 @@ MESHING = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "source", 
 
 def test_every_shipped_template_is_documented():
     from EMUstack.backend import meshing
-    text = open(MESHING).read()
+    text = open(MESHING, encoding="utf-8").read()
     assert meshing.list_templates()
     for name in meshing.list_templates():
         assert "``%s``" % name in text, name
@@ -107,7 +107,7 @@ def test_every_shipped_template_is_documented():
 
 @pytest.mark.skipif(not HAVE_GMSH, reason="gmsh not installed or cannot start")
 def test_shipped_templates_section_runs(tmp_path, monkeypatch):
-    text = open(MESHING).read()
+    text = open(MESHING, encoding="utf-8").read()
     text = text[text.index("Using the Shipped Templates"):text.index("Part I: General Presentation")]
     blocks = re.findall(r"\.\. code-block:: python\n\n((?:(?: {4}.*)?\n)+)", text)
     code = "\n".join("\n".join(line[4:] for line in b.splitlines()) for b in blocks)

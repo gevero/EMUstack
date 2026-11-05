@@ -156,7 +156,7 @@ def gmsh_plot_field(
     )
 
     filename = os.path.join(dir_name, f"{extra_name}_BM_abs2_eD_{gmsh_file_pos}.pos")
-    with open(filename, "w") as f:
+    with open(filename, "w", encoding="utf-8") as f:
         f.write("View.AdaptVisualizationGrid = 1;\n")
         f.write("View.IntervalsType = 3;\n")
         f.write("View.Light = 0;\n")

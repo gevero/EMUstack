@@ -6,6 +6,8 @@
 - On Windows, a gmsh run that hit `meshing.gmsh_timeout` hung instead of stopping: the pip
   `gmsh.bat` wrapper started a second process that kept running. gmsh now runs as one process,
   and the whole process tree is killed on timeout.
+- Template, mesh and field files are read and written as UTF-8 on every system. On Windows, a
+  `.geo` file with non-ASCII comments (for example `µm`) could fail to load.
 - The test suite runs on macOS and Windows in CI.
 
 ## 2.0.0rc1 (2026-11-04)

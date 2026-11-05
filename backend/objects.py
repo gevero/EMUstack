@@ -470,7 +470,7 @@ class NanoStruct:
             from . import meshing
         else:
             import meshing
-        with open(template_location + template, "r") as f:
+        with open(template_location + template, "r", encoding="utf-8") as f:
             text = f.read()
         return meshing.fill_geo_template(text, params, fmt='%f', strict=False, template=template)
 
@@ -507,7 +507,7 @@ class NanoStruct:
         for key in list(base):
             if key in params:
                 base[key] = params.pop(key)
-        with open(meshing.resolve_mesh_file_path(self.geo_file), "r") as f:
+        with open(meshing.resolve_mesh_file_path(self.geo_file), "r", encoding="utf-8") as f:
             text = f.read()
         # Every geo_params key must match a placeholder, except diameter1, which
         # the constructor also reads (legacy ignored it here).
@@ -956,7 +956,7 @@ class NanoStruct:
                         geo = self._legacy_custom_geo()
                     os.makedirs(msh_location, exist_ok=True)
                     tmp_geo = root + '.geo.%d.tmp' % os.getpid()
-                    with open(tmp_geo, 'w') as f:
+                    with open(tmp_geo, 'w', encoding='utf-8') as f:
                         f.write(geo)
                     os.replace(tmp_geo, root + '.geo')
                     meshing.conv_gmsh(root)

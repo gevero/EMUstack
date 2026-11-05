@@ -640,7 +640,7 @@ def import_gmsh_mesh(
         raise FileNotFoundError(f"MSH file not found: {msh_path}")
 
     # Inspect file format and element types
-    with open(msh_path, "r", errors="ignore") as f:
+    with open(msh_path, "r", encoding="utf-8", errors="ignore") as f:
         head = f.read(500)
     if "$MeshFormat" in head:
         lines = head.splitlines()
@@ -654,7 +654,7 @@ def import_gmsh_mesh(
                     )
 
     # Read with Netgen, which needs a name for every physical group
-    with open(msh_path, "r", errors="ignore") as f:
+    with open(msh_path, "r", encoding="utf-8", errors="ignore") as f:
         named = _prepare_msh_for_netgen(f.read())
     if named is None:
         ngm = ReadGmsh(msh_path)
@@ -708,7 +708,7 @@ def import_gmsh_mesh(
 
 def parse_mail_data(mail_path: str):
     """Parse .mail file into raw numpy tables (table_nod, type_el, x_arr, npt, nel)."""
-    with open(mail_path, "r") as f:
+    with open(mail_path, "r", encoding="utf-8") as f:
         lines = [line.strip() for line in f if line.strip()]
 
     header = lines[0].split()
@@ -870,7 +870,8 @@ def _kill_tree(proc: subprocess.Popen) -> None:
 def _run_gmsh(args: List[str], geo: str) -> subprocess.CompletedProcess:
     """Run gmsh with `args`; stop it and raise if it takes longer than `gmsh_timeout`."""
     cmd = _gmsh_command(args)
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            text=True, errors="replace")
     try:
         out, err = proc.communicate(timeout=gmsh_timeout)
     except BaseException as exc:  # timeout, Ctrl-C, ...: never leave gmsh running
@@ -937,7 +938,7 @@ def conv_gmsh(root: str) -> Tuple[int, int]:
     if res.returncode != 0 or not os.path.exists(tmp_msh):
         raise RuntimeError("gmsh failed on %s (exit %d):\n%s" % (geo, res.returncode, res.stderr))
 
-    with open(tmp_msh) as f:
+    with open(tmp_msh, encoding="utf-8", errors="ignore") as f:
         lines = f.read().split("\n")
     i = lines.index("$Nodes")
     npt = int(lines[i + 1])
@@ -968,7 +969,7 @@ def conv_gmsh(root: str) -> Tuple[int, int]:
     out += ["%d %s %d" % (e + 1, " ".join(str(n) for n in tris[e]), tri_tags[e])
             for e in range(len(tris))]
     tmp_mail = mail + ".%d.tmp" % os.getpid()
-    with open(tmp_mail, "w") as f:
+    with open(tmp_mail, "w", encoding="utf-8") as f:
         f.write("\n".join(out) + "\n")
     os.replace(tmp_msh, msh)  # atomic: parallel runs may build the same mesh
     os.replace(tmp_mail, mail)
@@ -1059,7 +1060,7 @@ def mesh_from_geo(
         geo_params = {}
 
     resolved_path = resolve_mesh_file_path(geo_file)
-    with open(resolved_path, "r", errors="ignore") as f:
+    with open(resolved_path, "r", encoding="utf-8", errors="ignore") as f:
         geo_text = f.read()
 
     period_val = float(geo_params.get("period", geo_params.get("d_in_nm", period)))

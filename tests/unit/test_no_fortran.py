@@ -20,7 +20,7 @@ def test_dod3_fem1d_no_ngsolve():
     """DoD-3: fem_1d.py must not import ngsolve or netgen."""
     fem1d_path = _BACKEND_DIR / "fem_1d.py"
     assert fem1d_path.exists(), "fem_1d.py missing"
-    content = fem1d_path.read_text()
+    content = fem1d_path.read_text(encoding="utf-8")
     assert "ngsolve" not in content, "fem_1d.py must not import ngsolve"
     assert "netgen" not in content, "fem_1d.py must not import netgen"
 
@@ -29,7 +29,7 @@ def test_dod2_fem2d_allowed_imports():
     """DoD-2: fem_2d imports only ngsolve, netgen, numpy, scipy, and stdlib/backend modules."""
     fem2d_path = _BACKEND_DIR / "fem_2d.py"
     assert fem2d_path.exists(), "fem_2d.py missing"
-    tree = ast.parse(fem2d_path.read_text())
+    tree = ast.parse(fem2d_path.read_text(encoding="utf-8"))
 
     allowed_modules = {
         "os", "time", "typing", "sys", "math", "warnings",
@@ -51,7 +51,7 @@ def test_dod2_fem2d_allowed_imports():
 def test_no_identify_periodic_boundaries():
     """IdentifyPeriodicBoundaries is banned because it marks identifications UNDEFINED in Netgen 6.2.2608."""
     for py_file in _BACKEND_DIR.glob("*.py"):
-        content = py_file.read_text()
+        content = py_file.read_text(encoding="utf-8")
         assert "IdentifyPeriodicBoundaries" not in content, (
             f"{py_file.name} contains banned Netgen API 'IdentifyPeriodicBoundaries'. "
             "Use 1-based AddPointIdentification instead (§5.8)."
@@ -66,7 +66,7 @@ def test_no_fortran_calls_in_backend():
 
     violations = []
     for py_file in _BACKEND_DIR.glob("*.py"):
-        lines = py_file.read_text().splitlines()
+        lines = py_file.read_text(encoding="utf-8").splitlines()
         for idx, line in enumerate(lines, start=1):
             if forbidden_pattern.search(line):
                 violations.append(f"{py_file.name}:{idx}: {line.strip()}")
@@ -79,7 +79,7 @@ def test_dod8_no_active_os_system():
     active_system_pattern = re.compile(r"^(?!\s*#).*?\bos\.system\s*\(")
     violations = []
     for py_file in _BACKEND_DIR.glob("*.py"):
-        lines = py_file.read_text().splitlines()
+        lines = py_file.read_text(encoding="utf-8").splitlines()
         for idx, line in enumerate(lines, start=1):
             if active_system_pattern.search(line):
                 violations.append(f"{py_file.name}:{idx}: {line.strip()}")
@@ -91,7 +91,7 @@ def test_mail_is_read_only():
     """Meshing and objects must only read .mail files, never write them."""
     write_mail_pattern = re.compile(r'open\s*\([^)]*?\.mail["\']\s*,\s*["\'][wa]')
     for py_file in _BACKEND_DIR.glob("*.py"):
-        content = py_file.read_text()
+        content = py_file.read_text(encoding="utf-8")
         assert not write_mail_pattern.search(content), f"{py_file.name} appears to write a .mail file!"
 
 
