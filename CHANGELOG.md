@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.0rc2.post1 (2026-11-05)
+
+Documentation only; the code is the same as 2.0.0rc2.
+
+- The installation instructions start with creating an environment and installing from PyPI;
+  cloning the repository is only needed for the example notebooks or development.
+- The README links the documentation.
+
 ## 2.0.0rc2 (2026-11-05)
 
 Fixes found by running the test suite on macOS and Windows.
