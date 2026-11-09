@@ -36,7 +36,8 @@ data_path = str(_backend_dir / 'data') + '/'
 # Dedicated directory where all .geo, *_template.py, .msh, and .mail files are stored
 _msh_dir = _backend_dir / "data" / "meshes"
 template_path = str(_msh_dir) + "/"
-# .geo/.msh/.mail files that NanoStruct generates (legacy wrote them next to the templates)
+# Mesh folder of EMUstack 2.0.0rc1/rc2, only searched for premade .mail files. NanoStruct now
+# writes its meshes next to the .geo used: see meshing.mesh_folder().
 msh_path = str(_msh_dir / "generated") + "/"
 
 

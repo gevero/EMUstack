@@ -199,6 +199,48 @@ the inclusions; see Concept 6).
      - Inclusion inside a strip of width ``strip`` (``diameter1 < strip < period_y``).
      - ``period``, ``period_y``, ``diameter1``, ``ellipticity``, ``square``, ``strip``, ``lc``, ``lc2``, ``lc3``
 
+.. _mesh-folder:
+
+Where the Meshes Are Written
+----------------------------
+
+With gmsh, ``NanoStruct`` writes three files per mesh: the ``.geo`` with the parameters filled
+in, the ``.msh`` made by gmsh, and the ``.mail`` that EMUstack reads. They go in a folder named
+``emustack_meshes``, so you can open them in gmsh to inspect the mesh:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 45 55
+
+   * - Geometry
+     - Meshes written to
+   * - Built-in shape (``inc_shape='circle'``, ...) or a shipped template given by name
+     - ``emustack_meshes/`` in the working directory (where the script or notebook runs)
+   * - Your own ``.geo``, in the working directory or given with a relative or absolute path
+     - ``emustack_meshes/`` next to that ``.geo``
+   * - Any of the above, with ``meshing.mesh_dir`` set (or the ``EMUSTACK_MESH_DIR``
+       environment variable)
+     - that folder
+
+.. code-block:: python
+
+    from EMUstack.backend import meshing
+    meshing.mesh_dir = '/scratch/me/meshes'   # every mesh goes here, e.g. on a cluster
+
+    layer.mesh_dir                            # folder of this layer's mesh
+    layer.mesh_file                           # its .mail file name
+
+The file names hold the template name, the periods and the parameters, for example
+``ellipse400_0_400_0__diameter1160_lc0_1.mail``. If the folder cannot be written (a read-only
+shared folder, for example), the meshes go to your user cache folder instead
+(``~/.cache/emustack/meshes`` on Linux, ``~/Library/Caches/emustack/meshes`` on macOS,
+``%LOCALAPPDATA%\emustack\meshes`` on Windows), with a warning.
+
+``NanoStruct`` meshes again on every run by default (``force_mesh=True``, as in version 1).
+With ``force_mesh=False`` it reuses a mesh already in the folder, unless your ``.geo`` has
+changed since. The netgen mesher (``.py`` templates, ``mesher='netgen'``) keeps meshes in memory
+and writes no files.
+
 ---
 
 Part I: General Presentation & the 6 Core Concepts

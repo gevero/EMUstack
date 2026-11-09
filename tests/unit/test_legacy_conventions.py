@@ -55,13 +55,13 @@ def test_conv_gmsh_reproduces_legacy_mesh(tmp_path):
     from EMUstack.backend import meshing, objects
     if not (shutil.which('gmsh') or os.environ.get('GMSH_BIN')):
         pytest.skip('gmsh not available')
-    old = objects.msh_location
-    objects.msh_location = str(tmp_path) + '/'
+    old = meshing.mesh_dir
+    meshing.mesh_dir = str(tmp_path)
     try:
         ns = objects.NanoStruct('2D_array', 165, 140, inc_shape='ellipse', ellipticity=80.0 / 140.0,
                                 height_nm=60, make_mesh_now=True, force_mesh=True, lc_bkg=0.2, lc2=5.0)
     finally:
-        objects.msh_location = old
+        meshing.mesh_dir = old
     assert (ns.n_msh_pts, ns.n_msh_el) == (1161, 568)
     npt, nel, pts, idfn, table_nod, type_el = meshing.parse_mail_data(str(tmp_path / ns.mesh_file))
     assert sorted(set(idfn)) == [0, 1, 2, 3, 4] and sorted(set(type_el)) == [1, 2]

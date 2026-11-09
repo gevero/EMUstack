@@ -112,6 +112,7 @@ def test_shipped_templates_section_runs(tmp_path, monkeypatch):
     blocks = re.findall(r"\.\. code-block:: python\n\n((?:(?: {4}.*)?\n)+)", text)
     code = "\n".join("\n".join(line[4:] for line in b.splitlines()) for b in blocks)
     monkeypatch.chdir(tmp_path)  # copy_template writes here
+    monkeypatch.setattr(meshing, "mesh_dir", meshing.mesh_dir)  # the examples set it
     ns = {}
     exec(compile(code, MESHING, "exec"), ns)
     assert ns["layer"].mesh is not None

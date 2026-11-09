@@ -999,6 +999,78 @@ def resolve_mesh_file_path(filename: str) -> str:
 # Folder of the mesh templates shipped with EMUstack (inside the installed package).
 TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "meshes")
 
+# Folder for the meshes that NanoStruct writes with gmsh (filled .geo, .msh, .mail).
+# None: next to the .geo used, see mesh_folder(). Set it (or EMUSTACK_MESH_DIR) to put
+# every mesh in one folder, e.g. on a cluster's scratch space.
+mesh_dir = os.environ.get("EMUSTACK_MESH_DIR") or None
+
+# Name of the folder that holds the meshes, next to the .geo or in the working directory.
+MESH_SUBDIR = "emustack_meshes"
+
+_warned_mesh_dirs = set()
+
+
+def is_shipped_template(path: str) -> bool:
+    """True if `path` is one of the templates shipped inside the package."""
+    try:
+        path = os.path.abspath(path)
+        return os.path.commonpath([path, TEMPLATE_DIR]) == TEMPLATE_DIR
+    except ValueError:  # different drives on Windows
+        return False
+
+
+def _writable_dir(folder: str) -> bool:
+    """Create `folder` if needed; True if a file can be written in it."""
+    try:
+        os.makedirs(folder, exist_ok=True)
+        with tempfile.NamedTemporaryFile(dir=folder):
+            pass
+        return True
+    except OSError:
+        return False
+
+
+def user_cache_dir() -> str:
+    """Per-user cache folder for meshes, used when the normal folder cannot be written."""
+    if sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA") or os.path.expanduser(os.path.join("~", "AppData", "Local"))
+    elif sys.platform == "darwin":
+        base = os.path.expanduser(os.path.join("~", "Library", "Caches"))
+    else:
+        base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser(os.path.join("~", ".cache"))
+    return os.path.join(base, "emustack", "meshes")
+
+
+def mesh_folder(source: Optional[str] = None) -> str:
+    """Folder where the mesh made from the template `source` is written (and created).
+
+    - ``meshing.mesh_dir`` (or the ``EMUSTACK_MESH_DIR`` environment variable), when set;
+    - for a .geo outside the package: ``emustack_meshes/`` next to that file;
+    - for shipped templates and built-in shapes (``source`` None): ``emustack_meshes/``
+      in the current working directory.
+
+    If that folder cannot be written, the user cache folder (or the system temp folder)
+    is used instead, with a warning.
+    """
+    if mesh_dir:
+        folder = os.path.abspath(os.path.expanduser(str(mesh_dir)))
+    elif source and not is_shipped_template(source):
+        folder = os.path.join(os.path.dirname(os.path.abspath(source)), MESH_SUBDIR)
+    else:
+        folder = os.path.join(os.getcwd(), MESH_SUBDIR)
+    if _writable_dir(folder):
+        return folder
+    for fallback in (user_cache_dir(), os.path.join(tempfile.gettempdir(), "emustack", "meshes")):
+        if _writable_dir(fallback):
+            if folder not in _warned_mesh_dirs:
+                _warned_mesh_dirs.add(folder)
+                warnings.warn("EMUstack cannot write meshes to %s; they go to %s instead. Set "
+                              "meshing.mesh_dir to choose another folder." % (folder, fallback),
+                              stacklevel=2)
+            return fallback
+    raise OSError("EMUstack cannot write meshes to %s, nor to the user cache or temp folder. "
+                  "Set meshing.mesh_dir to a writable folder." % folder)
+
 
 def _template_names(base: str) -> List[str]:
     """`base` followed by the names it may stand for: long form and old (legacy) names."""

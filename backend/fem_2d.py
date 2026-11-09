@@ -473,11 +473,12 @@ def solve_bloch_modes_2d(
                 structure.type_el = t_el
         elif getattr(structure, "mesh_file", "").endswith(".mail"):
             mail_name = structure.mesh_file
-            candidate_paths = [
-                os.path.join(paths.msh_path, mail_name),
-                os.path.join(paths.template_path, mail_name),
-                os.path.join(paths.data_path, "meshes", mail_name)
-            ]
+            # as given (a path), where make_mesh wrote it, the mesh folders, the shipped meshes,
+            # and the folder of EMUstack 2.0.0rc1/rc2
+            folders = [getattr(structure, "mesh_dir", None), meshing.mesh_dir,
+                       os.path.join(os.getcwd(), meshing.MESH_SUBDIR), paths.template_path,
+                       paths.msh_path]
+            candidate_paths = [mail_name] + [os.path.join(f, mail_name) for f in folders if f]
             mail_path = None
             for p in candidate_paths:
                 if os.path.exists(p):

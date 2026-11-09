@@ -27,6 +27,7 @@ backend/data/*.msh
 backend/data/meshes/*.log
 backend/data/meshes/*.msh
 backend/data/meshes/generated/
+emustack_meshes/
 
 # Never ignore checked-in test mail, msh, geo, and python template files
 !backend/data/meshes/*.mail

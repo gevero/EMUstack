@@ -33,7 +33,6 @@ else:
     from mode_calcs import Simmo, Anallo
 
 
-msh_location = paths.msh_path
 template_location = paths.template_path
 
 # How NanoStruct meshes a 2D unit cell when mesher is not given:
@@ -58,6 +57,15 @@ _BUILTIN_GEO_KEYS = ({'period', 'period_y', 'lc', 'lc2', 'lc3', 'lc4', 'lc5', 'l
 _BUILTIN_GEO_ALIASES = dict({'d_in_nm': 'period', 'dy_in_nm': 'period_y', 'lc_bkg': 'lc',
                              'thickness': 't'},
                             **{'a%d' % k: 'diameter%d' % k for k in range(1, 17)})
+
+
+def _read_text(path):
+    """Text of `path`, or None if it does not exist."""
+    try:
+        with open(path, encoding='utf-8') as f:
+            return f.read()
+    except OSError:
+        return None
 
 
 def _builtin_geo_params(geo_params):
@@ -517,6 +525,25 @@ class NanoStruct:
 
     def make_mesh(self):
         if self.periodicity == '2D_array':
+            if __package__:
+                from . import meshing
+            else:
+                import meshing
+            mesher = self.mesher or default_mesher
+            if mesher not in ('gmsh', 'netgen'):
+                raise ValueError("mesher must be 'gmsh' or 'netgen', got %r" % mesher)
+            geo_file = getattr(self, 'geo_file', None)
+            py_geometry = bool(geo_file) and geo_file.endswith('.py')
+            # gmsh meshes are written next to the .geo used (see meshing.mesh_folder);
+            # netgen meshes stay in memory.
+            if mesher == 'gmsh' and not py_geometry:
+                source = meshing.resolve_mesh_file_path(geo_file) if geo_file else None
+                self.mesh_dir = meshing.mesh_folder(source)
+                msh_location = self.mesh_dir + os.sep
+            else:
+                self.mesh_dir = None
+                msh_location = ''
+
             if (hasattr(self, 'geo_file') and self.geo_file) or self.inc_shape == 'custom':
 
                 # check that geo_file has been assigned
@@ -529,10 +556,12 @@ class NanoStruct:
                     raise ValueError(
                         'Must provide a .geo or .py file for custom geometry.')
 
-                # define root mesh name
-                root_msh_name = self.geo_file[:-4]
-                if root_msh_name.endswith('_template'):
-                    root_msh_name = root_msh_name[:-9]
+                # define root mesh name from the file name alone (the folder is msh_location)
+                root_msh_name = os.path.basename(self.geo_file)[:-4]
+                for suffix in ('_msh_template', '_template'):
+                    if root_msh_name.endswith(suffix):
+                        root_msh_name = root_msh_name[:-len(suffix)]
+                        break
 
                 # add period values to mesh name
                 msh_name = root_msh_name + '%(d)s_%(dy)s_' % {
@@ -937,24 +966,18 @@ class NanoStruct:
                                           self.inc_shape)
 
             self.mesh_file = msh_name + '.mail'
-            if __package__:
-                from . import meshing
-            else:
-                import meshing
             merged_geo_params = self.harvest_geo_params()
-            mesher = self.mesher or default_mesher
-            if mesher not in ('gmsh', 'netgen'):
-                raise ValueError("mesher must be 'gmsh' or 'netgen', got %r" % mesher)
-            py_geometry = bool(self.geo_file) and self.geo_file.endswith('.py')
 
             if mesher == 'gmsh' and not py_geometry:
                 # Legacy EMUstack: write the .geo, mesh it with gmsh, convert to .mail,
                 # and reuse an existing .mail unless force_mesh is set.
                 root = msh_location + msh_name
-                if not os.path.exists(root + '.mail') or self.force_mesh is True:
-                    if self.geo_file:
-                        geo = self._legacy_custom_geo()
-                    os.makedirs(msh_location, exist_ok=True)
+                stale = False
+                if self.geo_file:
+                    geo = self._legacy_custom_geo()
+                    # the user's .geo may have been edited since the cached mesh was made
+                    stale = _read_text(root + '.geo') != geo
+                if not os.path.exists(root + '.mail') or stale or self.force_mesh is True:
                     tmp_geo = root + '.geo.%d.tmp' % os.getpid()
                     with open(tmp_geo, 'w', encoding='utf-8') as f:
                         f.write(geo)

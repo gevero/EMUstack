@@ -28,3 +28,30 @@ def cleanup_calculation_outputs():
     from EMUstack.backend import plotting
     plotting.clear_previous()
 
+
+
+_mesh_tmp = None
+
+
+def pytest_configure(config):
+    """gmsh meshes go to a temporary folder, not into the repository. Set before collection:
+    the legacy test_case_*.py scripts mesh at import time."""
+    global _mesh_tmp
+    import tempfile
+    _mesh_tmp = tempfile.TemporaryDirectory(prefix="emustack_meshes_")
+    for meshing in _meshing_modules():
+        meshing.mesh_dir = _mesh_tmp.name
+
+
+def pytest_unconfigure(config):
+    for meshing in _meshing_modules():
+        meshing.mesh_dir = None
+    if _mesh_tmp is not None:
+        _mesh_tmp.cleanup()
+
+
+def _meshing_modules():
+    """The package's meshing module and the copy that legacy-style scripts import by bare name."""
+    from EMUstack.backend import meshing as package_meshing
+    import meshing as legacy_meshing
+    return {package_meshing, legacy_meshing}
