@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.0.0rc3 (2026-11-09)
+
+### Changed
+- **gmsh meshes are written where you can find them**, in an `emustack_meshes/` folder:
+  in the working directory for built-in shapes and shipped templates, and next to your own
+  `.geo` otherwise. `meshing.mesh_dir` (or `EMUSTACK_MESH_DIR`) sends every mesh to one
+  folder. If the folder cannot be written, meshes go to the user cache folder, with a warning.
+  Before, they went to a folder inside the installed package. Meshes made by 2.0.0rc1/rc2
+  are not reused; they are made again once. `NanoStruct.mesh_dir` gives the folder of a
+  layer's mesh.
+
+### Fixed
+- A custom `.geo` given with a relative or absolute path (`geo_file='cells/my.geo'`) failed
+  with `FileNotFoundError` under the default gmsh mesher.
+- With `force_mesh=False`, a cached mesh was reused after its `.geo` template had been edited.
+- Cached mesh names of shipped templates no longer contain a stray `_msh`.
+
 ## 2.0.0rc2.post3 (2026-11-05)
 
 Documentation only; the code is the same as 2.0.0rc2.
